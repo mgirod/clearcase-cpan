@@ -100,6 +100,7 @@ sub system {
 
     my $envp = $self->envp;
     my($ifd, $ofd, $efd) = ($self->stdin, $self->stdout, $self->stderr);
+    $self->stderr(0) unless $efd; #workaround for destructive reading
     $self->args($self->glob) if $self->autoglob;
     my @prog = @{$self->{AV_PROG}};
     shift(@prog) if $prog[0] =~ m%cleartool%;
@@ -502,9 +503,15 @@ sub _ipc_cmd {
     my $back = $self->{IPC}->{BACK};
     while($_ = <$back>) {
         my ($last, $next);
-	if (m%^cleartool: Error:%) {      #Simulate -status
-	  $rc += 1 << 8;
-	  $next = 1 unless $self->stderr;
+	my $out = *STDOUT;
+	if (m%^cleartool: (Error|Warning):%) {      #Simulate -status
+	  $rc += 1 << 8 if $1 == 'Error';
+	  if ($self->stderr) {
+	      $out = *STDERR;
+	  } else {
+	      $self->stderr(0);
+	      $next = 1 unless $self->stderr;
+	  }
 	}
 	if (s%^(.*)Command \d+ returned status (\d+)%$1%) {
 	    # Shift the status up so it looks like an exit status.
@@ -517,7 +524,7 @@ sub _ipc_cmd {
 	if ($disposition) {
 	    push(@$disposition, $_);
 	} else {
-	    print;
+	    print $out $_;
 	}
 	last if $last;
     }
