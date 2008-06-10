@@ -1,13 +1,15 @@
 package ClearCase::Argv;
 
-$VERSION = '1.27';
+$VERSION = '1.35';
 
 use Argv 1.22;
+use Text::ParseWords;
 
 use constant MSWIN => $^O =~ /MSWin32|Windows_NT/i ? 1 : 0;
+my $NUL = MSWIN ? 'NUL' : '/dev/null';
 
 @ISA = qw(Argv);
-%EXPORT_TAGS = ( 'functional' => [ qw(ctsystem ctexec ctqx ctqv ctpipe) ] );
+%EXPORT_TAGS = ( 'functional' => [ qw(ctsystem ctexec ctqx ctqv ctpipe chdir) ] );
 @EXPORT_OK = (@{$EXPORT_TAGS{functional}});
 
 *AUTOLOAD = \&Argv::AUTOLOAD;
@@ -15,7 +17,7 @@ use constant MSWIN => $^O =~ /MSWin32|Windows_NT/i ? 1 : 0;
 use strict;
 
 my $class = __PACKAGE__;
-
+my %pidcount;
 # For programming purposes we can't allow per-user preferences.
 if ($ENV{CLEARCASE_PROFILE}) {
     $ENV{_CLEARCASE_PROFILE} = $ENV{CLEARCASE_PROFILE};
@@ -70,7 +72,7 @@ sub prog {
     if (@_ || ref($prg) || $prg =~ m%^/|^\S*cleartool% || $self->ctcmd) {
 	return $self->SUPER::prog($prg, @_);
     } else {
-	return $self->SUPER::prog([$ct, $prg], @_);
+	return $self->SUPER::prog([$ct, parse_line('\s+', 1, $prg)], @_);
     }
 }
 
@@ -122,7 +124,10 @@ sub system {
 	open(STDOUT, $ofd) || warn "$ofd: $!";
     } else {
 	warn "Warning: illegal value '$ofd' for stdout" if $ofd > 2;
-	$outplace = -1 if $ofd == 0;
+        if ($ofd == 0) {
+	    $outplace = -1;
+	    open(STDOUT, ">$NUL") if $self->ipc();
+	}
     }
     $self->_dbg($dbg, '+>', \*STDERR, @cmd) if $dbg && $self->ctcmd;
     if ($efd == 1) {
@@ -166,6 +171,7 @@ sub qx {
 
     my $envp = $self->envp;
     my($ifd, $ofd, $efd) = ($self->stdin, $self->stdout, $self->stderr);
+    $self->stderr(0) unless $efd; #workaround for destructive reading
     $self->args($self->glob) if $self->autoglob;
     my @prog = @{$self->{AV_PROG}};
     shift(@prog) if $prog[0] =~ m%cleartool%;
@@ -252,25 +258,17 @@ sub pipe {
     return $class->new(@_)->pipe if !ref($_[0]) || ref($_[0]) eq 'HASH';
 
     my $self = shift;
-
+    my $mode;
     if ($self->ctcmd) {
-	my $otherSelf = $self->clone();
-	$self->warning("CtCmd usage incompatible with pipe - temporarily reverting to plain cleartool") if $self->dbglevel;
-	$otherSelf->prog($ct, $self->prog);
-	return $otherSelf->SUPER::pipe(@_);
+	$mode = 'CtCmd';
     } elsif ($self->ipc) {
-	my $cb = $self->pipecb;
-	$self->error("No callback supplied") unless ref($cb) eq 'CODE';
-	$self->args($self->glob) if $self->autoglob;
-	my @prog = @{$self->{AV_PROG}};
-	shift(@prog) if $prog[0] =~ m%cleartool%;
-	my @opts = $self->_sets2opts(@_);
-	my @args = @{$self->{AV_ARGS}};
-	my @cmd = (@prog, @opts, @args);
-	$self->_addstats("cleartool @prog", scalar @args)
-	    if defined %Argv::Summary;
-	my $rc = $self->_ipc_cmd($cb, @cmd);
-	return $rc;
+        $mode = 'IPC';
+    }
+    if ($mode) {
+	my $otherSelf = $self->clone();
+	$self->warning("$mode usage incompatible with pipe - temporarily reverting to plain cleartool") if $self->dbglevel;
+	($mode eq 'CtCmd') ? $otherSelf->ctcmd(0) : $otherSelf->ipc(0);
+	return $otherSelf->SUPER::pipe(@_);
     } else {
 	return $self->SUPER::pipe(@_);
     }
@@ -329,7 +327,9 @@ sub ctcmd {
 		    return undef;
 		}
 	    } else {
-		return undef;
+	      no strict 'refs';
+	      $self->{CCAV_CTCMD} = 0;
+	      return undef;
 	    }
 	}
     }
@@ -399,10 +399,12 @@ sub _ctcmd_cmd2cal {
     }
     $self->{'status'} = $rc if $self;
     my @results = $rc;
-    if ($self && exists($self->{outfunc}) && ($self->{outfunc} == 0)) {
-	print STDOUT $out;
-    } else {
-	push(@results, $out);
+    if (defined($out)) {
+        if ($self && exists($self->{outfunc}) && ($self->{outfunc} == 0)) {
+	    print STDOUT $out;
+        } else {
+	    push(@results, $out);
+        }
     }
     if ($self && exists($self->{errfunc}) && ($self->{errfunc} == 0)) {
 	print STDERR $err;
@@ -424,22 +426,32 @@ sub ipc {
     no strict 'refs';	# because $self may be a symbolic hash ref
     my $level = shift;
     if (defined($level) && !$level) {
-	# Send an explicit "exit" command and close up shop.
 	return 0 unless exists($self->{IPC});
 	my $down = $self->{IPC}->{DOWN};
+	my $pid = $self->{IPC}->{PID};
+	delete $self->{IPC};
+	return 0 if --$pidcount{$pid};
+	# Send an explicit "exit" command and close up shop.
 	print $down "exit\n";
 	my $rc = close($down);
-	waitpid($self->{IPC}->{PID}, 0);
-	delete $self->{IPC};
+	waitpid($pid, 0);
 	return $rc || $?;
-    } elsif (!defined($level) && defined(wantarray)) {
+    } elsif (!defined($level)) {
 	return exists($self->{IPC}) ? $self : 0;
     }
 
     if ($self->ctcmd) {
 	$self->ctcmd(0);	# shut down the CtCmd connection
     }
-
+    if (exists($class->{IPC})) {
+        if ($self ne $class) {
+	    ++$pidcount{$class->{IPC}->{PID}};
+	    $self->{IPC}->{PID}  = $class->{IPC}->{PID};
+	    $self->{IPC}->{DOWN} = $class->{IPC}->{DOWN};
+	    $self->{IPC}->{BACK} = $class->{IPC}->{BACK};
+	}
+	return $self;
+    }
     # This should never fail to load since it's built in.
     require IPC::Open3;
 
@@ -449,7 +461,7 @@ sub ipc {
 
     # Dies on failure.
     my($down, $back);
-    my $pid = IPC::Open3::open3($down, $back, undef, 'cleartool', '-status');
+    my $pid = IPC::Open3::open3($down, $back, undef, $ct);
 
     # Set the "line discipline" to convert CRLF to \n.
     binmode $back, ':crlf';
@@ -457,6 +469,7 @@ sub ipc {
     $self->{IPC}->{DOWN} = $down;
     $self->{IPC}->{BACK} = $back;
     $self->{IPC}->{PID} = $pid;
+    ++$pidcount{$pid};
 
     return $self;
 }
@@ -481,34 +494,32 @@ sub _ipc_cmd {
 	print $down $input, "\n.\n";
 	delete $self->{IPC}->{COMMENT};
     }
+    # Hack to simulate 'cleartool -status', until ClearCase bug fix
+    print $down "des -fmt \"Command 0 returned status 0\\n\" .\n";
 
     # Read back the results and get command status.
     my $rc = 0;
     my $back = $self->{IPC}->{BACK};
     while($_ = <$back>) {
-	if (m%^Command \d+ returned status (\d+)%) {
+        my ($last, $next);
+	if (m%^cleartool: Error:%) {      #Simulate -status
+	  $rc += 1 << 8;
+	  $next = 1 unless $self->stderr;
+	}
+	if (s%^(.*)Command \d+ returned status (\d+)%$1%) {
 	    # Shift the status up so it looks like an exit status.
-	    $rc = $1 << 8;
-	    last;
+	    # $rc = $2 << 8;                        #-status disabled
+	    chomp;
+	    $_ ? $last = 1 : last;
 	}
 	print '+ <=', $_ if $_ && $dbg >= 2;
-	chomp if $self->autochomp;
+	next if $next;
 	if ($disposition) {
-	    if (ref($disposition) eq 'CODE') {
-		my $keepGoing = &$disposition($_);
-		next if $keepGoing;
-		if ($self->_read_only) {
-		    kill HUP => $self->{IPC}->{PID};
-		    $rc = $self->ipc(0);
-		    last;
-		}
-		$self->warning("Not abortable unless readonly - continuing!");  
-	    } else {
-		push(@$disposition, $_);
-	    }
+	    push(@$disposition, $_);
 	} else {
 	    print;
 	}
+	last if $last;
     }
 
     return $rc;
@@ -610,12 +621,42 @@ sub attropts {
     return $self->SUPER::attropts(@_, qw(ipc ctcmd));
 }
 
+sub _chdir {
+    my $self = shift; # this might be an instance or a classname
+    my ($dir) = @_;
+    chomp $dir;
+    my $rc = CORE::chdir($dir);
+    if ($self->ipc) {
+        my $ct = ref($self) ? $self->clone : __PACKAGE__->new;
+        $ct->stdout(0)->argv('cd', $dir)->system;
+    }
+    return $rc;
+}
+
 # Export our own functional interfaces as well.
 sub ctsystem	{ return __PACKAGE__->new(@_)->system }
 sub ctexec	{ return __PACKAGE__->new(@_)->exec }
 sub ctqx	{ return __PACKAGE__->new(@_)->qx }
 sub ctpipe	{ return __PACKAGE__->new(@_)->pipe }
+sub chdir	{ return __PACKAGE__->_chdir(@_) }
 *ctqv = \&ctqx;  # just for consistency
+
+# Constructor, and copy constructor as clone, with $proto
+sub new {
+    my $proto = shift;
+    my $self = $proto->SUPER::new(@_);
+    if ($self->ipc) {
+	++$pidcount{$self->{IPC}->{PID}};
+	if (ref($proto)) {
+	    # Correct the effect of the base cloning on globs
+	    $self->{IPC}->{DOWN} = $proto->{IPC}->{DOWN};
+	    $self->{IPC}->{BACK} = $proto->{IPC}->{BACK};
+	}
+    }
+    bless $self, ref($proto) ? ref($proto) : $proto;
+    return $self;
+}
+*clone = \&new;
 
 # Clean up leftover cleartool processes if user forgot to.
 sub DESTROY {
@@ -645,7 +686,8 @@ ClearCase::Argv - ClearCase-specific subclass of Argv
     # Run it without the flags.
     $describe->system('-');
     # Run it through a pipe.
-    $describe->pipe(sub { print shift; return 1; });
+    $describe->pipecb(sub { print shift; return 1; });
+    $describe->pipe;
     # Create label type XX iff it doesn't exist
     ClearCase::Argv->new(qw(mklbtype -nc XX))
 	    if ClearCase::Argv->new(qw(lstype lbtype:XX))->stderr(0)->qx;
@@ -914,6 +956,34 @@ I suspect there are still some special quoting situations unaccounted
 for in the I<quote> method. This will need to be refined over time. Bug
 reports or patches gratefully accepted.
 
+Commands using a format option defining a multiline output fail in many
+cases in fork mode, because of the underlying Argv module.
+
+ClearCase::Argv will use IPC::ChildSafe if it finds it, which may 
+introduce differences of behavior with the newer code to replace it.
+It should probably just drop it, unless explicitly driven to use it.
+
+Autochomp should be equivalent in all modes on all platforms, which
+is hard to test (ipc w/wo IPC::ChildSafe, ctcmd, on Unix and Windows,
+with system and qx...).
+The autochomp setting should not affect system calls in ipc mode!?
+Hopefully it doesn't anymore. Problem: change not satisfactorily tested
+on Windows yet (where the output prior to the last change seemed ok...)
+
+Argv uses the first of three different methods for cloning, and I
+(Marc Girod) suspect that only the first one (Clone, in recent versions)
+performs correctly with GLOB objects... Work-around in place.
+
+The string 'cleartool' is hard-coded in many places, making it hard to
+implement additional support for multitool commands.
+
+The use of 'cleartool -status' needed to be disabled, and simulated,
+because of a ClearCase bug, with setview exiting the interactive session
+to the shell (Found from 2002.05.00 to 7.0.1).
+The result in an ipc mode using '-status' was: hang.
+
+Cygwin is not supported on Windows.
+
 =head1 PORTABILITY
 
 ClearCase::Argv should work on all supported ClearCase platforms and
@@ -921,10 +991,17 @@ versions. It's currently maintained on Solaris 9 and Windows XP with CC
 7.0 using Perl5.8.x.  Viability on other platforms and/or earlier
 versions is untestable by me.
 
+Marc Girod's testing environment: Solaris 8 and 10, and Windows 2000, 
+without CtCmd and IPC::ChildSafe, with Clone.
+Tatyana Shpichko's testing environment: RedHat Linux 4, with and without
+CtCmd, and Windows XP without CtCmd.
+
 =head1 FILES
 
 This is a subclass of I<Argv> and thus requires I<Argv> to be
-installed.  ClearCase::CtCmd is required for I<ctcmd mode>.
+installed.  ClearCase::CtCmd is required for I<ctcmd mode> in Unix.
+In Windows, I<Win32-Process-Info> or I<Win32::ToolHelp> is required
+for I<pipe> support.
 
 =head1 SEE ALSO
 
