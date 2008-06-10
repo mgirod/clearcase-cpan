@@ -207,3 +207,10 @@ Revision history for Perl extension ClearCase::Argv.
 	  Bugs remain, particularly in the area of quoting for
 	  IPC mode on Windows, but this version is released
 	  because it is far better on Windows than the previous.
+
+1.27 Wed Sep 19 09:54:43 EDT 2007
+	- Fixed more Windows bugs reported by James Anderson.
+	  - The $self->ctcmd method continued to return true even
+	    after ctcmd mode was turned off.
+	  - Quoting of arguments containing whitespace was improved
+	    in IPC mode.

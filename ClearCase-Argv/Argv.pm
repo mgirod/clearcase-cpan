@@ -1,6 +1,6 @@
 package ClearCase::Argv;
 
-$VERSION = '1.26';
+$VERSION = '1.27';
 
 use Argv 1.22;
 
@@ -296,39 +296,41 @@ sub ctcmd {
     my $self = shift;	# this might be an instance or a classname
     my $level = shift;
     $level = 2 if !defined($level) && !defined(wantarray);
-    if (defined $level) {
+    if ($level) {
 	eval { require ClearCase::CtCmd };
-    }
-    if ($@ && defined($level)) {
-	my $msg = $@;
-	if ($level == 2 && $msg =~ m%^(Can't locate \S+)%) {
-	    $msg = $1;
-	} elsif ($level > 2) {
-	    die("Error: $msg");
-	}
-	if ($level == 1 || $level == 2) {
-	    # On Windows, if the real ClearCase::CtCmd is missing hack
-	    # in our own version that uses CAL directly.
-	    if (MSWIN) {
-		eval { require Win32::OLE };
-		if ($@) {
-		    warn("Warning: $msg\n") if $level == 2;
-		    return undef;
+	if ($@) {
+	    my $msg = $@;
+	    if ($level == 2 && $msg =~ m%^(Can't locate \S+)%) {
+		$msg = $1;
+	    } elsif ($level > 2) {
+		die("Error: $msg");
+	    }
+	    if ($level == 1 || $level == 2) {
+		# On Windows, if the real ClearCase::CtCmd is missing hack
+		# in our own version that uses CAL directly.
+		if (MSWIN) {
+		    eval { require Win32::OLE };
+		    if ($@) {
+			warn("Warning: $msg\n") if $level == 2;
+			return undef;
+		    } else {
+			warn("Warning: $msg, using CAL instead\n")
+			    if $level == 2;
+			*ClearCase::CtCmd::new = \&_ctcmd_new;
+			*ClearCase::CtCmd::status = \&_ctcmd_status;
+			*ClearCase::CtCmd::exec = \&_ctcmd_cmd2cal;
+			*ClearCase::CtCmd::cleartool = \&_ctcmd_cmd2cal;
+			$ClearCase::CtCmd::VERSION = '1.01';
+			Win32::OLE->Option(Warn => 0);
+		    }
 		} else {
-		    warn("Warning: $msg, using CAL instead\n") if $level == 2;
-		    *ClearCase::CtCmd::new = \&_ctcmd_new;
-		    *ClearCase::CtCmd::status = \&_ctcmd_status;
-		    *ClearCase::CtCmd::exec = \&_ctcmd_cmd2cal;
-		    *ClearCase::CtCmd::cleartool = \&_ctcmd_cmd2cal;
-		    $ClearCase::CtCmd::VERSION = '1.01';
-		    Win32::OLE->Option(Warn => 0);
+		    warn("Warning: $msg, using fork/exec instead\n")
+			if $level == 2;
+		    return undef;
 		}
 	    } else {
-		warn("Warning: $msg, using fork/exec instead\n") if $level == 2;
 		return undef;
 	    }
-	} else {
-	    return undef;
 	}
     }
     no strict 'refs';		# because $self may be a symbolic hash ref
@@ -345,7 +347,7 @@ sub ctcmd {
 	    ## $ENV{CLEARCASE_ARGV_CTCMD} = $self->{CCAV_CTCMD} if !ref($self);
 	    return $self;
 	} else {					# close up shop
-	    delete $self->{CCAV_CTCMD} if $self->{CCAV_CTCMD};
+	    delete $self->{CCAV_CTCMD} if exists $self->{CCAV_CTCMD};
 	    delete $ENV{CLEARCASE_ARGV_CTCMD}
 				if $ENV{CLEARCASE_ARGV_CTCMD} && !ref($self);
 	    return $self;
@@ -805,7 +807,7 @@ I<CtCmd mode> is on or off. When called with a numerical argument, it
 sets the CtCmd mode as follows: if the argument is 0, CtCmd mode is
 turned off and subsequent commands are sent to real cleartool via the
 standard execution interface.  With an argument of 1, it attempts to
-use CtCmd mode. If CtCmd fails to load for any reason it will
+use CtCmd mode but if CtCmd fails to load for any reason it will
 (silently) run commands via CAL instead.  With an argument of 2 the
 behavior is the same but a warning ("CtCmd not found - using CAL
 instead") is printed.  With an argument of 3 the warning becomes a
