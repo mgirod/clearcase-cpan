@@ -509,8 +509,8 @@ sub _ipc_cmd {
 	  if ($self->stderr) {
 	      $out = *STDERR;
 	  } else {
-	      $self->stderr(0);
-	      $next = 1 unless $self->stderr;
+	      $self->stderr(0); # Restore after destructive read
+	      $next = 1;
 	  }
 	}
 	if (s%^(.*)Command \d+ returned status (\d+)%$1%) {
