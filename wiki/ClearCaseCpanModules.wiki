@@ -11,8 +11,8 @@ Focused on developing a set of packages, around ideas created by Dave Boyce.
 = Details =
 
   * Argv
-  * ClearCase::Argv
-  * ClearCase::SyncTree
-  * ClearCase::Wrapper
-  * ClearCase::Wrapper::DSB
-  * ClearCase::Wrapper::MGI
+  * !ClearCase::Argv
+  * !ClearCase::SyncTree
+  * !ClearCase::Wrapper
+  * !ClearCase::Wrapper::DSB
+  * !ClearCase::Wrapper::MGI
