@@ -6,13 +6,13 @@ Collaborating is hard.
 Even on tools such as ClearCase, which are collaboration tools.
 There is a large dispersion of forums, lists, sites.
 So here is one more, sadly enough.
-Focused on developing a set of packages, around ideas created by Dave Boyce.
+Focused on developing a set of packages, around ideas created by David Boyce.
 
 = Details =
 
   * Argv
   * !ClearCase::Argv
-  * !ClearCase::SyncTree
+  * !ClearCase::!SyncTree
   * !ClearCase::Wrapper
   * !ClearCase::Wrapper::DSB
   * !ClearCase::Wrapper::MGI
