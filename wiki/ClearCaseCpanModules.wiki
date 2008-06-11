@@ -6,7 +6,8 @@ Collaborating is hard.
 Even on tools such as !ClearCase, which are collaboration tools.
 There is a large dispersion of forums, lists, sites.
 So here is one more, sadly enough.
-Focused on developing a set of packages, around ideas created by David Boyce.
+Focused on developing a set of packages, created for most of them by David Boyce,
+and using his framework.
 
 = Details =
 
