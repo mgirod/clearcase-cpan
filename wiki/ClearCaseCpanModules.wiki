@@ -1,9 +1,9 @@
-A set of interrelated perl modules, offering an open interface to ClearCase
+A set of interrelated perl modules, offering an open interface to !ClearCase
 
 = Introduction =
 
 Collaborating is hard.
-Even on tools such as ClearCase, which are collaboration tools.
+Even on tools such as !ClearCase, which are collaboration tools.
 There is a large dispersion of forums, lists, sites.
 So here is one more, sadly enough.
 Focused on developing a set of packages, around ideas created by David Boyce.
