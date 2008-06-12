@@ -182,10 +182,6 @@ $reps using the ClearCase::CtCmd (in-process) --iff this module is
 installed-- and IPC (co-process) models. It will fall back to fork/exec.
 If $reps is the wrong number for your environment, you can
 override it with the CCARGV_TEST_REPS environment variable.
-vs $reps using the ClearCase::CtCmd (in-process) and ipc (co-process)
-models, if those modules are installed. If not, it will fall back to
-fork/exec.  If $reps is the wrong number for your environment, you can
-override it with the CCARGV_TEST_REPS environment variable.
 ************************************************************************
 
 );
@@ -230,7 +226,7 @@ if (ClearCase::Argv->ctcmd(1)) {
 print qq(
 ************************************************************************
 If you have ClearCase::CtCmd, and anyway with ipc mode (whether you have
-IPC::ChildSafe installed or not--preferably not), you were able to see a
+IPC::ChildSafe installed or not--preferably not), you should see a
 substantial speedup using them. I usually see multiples ranging from 50%
 to 30:1, but this is dependent on a wide range of factors.
 ************************************************************************

@@ -40,7 +40,7 @@ process each time. This can speed up scripts by anywhere between 1
 
 =item * CtCmd Interface for Speed
 
-As an alternative to IPC mode, ClearCase::Argv also be told to process
+As an alternative to IPC mode, ClearCase::Argv can also be told to process
 commands via B<ClearCase::CtCmd>.
 
 =item * Convenience Features
