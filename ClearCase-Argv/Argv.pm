@@ -18,6 +18,9 @@ use strict;
 
 my $class = __PACKAGE__;
 my %pidcount;
+END {
+  ClearCase::Argv->ipc(0); #Kill any remaining coprocess
+}
 # For programming purposes we can't allow per-user preferences.
 if ($ENV{CLEARCASE_PROFILE}) {
     $ENV{_CLEARCASE_PROFILE} = $ENV{CLEARCASE_PROFILE};
