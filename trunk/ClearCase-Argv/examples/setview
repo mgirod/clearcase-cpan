@@ -8,7 +8,7 @@
 use ClearCase::Argv;
 
 ## Setting a view requires that you be in IPC mode.
-ClearCase::Argv->ipc;
+ClearCase::Argv->ipc(3);
 
 # Print out each command before executing it (like sh -x).
 ClearCase::Argv->dbglevel(1);
