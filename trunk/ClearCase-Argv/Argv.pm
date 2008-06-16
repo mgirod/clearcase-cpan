@@ -409,6 +409,8 @@ sub _ctcmd_cmd2cal {
         } else {
 	    push(@results, $out);
         }
+    } else {
+        push(@results, q()); #Make sure $err will go into the 3rd slot
     }
     if ($self && exists($self->{errfunc}) && ($self->{errfunc} == 0)) {
 	print STDERR $err;
