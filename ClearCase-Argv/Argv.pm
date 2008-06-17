@@ -1,6 +1,6 @@
 package ClearCase::Argv;
 
-$VERSION = '1.35';
+$VERSION = '1.36';
 
 use Argv 1.22;
 use Text::ParseWords;
@@ -450,7 +450,7 @@ sub ipc {
 	$self->ctcmd(0);	# shut down the CtCmd connection
     }
     if (exists($class->{IPC})) {
-        if ($self ne $class) {
+        if (($self ne $class) and !$self->ipc) {
 	    ++$pidcount{$class->{IPC}->{PID}};
 	    $self->{IPC}->{PID}  = $class->{IPC}->{PID};
 	    $self->{IPC}->{DOWN} = $class->{IPC}->{DOWN};
@@ -995,6 +995,12 @@ to the shell (Found from 2002.05.00 to 7.0.1).
 The result in an ipc mode using '-status' was: hang.
 
 Cygwin is not supported on Windows.
+
+The 'exit' cleartool command is dangerous in ipc mode: it will stop the
+coprocess unconditionally, without Argv updating its ipc status, and the
+ipccount. This will affect any other users of the same coprocess.
+An other symptom of the problem is a 'broken pipe' error. Argv writes
+to the coprocess, but obviously fails to read anything coming back.
 
 =head1 PORTABILITY
 

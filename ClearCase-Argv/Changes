@@ -257,3 +257,10 @@ Revision history for Perl extension ClearCase::Argv.
 1.35 Sun Jun  8 15:08:17 BST 2008
 	- Merged in 1.27
 	- Support for stderr(0) in ipc mode
+
+1.36 Tue Jun 17 09:15:31 BST 2008
+	- END clause to kill remaining cleartool coprocesses, esp in Windows
+	- sdterr(0) fix for CAL mode
+	- Redirection to STDERR in ipc mode
+	- Fix (James Anderson) to reference counting if already in ipc mode
+	- Fixes to example/setview
