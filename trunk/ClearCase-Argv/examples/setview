@@ -24,4 +24,3 @@ $ct->argv('pwv -s')->system;
 $ct->argv('setview', [], $views[0])->system;
 # Prove that we've retained the setview state.
 $ct->argv('pwv -s')->system;
-$ct->argv('exit')->system;
