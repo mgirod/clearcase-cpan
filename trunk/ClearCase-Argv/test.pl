@@ -430,7 +430,7 @@ print qq(
 Quoting: exploring the options in a command with a whitespace in format.
 ************************************************************************
 );
-if (!MSWIN) {
+{
     ClearCase::Argv->ipc(1);
     my $r = ClearCase::Argv->new('des',['-fmt','a b'],'.')->qx;
     $final += printok($r eq 'a b');
