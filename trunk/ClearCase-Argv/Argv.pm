@@ -489,7 +489,8 @@ sub _ipc_cmd {
     $self->_dbg($dbg, '=>', \*STDERR, @_) if $dbg;
 
     # Send the command to cleartool.
-    my $cmd = join(' ', map {$_ =~ /\s/ ? qq("$_") : $_} @_);
+    my $cmd =
+      join(' ', map {/\s/ && !(/^'.+'$/ || /^".+"$/) ? qq("$_") : $_} @_);
     chomp $cmd;
     my $down = $self->{IPC}->{DOWN};
     print $down $cmd, "\n";
