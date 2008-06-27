@@ -511,7 +511,7 @@ sub _ipc_cmd {
         my ($last, $next);
 	my $out = *STDOUT;
 	if (m%^cleartool: (Error|Warning):%) {      #Simulate -status
-	  $rc += 1 << 8 if $1 == 'Error';
+	  $rc += 1 << 8 if $1 eq 'Error';
 	  if ($self->stderr) {
 	      $out = *STDERR;
 	  } else {
