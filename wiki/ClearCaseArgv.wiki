@@ -29,7 +29,7 @@ mentioned here.
     * on Windows, the CAL interface
   * a _co-process_ model, using the _ipc_ mode (not bound anymore to the [http://search.cpan.org/search?query=IPC%3A%3AClearTool&mode=all IPC::ClearTool] module, although using it if found installed.
 
-Not completely orthogonal to the former, there are obviously the platform dychotomy between Unix and Windows.
+Not completely orthogonal to the former, there is obviously the platform dychotomy between Unix and Windows.
 Furthermore, the diversity is made more complex by the dynamic use (tested with _eval_) of  various possible _cloning_ techniques, depending on the installed modules.
 
 The goal of !ClearCase::Argv is thus to hide this diversity, and to offer, as far as possible, script portability over this multiplicity.
