@@ -20,6 +20,7 @@ mentioned here.
     * setview
     * ccreport
     * multitool
+    * no support for cygwin on Windows
 
 = General =
 
@@ -39,3 +40,5 @@ Obviously, one main interest (beyond mere portability, valuable in itself) of us
 
 This makes the fork model _secondary_.
 The _co-process_ model suffers an other important drawback: the !ClearCase::!CtCmd module must be recompiled with every !ClearCase reinstallation, which is often considered a major burden (with common support models within large organisations, but also especially on Windows, because of the requirement on a build environment), and prevents sharing it to multiple clients, if their configuration is not synchronised.
+
+These considerations orient the work towards ensuring that the ipc mode works optimally, i.e. reusing for successive commands the same background process, unless otherwise required (e.g. for setting different views in different contexts); and in the same way as with the other models. The other models serve in a way to define the standard for the ipc model.
