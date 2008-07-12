@@ -12,7 +12,7 @@ and using his framework.
 = Details =
 
   * Argv
-  * !ClearCase::Argv
+  * [ClearCaseArgv ClearCase::Argv]
   * !ClearCase::!SyncTree
   * !ClearCase::Wrapper
   * !ClearCase::Wrapper::DSB
