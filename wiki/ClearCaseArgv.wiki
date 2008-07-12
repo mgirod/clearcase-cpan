@@ -14,6 +14,15 @@ mentioned here.
 
   * Stable version offered as a proposal for publication as 1.36
   * There are known problems and limitations (see issues)
-    * inteactive comments
+    * interactive comments
     * test cases
     * quoting
+    * setview
+
+= General =
+
+!ClearCase::Argv offers a consistent interface over 4 different possible sub-layers:
+  * a _fork_ model, using the Argv module
+  * an _in-process_ model, using the IBM/Rational [http://search.cpan.org/search?query=ClearCase%3A%3ACtCmd&mode=all ClearCase::CtCmd] module (and possibly in some future, the [http://search.cpan.org/search?query=ClearCase%3A%3AMtCmd&mode=all ClearCase::MtCmd] one), or,
+    * on Windows, the CAL interface
+  * a _co-process_ model, using the _ipc_ mode (not bound anymore to the [http://search.cpan.org/search?query=IPC%3A%3AClearTool&mode=all IPC::ClearTool] module, although using it if found installed.
