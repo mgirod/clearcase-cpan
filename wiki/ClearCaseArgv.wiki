@@ -18,6 +18,8 @@ mentioned here.
     * test cases
     * quoting
     * setview
+    * ccreport
+    * multitool
 
 = General =
 
@@ -26,3 +28,14 @@ mentioned here.
   * an _in-process_ model, using the IBM/Rational [http://search.cpan.org/search?query=ClearCase%3A%3ACtCmd&mode=all ClearCase::CtCmd] module (and possibly in some future, the [http://search.cpan.org/search?query=ClearCase%3A%3AMtCmd&mode=all ClearCase::MtCmd] one), or,
     * on Windows, the CAL interface
   * a _co-process_ model, using the _ipc_ mode (not bound anymore to the [http://search.cpan.org/search?query=IPC%3A%3AClearTool&mode=all IPC::ClearTool] module, although using it if found installed.
+
+Not completely orthogonal to the former, there are obviously the platform dychotomy between Unix and Windows.
+Furthermore, the diversity is made more complex by the dynamic use (tested with _eval_) of  various possible _cloning_ techniques, depending on the installed modules.
+
+The goal of !ClearCase::Argv is thus to hide this diversity, and to offer, as far as possible, script portability over this multiplicity.
+
+Now, all these options are not quite equal.
+Obviously, one main interest (beyond mere portability, valuable in itself) of using a module to access !ClearCase, is to boost efficiency by avoiding the initialisation and finalisation of a _cleartool_ (or _multitool_) process for every invocation.
+
+This makes the fork model _secondary_.
+The _co-process_ model suffers an other important drawback: the !ClearCase::!CtCmd module must be recompiled with every !ClearCase reinstallation, which is often considered a major burden (with common support models within large organisations, but also especially on Windows, because of the requirement on a build environment), and prevents sharing it to multiple clients, if their configuration is not synchronised.
