@@ -1,0 +1,64 @@
+Interactive comments in [ClearCaseArgv ClearCase::Argv]
+
+= Introduction =
+
+In the current version, in _ipc_ mode, commands prompting for a comment hang.
+
+The status is to satisfy oneself with a (partial) work around.
+
+= Details =
+
+  * There is a current issue with ipc
+  * The problem interferes with the work-around for the [http://www-128.ibm.com/developerworks/support/rational/rfe/execute?use_case=searchChangeRequests&PROD_ID=0&COMP_ID=0&RESP_ID=0&CREATED_BY=314 bug (423)] in _cleartool -status_
+  * There is a workaround for unix, which as it is, fails on Windows
+  * Interactive comments are not essential for writing scripts
+  * It is important for writing wrappers
+
+== Workaround ==
+
+The way the _ipc_ mode works is by sending commands to the running coprocess, and reading replies.
+There is a need to decide in a generic way when the reply is complete.
+The _-status_ functionality offers an easy way, in guaranteeing that a standard line will be sent in the end of every ouput.
+Unfortunately, this functionality is broken in the case of the _setview_ command.
+Because of this, and until IBM/Rational fixes the bug,
+the _ipc_ mode cannot use this functionality. 
+What it does is it attempts to simulate it, by sending,
+after every command, a second command 
+resulting in a similar standard output.
+This clashes with the prompt for comments:
+the _ipc_ mode sends the second command unconditionally,
+and starts reading output only then.
+The result is the the second command is recorded as a comment,
+and the two peers start waiting for each other,
+out of sync in their common protocol.
+
+The work-around for now is to detect the prompt,
+get iinput from the user and send it,
+then reissue the necessary second command.
+It is however too late at this point to prevent the first instance
+from being recorded as first line of comment.
+
+One could remove it afterwards, but this would break the genericity of the code
+(force to understand what exact command was run,
+so as to issue an appropriate _chevent_ command).
+Considered awkward anyway.
+
+One could also consider entering some kind of non-blocking _select_
+instead of blindly sending the 'second command'.
+This is however a complete redesign,
+replacing the strategy of sending the second command.
+It may be non-trivial,
+especially in the context of maintaining portability to Windows.
+I still believe this is only needed as a temporary solution,
+waiting for the bug fix from IBM.
+
+The prompt is not completely independent from the command run...
+
+The work-around is inelegant, in that it results in garbage in the comment field,
+but which can easily be cleaned up by the user.
+This is considered better than hanging.
+
+The work-around described above continues however to hang on Windows.
+
+For all these reasons, I do not dare putting it into the main branch,
+but shall publish it anyway as a work in progress.
