@@ -1,4 +1,4 @@
-Interactive comments in [ClearCaseArgv ClearCase::Argv]
+#summary Interactive comments in [ClearCaseArgv ClearCase::Argv]
 
 = Introduction =
 
@@ -10,7 +10,7 @@ The status is to satisfy oneself with a (partial) work around.
 
   * There is a current issue with ipc
   * The problem interferes with the work-around for the [http://www-128.ibm.com/developerworks/support/rational/rfe/execute?use_case=searchChangeRequests&PROD_ID=0&COMP_ID=0&RESP_ID=0&CREATED_BY=314 bug (423)] in _cleartool -status_
-  * There is a [#wa workaround] for unix, which as it is, fails on Windows
+  * There is a workaround for unix, which as it is, fails on Windows
   * Interactive comments are not essential for writing scripts
   * It is important for writing wrappers
 
