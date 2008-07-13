@@ -1,4 +1,4 @@
-#summary Interactive comments in [ClearCaseArgv ClearCase::Argv]
+Interactive comments in [ClearCaseArgv ClearCase::Argv]
 
 = Introduction =
 
