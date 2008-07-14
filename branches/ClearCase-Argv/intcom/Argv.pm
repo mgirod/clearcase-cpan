@@ -511,13 +511,13 @@ sub _ipc_cmd {
         my ($last, $next);
 	my $out = *STDOUT;
 	if (m%^cleartool: (Error|Warning):%) {      #Simulate -status
-	  $rc += 1 << 8 if $1 eq 'Error';
-	  if ($self->stderr) {
-	      $out = *STDERR;
-	  } else {
-	      $self->stderr(0); # Restore after destructive read
-	      $next = 1;
-	  }
+	    $rc += 1 << 8 if $1 eq 'Error';
+	    if ($self->stderr) {
+	        $out = *STDERR;
+	    } else {
+	        $self->stderr(0); # Restore after destructive read
+	        $next = 1;
+	    }
 	}
 	if (s%^(.*)Command \d+ returned status (\d+)%$1%) {
 	    # Shift the status up so it looks like an exit status.
@@ -531,6 +531,15 @@ sub _ipc_cmd {
 	    push(@$disposition, $_);
 	} else {
 	    print $out $_;
+	}
+	if (/^Comments for /) {
+	    while (<>) {
+	        chomp;
+		print $down "$_\n";
+	        last if /^\.$/;
+	    }
+	    print $down ".\n" unless defined($_);
+	    print $down "des -fmt \"Command 0 returned status 0\\n\" .\n";
 	}
 	last if $last;
     }
