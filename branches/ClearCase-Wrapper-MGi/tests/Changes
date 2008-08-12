@@ -1,0 +1,25 @@
+Revision history for Perl extension ClearCase::Wrapper::MGi.
+
+0.01 Tue Sep 25 15:51:36 IST 2007
+	- Initial version: port of lsgen on top of ClearCase::Wrapper
+
+0.02 Tue Oct  2 20:39:17 IST 2007
+	- Fixed bug reported by Tatyana Shpichko: tested the argument(s)
+
+0.03 Fri Oct  5 18:04:50 IST 2007
+	- Fixed bug with branch names matching part of one another
+	- Initial version of checkout
+
+0.04 Wed Oct 10 12:00:38 IST 2007
+	- Run lsgen and checkout under CtCmd or IPC if installed.
+	- Bug fixes: Branch type constraint check on Windows; respect
+	  for functionality added in ClearCase::Wrapper; support for
+	  all options; initialisation of the return value.
+
+0.05 Thu Oct 11 18:09:17 IST 2007
+	- Bug fixes: lsgen input rejected unless version.  Wildcards
+	  supported on Windows.  Wrong semantics for -bra[nch] in
+	  checkout. Returned to default if either -ver or -bra used.
+
+0.06 Tue Nov  6 17:51:41 GMT 2007
+	- Support for checkout via view extended path
