@@ -16,4 +16,4 @@ and using his framework.
   * !ClearCase::!SyncTree
   * !ClearCase::Wrapper
   * !ClearCase::Wrapper::DSB
-  * !ClearCase::Wrapper::MGI
+  * [CcWrapMgi ClearCase::Wrapper::MGI]
