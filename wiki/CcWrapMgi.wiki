@@ -16,10 +16,12 @@ The code on this site is currently only found in a _tests_ branch.
   * I also acknowledge deficiencies in the support for the branch-no-merge strategy:
     * missing support for {{{diff -pred}}} and {{{des -fmt "%PVn"}}}
     * missing support for graphical {{{lsgen}}}
+    * missing support for {{{annotate}}}
+    * suspicious effects with {{{merge}}}, maybe a !ClearCase bug.
   * Known bugs:
     * no support for interactive comments (problem in {{{cleartool -status}}}, not worked-around in !ClearCase::Argv)
     * indentation error in {{{lsgen}}} for _alternative paths_
   * Intentions:
     * support for incremental types, and first for label types.
-    * availability of functinality from !ClearCase::Wrapper:DSB, such as inclusion of config spec components
+    * availability of functionality from !ClearCase::Wrapper:DSB, such as inclusion of config spec components
     * integration of {{{synctree}}} under {{{cleartool}}}, including via the graphical interface.
