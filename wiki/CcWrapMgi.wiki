@@ -14,7 +14,7 @@ The code on this site is currently only found in a _tests_ branch.
   * I also made tentative fixes in MGI.pm, which have not been thoroughly tested&mdash;I use myself the current version.
   * My intention was to develop a regression testing suite, which I started to do on !ClearCase::!SyncTree (still pending)
   * I also acknowledge deficiencies in the support for the branch-no-merge strategy:
-    * missing support for {{{diff -pred}}} and {{{des -fmt "%PVn"}}}
+    * missing support for {{{diff -pred}}} and {{{des -fmt "%PVn"}}} and {{{%PSn}}}
     * missing support for graphical {{{lsgen}}}
     * missing support for {{{annotate}}}
     * suspicious effects with {{{merge}}}, maybe a !ClearCase bug.
