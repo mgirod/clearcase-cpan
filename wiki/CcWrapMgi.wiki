@@ -9,9 +9,9 @@ It aims at supporting various novel usage patterns of (base) !ClearCase.
 = Details =
 
 The code on this site is currently only found in a _tests_ branch.
-  * Currently, I fixed a bug in lsgen, maybe only relevant in ipc mode
   * My own test environment moved from _ctcmd_ to _ipc_ mode, after which I noticed major problems, which were fixed in !ClearCase::Argv, in the version available from this site, and proposed for publication to CPAN.
-  * I also made tentative fixes in MGI.pm, which have not been thoroughly tested&mdash;I use myself the current version.
+  * I fixed a bug in lsgen, maybe only relevant in ipc mode, but impacted its fundamental function (wrong, truncated, output)
+  * I also made tentative fixes in MGI.pm, which have not been thoroughly tested--I use myself the current version.
   * My intention was to develop a regression testing suite, which I started to do on !ClearCase::!SyncTree (still pending)
   * I also acknowledge deficiencies in the support for the branch-no-merge strategy:
     * missing support for {{{diff -pred}}} and {{{des -fmt "%PVn"}}} and {{{%PSn}}}
