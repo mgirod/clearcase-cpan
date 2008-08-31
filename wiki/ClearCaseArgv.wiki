@@ -1,4 +1,4 @@
-Status of the work on this module on this site, with respect to CPAN
+#summary Status of the work on ClearCase::Argv on this site, with respect to CPAN
 
 = Introduction =
 
