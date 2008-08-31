@@ -1,0 +1,25 @@
+#cleartool wrapper: support for branch-no-merge strategy, and incremental types
+
+= Introduction =
+
+This wrapper is distributed via CPAN, and is documented [http://search.cpan.org/search?query=ClearCase%3A%3AWrapper%3A%3AMGi&mode=all there].
+It builds upon !ClearCase::Wrapper and thus upon [ClearCaseArgv ClearCase::Argv].
+It aims at supporting various novel usage patterns of (base) !ClearCase.
+
+= Details =
+
+The code on this site is currently only found in a _tests_ branch.
+  * Currently, I fixed a bug in lsgen, maybe only relevant in ipc mode
+  * My own test environment moved from CtCmd to ipc, after which I noticed major problems, which were fixed in !ClearCase::Argv, in the version available from this site, and proposed for publication to CPAN.
+  * I also made tentative fixes in MGI.pm, which have not been thoroughly tested&mdash;I use myself the current version.
+  * My intention was to develop a regression testing suite, which I started to do on !ClearCase::!SyncTree (still pending)
+  * I also acknowledge deficiencies in the support for the branch-no-merge strategy:
+    * missing support for {{{diff -pred}}} and {{{des -fmt "%PVn"}}}
+    * missing support for graphical {{{lsgen}}}
+  * Known bugs:
+    * no support for interactive comments (problem in {{{cleartool -status}}}, not worked-around in !ClearCase::Argv)
+    * indentation error in {{{lsgen}}} for _alternative paths_
+  * Intentions:
+    * support for incremental types, and first for label types.
+    * availability of functinality from !ClearCase::Wrapper:DSB, such as inclusion of config spec components
+    * integration of {{{synctree}}} under {{{cleartool}}}, including via the graphical interface.
