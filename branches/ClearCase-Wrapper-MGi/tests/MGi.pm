@@ -216,8 +216,7 @@ sub lsgenealogy {
 
     while (my $e = shift @argv) {
 	my ($ele, $ver, $type, $pred) =
-	  split(/\n/,
-		$ct->argv(qw(des -fmt "%En\n%En@@%Vn\n%m\n%En@@%PVn"),$e)->qx);
+	  $ct->argv(qw(des -fmt "%En\n%En@@%Vn\n%m\n%En@@%PVn"),$e)->qx;
 	if (!defined($type) or ($type !~ /version$/)) {
 	    warn Msg('W', "Not a version: $e");
 	    next;
@@ -227,19 +226,12 @@ sub lsgenealogy {
 	$pred =~ s%\\%/%g;
 	$ver = $pred if $ver =~ m%/CHECKEDOUT$%;
 	my $obsopt = $opt{obsolete}?' -obs':'';
-	my $cto = $ct->argv('lsvtree', '-merge', "-all$obsopt", $ele)->qx;
-	$cto =~ s%\\%/%g;
-	my @vt = split /\n/, $cto;
+	my @vt = grep !m%/(0|[^0-9]+)$%,
+	  $ct->argv('lsvtree', '-merge', "-all$obsopt", $ele)->qx;
+	map { s%\\%/%g } @v;
 	my %gen = ();
 	my @stack = ();
 	foreach my $g (@vt) {
-	    if ($g =~ m%^[^ ].*/0$%) {
-		next;
-	    }
-	    if ($g =~ m%^[^ ].*/([^/()]+)$%) {
-		my $b = $1;
-		next if $b =~ /[^0-9]/;
-	    }
 	    if ($g =~ m%^(.*) (\(.*\))$%) {
 		$g = $1;
 		$gen{$g}{labels} = $2;
