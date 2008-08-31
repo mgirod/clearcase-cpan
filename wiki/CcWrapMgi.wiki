@@ -1,4 +1,4 @@
-cleartool wrapper: support for branch-no-merge strategy, and incremental types
+#summary ClearCase::Wrapper::MGi: support for branch-no-merge strategy, and incremental types
 
 = Introduction =
 
