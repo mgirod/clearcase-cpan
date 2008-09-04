@@ -244,7 +244,7 @@ sub qx {
 	    $? = $rc;
 	    return @data;
 	} else {
-	    my $data = "@data";
+	    my $data = join '', @data;
 	    chomp($data) if $self->autochomp;
 	    $self->unixpath($data) if MSWIN && $self->outpathnorm;
 	    if ($rc) {
