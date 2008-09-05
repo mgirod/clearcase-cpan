@@ -573,8 +573,7 @@ sub quote {
 	if (m%^'(.*)'$%s) {
 	    $_ = qq(\\"$1\\") if MSWIN;
 	    next;
-	} elsif (m%^"(.*)"$%s) {
-	    $_ = qq(\\"$_\\");
+	} elsif (m%^".*"$%s) {
 	    next;
 	}
 	# Skip if contains no special chars.
