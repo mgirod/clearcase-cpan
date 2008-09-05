@@ -1,8 +1,8 @@
 package ClearCase::Argv;
 
-$VERSION = '1.36';
+$VERSION = '1.37';
 
-use Argv 1.22;
+use Argv 1.23;
 use Text::ParseWords;
 
 use constant MSWIN => $^O =~ /MSWin32|Windows_NT/i ? 1 : 0;

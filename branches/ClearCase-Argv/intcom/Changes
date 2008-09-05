@@ -264,3 +264,8 @@ Revision history for Perl extension ClearCase::Argv.
 	- Redirection to STDERR in ipc mode
 	- Fix (James Anderson) to reference counting if already in ipc mode
 	- Fixes to example/setview
+
+1.37 Fri Sep  5 10:36:23 BST 2008
+	- Fix to multiline return in scalar context, in ipc mode
+	- Uncommented fork model quoting tests after fix in Argv.pm 1.23
+	- Flaky/dubious support for interactive comments in unix in ipc mode
