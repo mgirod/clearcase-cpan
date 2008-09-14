@@ -277,3 +277,6 @@ Revision history for Perl extension ClearCase::Argv.
 
 1.39 Sat Sep  6 10:47:09 EDT 2008
 	- Renamed 'find_cleartool' to more intuitive 'cleartool_path'.
+
+1.40 Mon Sep  8 12:46:08 EDT 2008
+	- Fixed merge skew in setview and CCreport example scripts.
