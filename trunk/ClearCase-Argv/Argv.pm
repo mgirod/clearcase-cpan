@@ -1,8 +1,8 @@
 package ClearCase::Argv;
 
-$VERSION = '1.36';
+$VERSION = '1.39';
 
-use Argv 1.22;
+use Argv 1.23;
 use Text::ParseWords;
 
 use constant MSWIN => $^O =~ /MSWin32|Windows_NT/i ? 1 : 0;
@@ -34,14 +34,15 @@ for (grep !/^_/, keys %Argv::Argv) {
     $Argv::Argv{$_} = $ENV{$ev} if defined $ENV{$ev};
 }
 
-my $ct = 'cleartool';
+my @ct = ('cleartool');
 
 # Attempt to find the definitive ClearCase bin path at startup. Don't
 # try excruciatingly hard, it would take unwarranted time. And don't
 # do so at all if running setuid or as root. If this doesn't work,
-# the path can be set explicitly via the 'find_cleartool' class method.
+# the path can be set explicitly via the 'cleartool_path' class method.
 if (!MSWIN && ($< == 0 || $< != $>)) {
-    $ct = '/usr/atria/bin/cleartool';	# running setuid or as root
+    # running setuid or as root
+    @ct = ('/opt/rational/clearcase/bin/cleartool');
 } elsif ($ENV{PATH} !~ m%\W(atria|ClearCase)\Wbin\b%i) {
     if (!MSWIN) {
 	my $abin = $ENV{ATRIAHOME} ? "$ENV{ATRIAHOME}/bin" : '/usr/atria/bin';
@@ -62,7 +63,12 @@ if (!MSWIN && ($< == 0 || $< != $>)) {
 }
 
 # Class method to get/set the location of 'cleartool'.
-sub find_cleartool { (undef, $ct) = @_ if $_[1]; $ct }
+sub cleartool_path {
+    shift;
+    @ct = @_ if @_;
+    return wantarray ? @ct : $ct[0];
+}
+*find_cleartool = \&cleartool_path;  # backward compatibility 
 
 # Override of base-class method to change a prog value of 'foo' into
 # qw(cleartool foo). If the value is already an array or array ref
@@ -75,7 +81,7 @@ sub prog {
     if (@_ || ref($prg) || $prg =~ m%^/|^\S*cleartool% || $self->ctcmd) {
 	return $self->SUPER::prog($prg, @_);
     } else {
-	return $self->SUPER::prog([$ct, parse_line('\s+', 1, $prg)], @_);
+	return $self->SUPER::prog([@ct, parse_line('\s+', 1, $prg)], @_);
     }
 }
 
@@ -244,7 +250,7 @@ sub qx {
 	    $? = $rc;
 	    return @data;
 	} else {
-	    my $data = "@data";
+	    my $data = join '', @data;
 	    chomp($data) if $self->autochomp;
 	    $self->unixpath($data) if MSWIN && $self->outpathnorm;
 	    if ($rc) {
@@ -382,11 +388,11 @@ sub _ctcmd_cmd2cal {
     my $self = ref($_[0]) ? shift : undef;
     # It may make more sense to stash a copy of this object rather than
     # recreate it each time.
-    my $ct = Win32::OLE->new('ClearCase.ClearTool');
+    my $ccct = Win32::OLE->new('ClearCase.ClearTool');
     # Turn list cmds into a quoted string.
     my $cmd = (@_ == 1) ? $_[0] : join(' ', map {"'$_'"} @_);
     # Send the actual command to CAL and get stdout returned.
-    my $out = $ct->CmdExec($cmd);
+    my $out = $ccct->CmdExec($cmd);
     # Must reap the return code first, then get stderr IFF retcode != 0.
     my $rc = int Win32::OLE->LastError;
     my $err = $rc ? Win32::OLE->LastError . "\n" : '';
@@ -461,13 +467,9 @@ sub ipc {
     # This should never fail to load since it's built in.
     require IPC::Open3;
 
-    my $ct = MSWIN ?
-	'cleartool' :
-	join('/', $ENV{ATRIAHOME}||'/opt/rational/clearcase', 'bin/cleartool');
-
     # Dies on failure.
     my($down, $back);
-    my $pid = IPC::Open3::open3($down, $back, undef, $ct);
+    my $pid = IPC::Open3::open3($down, $back, undef, @ct);
 
     # Set the "line discipline" to convert CRLF to \n.
     binmode $back, ':crlf';
@@ -511,13 +513,13 @@ sub _ipc_cmd {
         my ($last, $next);
 	my $out = *STDOUT;
 	if (m%^cleartool: (Error|Warning):%) {      #Simulate -status
-	  $rc += 1 << 8 if $1 eq 'Error';
-	  if ($self->stderr) {
-	      $out = *STDERR;
-	  } else {
-	      $self->stderr(0); # Restore after destructive read
-	      $next = 1;
-	  }
+	    $rc += 1 << 8 if $1 eq 'Error';
+	    if ($self->stderr) {
+	        $out = *STDERR;
+	    } else {
+	        $self->stderr(0); # Restore after destructive read
+	        $next = 1;
+	    }
 	}
 	if (s%^(.*)Command \d+ returned status (\d+)%$1%) {
 	    # Shift the status up so it looks like an exit status.
@@ -531,6 +533,15 @@ sub _ipc_cmd {
 	    push(@$disposition, $_);
 	} else {
 	    print $out $_;
+	}
+	if (/^Comments for /) {
+	    while (<>) {
+	        chomp;
+		print $down "$_\n";
+	        last if /^\.$/;
+	    }
+	    print $down ".\n" unless defined($_);
+	    print $down "des -fmt \"Command 0 returned status 0\\n\" .\n";
 	}
 	last if $last;
     }
@@ -640,8 +651,8 @@ sub _chdir {
     chomp $dir;
     my $rc = CORE::chdir($dir);
     if ($self->ipc) {
-        my $ct = ref($self) ? $self->clone : __PACKAGE__->new;
-        $ct->stdout(0)->argv('cd', $dir)->system;
+        my $ctcd = ref($self) ? $self->clone : __PACKAGE__->new;
+        $ctcd->stdout(0)->argv('cd', $dir)->system;
     }
     return $rc;
 }

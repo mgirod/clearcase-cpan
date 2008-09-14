@@ -411,10 +411,10 @@ sub quotetest {
 }
 ClearCase::Argv->ipc(0);
 ClearCase::Argv->ctcmd(0);
-# quotetest('Fork model', 1, 1, 1, 0, 0);
+quotetest('Fork model', 1, 1, 1, 0, 0);
 quotetest('Fork model', 1, 1, 0, 1, 0);
-# quotetest('Fork model', 1, 0, 1, 0, 0);
-# quotetest('Fork model', 1, 0, 0, 0, 0);
+quotetest('Fork model', 1, 0, 1, 0, 0);
+quotetest('Fork model', 1, 0, 0, 0, 0);
 ClearCase::Argv->ipc(1);
 quotetest('IPC model', 1, 1, 1, 1, 1);
 quotetest('IPC model', 1, 1, 0, 1, 1);
