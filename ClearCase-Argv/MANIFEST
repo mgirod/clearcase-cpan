@@ -1,12 +1,14 @@
 Argv.pm
 Changes
 MANIFEST
+META.yml
 README
 README.html
 Makefile.PL
 examples/README
 examples/CCreport
 examples/bmccug
+examples/ctsudo
 examples/fix_eltype
 examples/envp
 examples/functional

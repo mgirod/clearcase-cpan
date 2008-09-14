@@ -264,3 +264,16 @@ Revision history for Perl extension ClearCase::Argv.
 	- Redirection to STDERR in ipc mode
 	- Fix (James Anderson) to reference counting if already in ipc mode
 	- Fixes to example/setview
+
+1.37 Fri Sep  5 10:36:23 BST 2008
+	- Fix to multiline return in scalar context, in ipc mode
+	- Uncommented fork model quoting tests after fix in Argv.pm 1.23
+	- Flaky/dubious support for interactive comments in unix in ipc mode
+
+1.38 Fri Sep  5 23:26:44 EDT 2008
+	- Represent 'cleartool' as a list instead of a scalar.
+	  The idea is to allow 'cleartool' to be replaced by something
+	  like qw(sudo cleartool). See ./examples/ctsudo.
+
+1.39 Sat Sep  6 10:47:09 EDT 2008
+	- Renamed 'find_cleartool' to more intuitive 'cleartool_path'.
