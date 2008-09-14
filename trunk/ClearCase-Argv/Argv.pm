@@ -1,6 +1,6 @@
 package ClearCase::Argv;
 
-$VERSION = '1.39';
+$VERSION = '1.40';
 
 use Argv 1.23;
 use Text::ParseWords;
