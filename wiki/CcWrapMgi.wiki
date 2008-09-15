@@ -2,7 +2,8 @@
 
 = Introduction =
 
-This wrapper is distributed via CPAN, and is documented [http://search.cpan.org/search?query=ClearCase%3A%3AWrapper%3A%3AMGi&mode=all there].
+This wrapper is distributed via CPAN, and was documented [http://search.cpan.org/search?query=ClearCase%3A%3AWrapper%3A%3AMGi&mode=all there]
+([http://www.cmwiki.com/IncrementalTypesImp sketched in the cm wiki]).
 It builds upon !ClearCase::Wrapper and thus upon [ClearCaseArgv ClearCase::Argv].
 It aims at supporting various novel usage patterns of (base) !ClearCase.
 
@@ -24,7 +25,7 @@ The code on this site is currently only found in a _tests_ branch.
     * indentation error in {{{lsgen}}} for _alternative paths_
   * Intentions:
     * support for incremental types, and first for label types, including:
-      * {{{mklbtype -inc}}}
+      * {{{mklbtype -family}}}
       * moving the floating and applying the fixed in {{{mklabel}}} under the {{{##:TypeFamilies: incremental}}} keyword in the config spec
       * lock/unlock (locking both. Note: possible ownership problems)
       * folding config specs (automatic generation of the cascading rules)
