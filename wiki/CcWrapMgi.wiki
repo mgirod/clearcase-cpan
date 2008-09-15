@@ -19,7 +19,7 @@ The code on this site is currently only found in a _tests_ branch.
     * missing support for graphical {{{lsgen}}}
     * missing support for {{{annotate}}}
     * suspicious effects with {{{merge}}}, maybe a !ClearCase bug.
-  * Known bugs:
+  * [http://code.google.com/p/clearcase-cpan/issues/list Known bugs]:
     * no support for interactive comments (problem in {{{cleartool -status}}}, not worked-around in !ClearCase::Argv)
     * indentation error in {{{lsgen}}} for _alternative paths_
   * Intentions:
