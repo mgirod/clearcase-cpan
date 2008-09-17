@@ -12,7 +12,6 @@ mentioned here.
 
 = Details =
 
-  * Stable version offered as a proposal for publication as 1.36
   * There are known problems and limitations (see issues)
     * interactive comments
     * test cases
