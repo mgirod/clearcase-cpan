@@ -1,0 +1,31 @@
+#summary Install ClearCase::CtCmd on Windows
+
+= Introduction =
+
+Installing [http://search.cpan.org/search?query=ClearCase%3A%3ACtCmd&mode=all ClearCase::CtCmd] on Windows may not be trivial.
+
+= Details =
+
+You need a compiler first, Visual Studio C more precisely.
+
+It is available for free from Microsoft, for non-commercial purposes, 
+as the Express Edition.
+Building your own perl modules is as I understand it, acceptable.
+
+Go to: [http://www.microsoft.com/express/]
+Get the version suitable for your Windows flavour:
+2005 for Windows 2000, 2008 for newer.
+
+But this is not enough: you need in addition the Windows (or Platform) SDK.
+Search for it on the previous page.
+Get again the one suitable for you.
+
+You need to set a few paths to make use of them.
+I just started a command shell from the VC++ menu.
+But I had then to set two environment strings (on w2k - on Vista, it may go easier):
+{{{
+set lib=C:\PROGRA~1\MIC977~1\Lib;C:\Progra~1\MICROS~4\VC\lib
+set inc=-I"C:\PROGRA~1\MIC977~1\Include"
+}}}
+These paths are of course mine, with short names got from {{{dir /x}}}
+(some 8bitpath setting enabled...)
