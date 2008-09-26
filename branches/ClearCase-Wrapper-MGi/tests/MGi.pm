@@ -109,20 +109,21 @@ sub findpredinstack($$) {
   return 0; 
 }
 sub setdepths {
-    my ($id, $dep, $gen) = @_;
-    if (defined($$gen{$id}{depth})) {
-	if ($$gen{$id}{depth} > $dep) {
-	    $$gen{$id}{depth} = $dep;
-	} else {
-	    return;
-	}
+  no warnings 'recursion';
+  my ($id, $dep, $gen) = @_;
+  if (defined($$gen{$id}{depth})) {
+    if ($$gen{$id}{depth} > $dep) {
+      $$gen{$id}{depth} = $dep;
     } else {
-	$$gen{$id}{depth} = $dep;
+      return;
     }
-    my @p = defined($$gen{$id}{parents}) ? @{ $$gen{$id}{parents} } : ();
-    foreach my $p (@p) {
-	setdepths($p, $$gen{$id}{depth} + 1, $gen);
-    }
+  } else {
+    $$gen{$id}{depth} = $dep;
+  }
+  my @p = defined($$gen{$id}{parents}) ? @{ $$gen{$id}{parents} } : ();
+  foreach my $p (@p) {
+    setdepths($p, $$gen{$id}{depth} + 1, $gen);
+  }
 }
 sub checkcs {
     use File::Basename;
