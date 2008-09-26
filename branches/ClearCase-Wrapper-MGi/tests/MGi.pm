@@ -227,16 +227,16 @@ sub lsgenealogy {
 	$pred =~ s%\\%/%g;
 	if ($ver =~ m%/CHECKEDOUT$%) {
 	  if ($pred =~ m%/0$% and @merge) {
-	    $merge[1] =~ m%^ *Merge <- .*?/([^/]+\@\@.*)$%;
-	    $ver = $1;
+	    $merge[1] =~ m%^ *Merge <- .*?\@\@(.*)$%;
+	    $ver = "$ele\@\@$1";
 	  } else {
 	    $ver = $pred;
 	  }
 	}
 	my $obsopt = $opt{obsolete}?' -obs':'';
-	my @vt = grep !m%/(0|[0-9]*[^0-9 ]+[^/ ]*)$%,
+	my @vt = grep m%/([1-9]\d*|CHECKEDOUT)( .*)?$%,
 	  $ct->argv('lsvtree', '-merge', "-all$obsopt", $ele)->qx;
-	map { s%\\%/%g } @v;
+	map { s%\\%/%g } @vt;
 	my %gen = ();
 	my @stack = ();
 	foreach my $g (@vt) {
