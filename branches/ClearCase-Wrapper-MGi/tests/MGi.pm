@@ -1,6 +1,6 @@
 package ClearCase::Wrapper::MGi;
 
-$VERSION = '0.06';
+$VERSION = '0.07';
 
 use AutoLoader 'AUTOLOAD';
 use ClearCase::Wrapper;
@@ -215,8 +215,9 @@ sub lsgenealogy {
     $ct->ipc(1) unless $ct->ctcmd(1);
 
     while (my $e = shift @argv) {
-	my ($ele, $ver, $type, $pred) =
-	  $ct->argv(qw(des -fmt "%En\n%En@@%Vn\n%m\n%En@@%PVn"),$e)->qx;
+	my ($ele, $ver, $type, $pred, @merge) =
+	  $ct->argv(qw(des -fmt "%En\n%En@@%Vn\n%m\n%En@@%PVn\n" -ahl Merge),
+		    $e)->qx;
 	if (!defined($type) or ($type !~ /version$/)) {
 	    warn Msg('W', "Not a version: $e");
 	    next;
@@ -224,9 +225,16 @@ sub lsgenealogy {
 	$ele =~ s%\\%/%g;
 	$ver =~ s%\\%/%g;
 	$pred =~ s%\\%/%g;
-	$ver = $pred if $ver =~ m%/CHECKEDOUT$%;
+	if ($ver =~ m%/CHECKEDOUT$%) {
+	  if ($pred =~ m%/0$% and @merge) {
+	    $merge[1] =~ m%^ *Merge <- .*?/([^/]+\@\@.*)$%;
+	    $ver = $1;
+	  } else {
+	    $ver = $pred;
+	  }
+	}
 	my $obsopt = $opt{obsolete}?' -obs':'';
-	my @vt = grep !m%/(0|[^0-9]+)$%,
+	my @vt = grep !m%/(0|[0-9]*[^0-9 ]+[^/ ]*)$%,
 	  $ct->argv('lsvtree', '-merge', "-all$obsopt", $ele)->qx;
 	map { s%\\%/%g } @v;
 	my %gen = ();
