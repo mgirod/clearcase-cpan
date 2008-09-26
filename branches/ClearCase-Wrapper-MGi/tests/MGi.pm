@@ -32,8 +32,8 @@ __END__
 ## Internal service routines, undocumented.
 sub sosbranch($$) { # same or sub- branch
     my ($cur, $prd) = @_;
-    $cur =~ s:/[0-9]+$:/:;
-    $prd =~ s:/[0-9]+$:/:;
+    $cur =~ s:/([0-9]+|CHECKEDOUT)$:/:;
+    $prd =~ s:/([0-9]+|CHECKEDOUT)$:/:;
     return ($cur =~ qr(^$prd));
 }
 sub printparents {
@@ -215,9 +215,8 @@ sub lsgenealogy {
     $ct->ipc(1) unless $ct->ctcmd(1);
 
     while (my $e = shift @argv) {
-	my ($ele, $ver, $type, $pred, @merge) =
-	  $ct->argv(qw(des -fmt "%En\n%En@@%Vn\n%m\n%En@@%PVn\n" -ahl Merge),
-		    $e)->qx;
+	my ($ele, $ver, $type, $pred) =
+	  $ct->argv(qw(des -fmt "%En\n%En@@%Vn\n%m\n%En@@%PVn"), $e)->qx;
 	if (!defined($type) or ($type !~ /version$/)) {
 	    warn Msg('W', "Not a version: $e");
 	    next;
@@ -225,14 +224,6 @@ sub lsgenealogy {
 	$ele =~ s%\\%/%g;
 	$ver =~ s%\\%/%g;
 	$pred =~ s%\\%/%g;
-	if ($ver =~ m%/CHECKEDOUT$%) {
-	  if ($pred =~ m%/0$% and @merge) {
-	    $merge[1] =~ m%^ *Merge <- .*?\@\@(.*)$%;
-	    $ver = "$ele\@\@$1";
-	  } else {
-	    $ver = $pred;
-	  }
-	}
 	my $obsopt = $opt{obsolete}?' -obs':'';
 	my @vt = grep m%/([1-9]\d*|CHECKEDOUT)( .*)?$%,
 	  $ct->argv('lsvtree', '-merge', "-all$obsopt", $ele)->qx;
@@ -240,22 +231,23 @@ sub lsgenealogy {
 	my %gen = ();
 	my @stack = ();
 	foreach my $g (@vt) {
-	    if ($g =~ m%^(.*) (\(.*\))$%) {
-		$g = $1;
-		$gen{$g}{labels} = $2;
-	    }
-	    if ($g =~ /^  -> (.*)$/) {
-		my $v = $1;
-		my $n = "$ele\@\@$v";
-		push @{ $gen{$stack[-1]}{children} }, $n;
-		push @{ $gen{$n}{parents} }, $stack[-1];
-		next;
-	    }
-	    if (findpredinstack($g, \@stack)) {
-		push @{ $gen{$g}{parents} }, $stack[-1];
-		push @{ $gen{$stack[-1]}{children} }, $g;
-	    }
-	    push @stack, $g;
+	  $g =~ s%^(.*/CHECKEDOUT) view ".*"(.*)$%$1$2%;
+	  if ($g =~ m%^(.*) (\(.*\))$%) {
+	    $g = $1;
+	    $gen{$g}{labels} = $2;
+	  }
+	  if ($g =~ /^  -> (.*)$/) {
+	    my $v = $1;
+	    my $n = "$ele\@\@$v";
+	    push @{ $gen{$stack[-1]}{children} }, $n;
+	    push @{ $gen{$n}{parents} }, $stack[-1];
+	    next;
+	  }
+	  if (findpredinstack($g, \@stack)) {
+	    push @{ $gen{$g}{parents} }, $stack[-1];
+	    push @{ $gen{$stack[-1]}{children} }, $g;
+	  }
+	  push @stack, $g;
 	}
 	setdepths($ver, 0, \%gen);
 	my %seen = ();
