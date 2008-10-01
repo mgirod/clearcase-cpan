@@ -1,4 +1,4 @@
-#summary Support for !ClearCase on !CygWin
+#summary Support for ClearCase on CygWin
 
 = Introduction =
 
