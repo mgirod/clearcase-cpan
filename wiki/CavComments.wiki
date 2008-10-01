@@ -9,7 +9,7 @@ The status is to satisfy oneself with a (partial) work around.
 = Details =
 
   * There is a current issue with ipc
-  * The problem interferes with the work-around for the [http://www-128.ibm.com/developerworks/support/rational/rfe/execute?use_case=searchChangeRequests&PROD_ID=0&COMP_ID=0&RESP_ID=0&CREATED_BY=314 bug (RFE 423, acknowledged as defect RATLC01064211)] in _cleartool -status_
+  * The problem interferes with the work-around for the [http://www-128.ibm.com/developerworks/support/rational/rfe/execute?use_case=searchChangeRequests&PROD_ID=0&COMP_ID=0&RESP_ID=0&CREATED_BY=314 bug] (RFE 423, acknowledged as defect RATLC01064211, but now [http://www-01.ibm.com/support/docview.wss?uid=swg1PK69112 closed] as a user error!) in _cleartool -status_
   * There is a workaround for unix, which as it is, fails on Windows
   * Interactive comments are not essential for writing scripts
   * It is important for writing wrappers
