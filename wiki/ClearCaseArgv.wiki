@@ -13,7 +13,7 @@ mentioned here.
 = Details =
 
   * There are known problems and limitations (see issues)
-    * interactive comments
+    * [CavComments interactive comments]
     * test cases
     * quoting
     * setview
