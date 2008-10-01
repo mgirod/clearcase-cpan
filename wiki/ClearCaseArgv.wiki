@@ -19,7 +19,7 @@ mentioned here.
     * setview
     * ccreport
     * multitool
-    * no support for cygwin on Windows
+    * no [CygWinSupport support for cygwin] on Windows
 
 = General =
 
