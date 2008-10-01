@@ -5,6 +5,8 @@
 In the current version, in _ipc_ mode, commands prompting for a comment hang.
 
 The status is to satisfy oneself with a (partial) work around.
+Given the refusal by IBM to fix the problem, this may be reconsidered.
+One could trade the support for setview for this for comments...
 
 = Details =
 
