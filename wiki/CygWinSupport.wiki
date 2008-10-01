@@ -1,0 +1,16 @@
+#summary Support for !ClearCase on !CygWin
+
+= Introduction =
+
+!ClearCase is available on Windows, but not on !CygWin.
+Supporting !CygWin in !ClearCase::Argv would result in a wrapper offering the illusion of a port of !ClearCase onto !CygWin.
+
+= Details =
+
+The support should be exclusively in !ClearCase::Argv, not in Argv: the bulk of the applications one might want to use via Argv are !CygWin, not Windows, applications.
+The interest of the port is the usage of cleartool via a wrapper.
+
+The problems to solve are:
+  * input paths
+  * output paths
+  * end-of-line convention in cleartool output
