@@ -1,12 +1,13 @@
 package ClearCase::Argv;
 
-$VERSION = '1.40';
+$VERSION = '1.38';
 
 use Argv 1.23;
 use Text::ParseWords;
 
-use constant MSWIN => $^O =~ /MSWin32|Windows_NT/i ? 1 : 0;
-my $NUL = MSWIN ? 'NUL' : '/dev/null';
+use constant CYGWIN => $^O eq 'cygwin';
+use constant MSWIN => CYGWIN | $^O =~ /MSWin32|Windows_NT/i ? 1 : 0;
+my $NUL = (MSWIN and !CYGWIN) ? 'NUL' : '/dev/null';
 
 @ISA = qw(Argv);
 %EXPORT_TAGS = ( 'functional' => [ qw(ctsystem ctexec ctqx ctqv ctpipe chdir) ] );
@@ -17,9 +18,17 @@ my $NUL = MSWIN ? 'NUL' : '/dev/null';
 use strict;
 
 my $class = __PACKAGE__;
+my $cygpfx = '';
+if (CYGWIN) {
+    $class->inpathnorm(1);
+    $class->outpathnorm(1);
+    $cygpfx = (split/ +/,(`df /tmp`)[1])[0];
+}
 my %pidcount;
 END {
+  my $ret = $?;
   ClearCase::Argv->ipc(0); #Kill any remaining coprocess
+  exit $ret;
 }
 # For programming purposes we can't allow per-user preferences.
 if ($ENV{CLEARCASE_PROFILE}) {
@@ -34,15 +43,14 @@ for (grep !/^_/, keys %Argv::Argv) {
     $Argv::Argv{$_} = $ENV{$ev} if defined $ENV{$ev};
 }
 
-my @ct = ('cleartool');
+my $ct = 'cleartool';
 
 # Attempt to find the definitive ClearCase bin path at startup. Don't
 # try excruciatingly hard, it would take unwarranted time. And don't
 # do so at all if running setuid or as root. If this doesn't work,
-# the path can be set explicitly via the 'cleartool_path' class method.
+# the path can be set explicitly via the 'find_cleartool' class method.
 if (!MSWIN && ($< == 0 || $< != $>)) {
-    # running setuid or as root
-    @ct = ('/opt/rational/clearcase/bin/cleartool');
+    $ct = '/usr/atria/bin/cleartool';	# running setuid or as root
 } elsif ($ENV{PATH} !~ m%\W(atria|ClearCase)\Wbin\b%i) {
     if (!MSWIN) {
 	my $abin = $ENV{ATRIAHOME} ? "$ENV{ATRIAHOME}/bin" : '/usr/atria/bin';
@@ -63,12 +71,7 @@ if (!MSWIN && ($< == 0 || $< != $>)) {
 }
 
 # Class method to get/set the location of 'cleartool'.
-sub cleartool_path {
-    shift;
-    @ct = @_ if @_;
-    return wantarray ? @ct : $ct[0];
-}
-*find_cleartool = \&cleartool_path;  # backward compatibility 
+sub find_cleartool { (undef, $ct) = @_ if $_[1]; $ct }
 
 # Override of base-class method to change a prog value of 'foo' into
 # qw(cleartool foo). If the value is already an array or array ref
@@ -81,7 +84,7 @@ sub prog {
     if (@_ || ref($prg) || $prg =~ m%^/|^\S*cleartool% || $self->ctcmd) {
 	return $self->SUPER::prog($prg, @_);
     } else {
-	return $self->SUPER::prog([@ct, parse_line('\s+', 1, $prg)], @_);
+	return $self->SUPER::prog([$ct, parse_line('\s+', 1, $prg)], @_);
     }
 }
 
@@ -174,7 +177,12 @@ sub qx {
     return $class->new(@_)->qx if !ref($_[0]) || ref($_[0]) eq 'HASH';
     my $self = shift;
 
-    return $self->SUPER::qx(@_) unless $self->ctcmd || $self->ipc;
+    unless ($self->ctcmd || $self->ipc) {
+        my @ret = $self->SUPER::qx(@_);
+        map { s/\r//g } @ret  if CYGWIN;
+	$self->unixpath(@ret) if MSWIN && $self->outpathnorm;
+        return wantarray? @ret : join '', @ret;
+    }
 
     my($rc, $data, $errors);
     my $dbg = $self->dbglevel;
@@ -288,14 +296,17 @@ sub pipe {
 sub unixpath {
     my $self = shift;
     $self->SUPER::unixpath(@_);
+    map {
+      if (m%^([A-Za-z]):(.*)$%) { $_ = "/cygdrive/" . lc($1) . $2 }
+    } @_ if CYGWIN;
     # Now apply CC-specific, @@-sensitive transforms to partial lines.
     for my $line (@_) {
-	my $fixed = '';
-	for (split(m%(\S+@@\S+)%, $line)) {
-	    s%\\%/%g if m%^\S+@@\S+$%;
-	    $fixed .= $_;
-	}
-	$line = $fixed;
+        my $fixed = '';
+        for (split(m%(\S+@@\S+)%, $line)) {
+            s%\\%/%g if m%^\S+@@\S+$%;
+            $fixed .= $_;
+        }
+        $line = $fixed;
     }
 }
 
@@ -388,11 +399,11 @@ sub _ctcmd_cmd2cal {
     my $self = ref($_[0]) ? shift : undef;
     # It may make more sense to stash a copy of this object rather than
     # recreate it each time.
-    my $ccct = Win32::OLE->new('ClearCase.ClearTool');
+    my $ct = Win32::OLE->new('ClearCase.ClearTool');
     # Turn list cmds into a quoted string.
     my $cmd = (@_ == 1) ? $_[0] : join(' ', map {"'$_'"} @_);
     # Send the actual command to CAL and get stdout returned.
-    my $out = $ccct->CmdExec($cmd);
+    my $out = $ct->CmdExec($cmd);
     # Must reap the return code first, then get stderr IFF retcode != 0.
     my $rc = int Win32::OLE->LastError;
     my $err = $rc ? Win32::OLE->LastError . "\n" : '';
@@ -467,9 +478,13 @@ sub ipc {
     # This should never fail to load since it's built in.
     require IPC::Open3;
 
+    my $ct = MSWIN ?
+	'cleartool' :
+	join('/', $ENV{ATRIAHOME}||'/opt/rational/clearcase', 'bin/cleartool');
+
     # Dies on failure.
     my($down, $back);
-    my $pid = IPC::Open3::open3($down, $back, undef, @ct);
+    my $pid = IPC::Open3::open3($down, $back, undef, $ct);
 
     # Set the "line discipline" to convert CRLF to \n.
     binmode $back, ':crlf';
@@ -491,6 +506,7 @@ sub _ipc_cmd {
     $self->_dbg($dbg, '=>', \*STDERR, @_) if $dbg;
 
     # Send the command to cleartool.
+    map { s%^/cygdrive/([A-Za-z])%$1:% or s%^/%$cygpfx/%; } @_ if CYGWIN;
     my $cmd =
       join(' ', map {/\s/ && !(/^'.+'$/ || /^".+"$/) ? qq("$_") : $_} @_);
     chomp $cmd;
@@ -529,6 +545,7 @@ sub _ipc_cmd {
 	}
 	print '+ <=', $_ if $_ && $dbg >= 2;
 	next if $next;
+	$self->unixpath($_) if MSWIN && $self->outpathnorm;
 	if ($disposition) {
 	    push(@$disposition, $_);
 	} else {
@@ -615,6 +632,10 @@ sub quote {
     for (@_) {
 	# If requested, change / for \ in Windows file paths.
 	s%/%\\%g if $inpathnorm;
+	if (CYGWIN) {
+	    s%^/cygdrive/([a-za-z])%$1:%;
+	    s%^/%$cygpfx/%;
+	}
 	# Now quote embedded quotes ...
 	s%'%\\'%g;
 	# and then the entire string.
@@ -651,8 +672,8 @@ sub _chdir {
     chomp $dir;
     my $rc = CORE::chdir($dir);
     if ($self->ipc) {
-        my $ctcd = ref($self) ? $self->clone : __PACKAGE__->new;
-        $ctcd->stdout(0)->argv('cd', $dir)->system;
+        my $ct = ref($self) ? $self->clone : __PACKAGE__->new;
+        $ct->stdout(0)->argv('cd', $dir)->system;
     }
     return $rc;
 }
@@ -747,7 +768,7 @@ I<ALTERNATE EXECUTION INTERFACES> below for how to invoke them. Sample
 scripts are packaged with I<ClearCase::Argv> in ./examples.
 
 I<As ClearCase::Argv is in most other ways identical to its base
-class, see C<perldoc Argv> for substantial further documentation.>
+class>, see C<perldoc Argv> for substantial further documentation.>
 
 =head2 OVERRIDDEN METHODS
 
