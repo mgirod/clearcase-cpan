@@ -1,3 +1,0 @@
-This directory contains a couple of scripts for benchmarking
-ClearCase::Argv in ->fork_exec vs ->ctcmd modes. It's also easy to
-adapt them to add ->ipc mode.
