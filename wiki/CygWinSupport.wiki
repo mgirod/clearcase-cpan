@@ -21,3 +21,5 @@ I started to work on it in a _cygwin_ branch, but the result so far is not quite
   * {{{lsvob}}} returns vob paths without any kind of view mapped drive.
   * I tried the wrapper, but it fails for now in simple cases such as: {{{ctx setcs /tmp/cs}}}
   * Also {{{ctx lsgen ...}}} doesn't work correctly, probably because the regexps don't match (presence of remaining {{{\r}}}'s?)
+
+I took the wrong version of {{{Clearcase-Argv}}} as basis...
