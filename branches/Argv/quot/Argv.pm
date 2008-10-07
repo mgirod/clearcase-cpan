@@ -1,6 +1,6 @@
 package Argv;
 
-$VERSION = '1.23';
+$VERSION = '1.24';
 @ISA = qw(Exporter);
 
 use constant MSWIN => $^O =~ /MSWin32|Windows_NT/i ? 1 : 0;
@@ -371,7 +371,10 @@ sub argv {
 	$self->prog(shift) if @_;
 	$self->attrs(shift) if ref($_[0]) eq 'HASH';
 	$self->opts(@{shift @_}) if ref $_[0] eq 'ARRAY';
-	$self->args(@_) if @_;
+	if (@_) {
+	  $self->args(@_);
+	  map { s/^\"(.*)\"$/$1/ } @{$self->{AV_ARGS}} if MSWIN;
+	}
 	return $self;
     } else {
 	my @cmd = ($self->prog, $self->opts, $self->args);
