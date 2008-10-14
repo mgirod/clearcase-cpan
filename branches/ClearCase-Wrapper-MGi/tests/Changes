@@ -27,3 +27,5 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 0.07 Fri Sep 26 10:51:39 BST 2008
 	- lsgen: skip branch objects with digits in their name
 	- lsgen: when checked out from version 0, use source of merge arrow
+	- lsgen: use of portable quoting pattern
+	- checkcs/co: fix for use of relative path

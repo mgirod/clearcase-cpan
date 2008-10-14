@@ -127,17 +127,13 @@ sub setdepths {
 }
 sub checkcs {
     use File::Basename;
+    use Cwd;
     my ($ct, $v) = @_;
     $ct = $ct->clone();
     $v =~ s/^(.*?)\@\@.*$/$1/;
     my $dest = dirname($v);
-    my $pwd = 0;
-    if ($ct->ipc() or $ct->ctcmd()) {
-	$ct->stdout(0)->argv('cd', $dest)->system;
-    } else {
-	$pwd = getcwd();
-	chdir($dest);
-    }
+    my $pwd = getcwd();
+    chdir($dest);
     my @cs = grep /^\#\#:BranchOff: *root/, $ct->argv('catcs')->qx;
     chdir($pwd) if $pwd;
     return scalar @cs;
@@ -217,7 +213,7 @@ sub lsgenealogy {
 
     while (my $e = shift @argv) {
 	my ($ele, $ver, $type, $pred) =
-	  $ct->argv(qw(des -fmt "%En\n%En@@%Vn\n%m\n%En@@%PVn"), $e)->qx;
+	  $ct->argv(qw(des -fmt), '%En\n%En@@%Vn\n%m\n%En@@%PVn', $e)->qx;
 	if (!defined($type) or ($type !~ /version$/)) {
 	    warn Msg('W', "Not a version: $e");
 	    next;
