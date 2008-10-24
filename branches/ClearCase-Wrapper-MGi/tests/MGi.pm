@@ -274,96 +274,102 @@ indirect contributors.
 =cut
 
 sub checkout {
-    for (@ARGV[1..$#ARGV]) { $_ = readlink if -l && defined readlink }
-    my $ct = ClearCase::Argv->new({autochomp=>1});
-    $ct->ipc(1) unless $ct->ctcmd(1);
-    # Duplicate the base Wrapper checkout functionality.
-    my @agg = grep /^-(?:dir|rec|all|avo)/, @ARGV;
-    die Msg('E', "mutually exclusive flags: @agg") if @agg > 1;
-    if (@agg) {
-	# Remove the aggregation flag, push the aggregated list of
-	# not-checked-out file elements onto argv, and return.
-	my %opt;
-	GetOptions(\%opt, qw(directory recurse all avobs ok));
-	my @added = AutoNotCheckedOut($agg[0], $opt{ok}, 'f', @ARGV);
-	push(@ARGV, @added);
-    }
-    return 0 if grep /^-(bra|ver)/, @ARGV[1..$#ARGV];
+  for (@ARGV[1..$#ARGV]) {
+    $_ = readlink if -l && defined readlink;
+  }
+  my $ct = ClearCase::Argv->new({autochomp=>1});
+  $ct->ipc(1) unless $ct->ctcmd(1);
+  # Duplicate the base Wrapper checkout functionality.
+  my @agg = grep /^-(?:dir|rec|all|avo)/, @ARGV;
+  die Msg('E', "mutually exclusive flags: @agg") if @agg > 1;
+  if (@agg) {
+    # Remove the aggregation flag, push the aggregated list of
+    # not-checked-out file elements onto argv, and return.
     my %opt;
-    GetOptions(\%opt, qw(reserved unreserved nmaster out=s ndata ptime
-			 nwarn c=s cfile=s cq cqe nc
-			 query nquery usehijack));
-    if (my @o = grep /^-/, @ARGV) {
-	if (!(grep /^--$/, @o)) {
-	    warn Msg('E', "Unsupported options: @o");
-	    exit(1);
-	}
+    GetOptions(\%opt, qw(directory recurse all avobs ok));
+    my @added = AutoNotCheckedOut($agg[0], $opt{ok}, 'f', @ARGV);
+    push(@ARGV, @added);
+  }
+  return 0 if grep /^-(bra|ver)/, @ARGV[1..$#ARGV];
+  my %opt;
+  GetOptions(\%opt, qw(reserved unreserved nmaster out=s ndata ptime
+		       nwarn c=s cfile=s cq cqe nc
+		       query nquery usehijack));
+  if (my @o = grep /^-/, @ARGV) {
+    if (!(grep /^--$/, @o)) {
+      warn Msg('E', "Unsupported options: @o");
+      exit(1);
     }
-    my @gopts = ();
-    push @opts, q(-res) if $opt{reserved};
-    push @gopts, q(-unr) if $opt{unreserved};
-    push @gopts, q(-nma) if $opt{nmaster};
-    push @gopts, q(-out), $opt{out}     if $opt{out};
-    push @gopts, q(-nda) if $opt{ndata};
-    push @gopts, q(-pti) if $opt{ptime};
-    push @gopts, q(-nwa) if $opt{nwarn};
-    push @gopts, q(-cfi), $opt{cfile}   if $opt{cfile};
-    push @gopts, q(-cq)  if $opt{cq};
-    push @gopts, q(-cqe) if $opt{cqe};
-    push @gopts, q(-que) if $opt{query};
-    push @gopts, q(-nqu) if $opt{nquery};
-    push @gopts, q(-use) if $opt{usehijack};
-    my @copt = ();
-    push @copt, q(-c), $opt{c} if $opt{c};
-    push @copt, q(-nc)         if $opt{nc};
-    my @args = ();
-    if (MSWIN) {
-	for (@ARGV[1..$#ARGV]) { push @args, glob($_); }
-    } else {
-	@args = @ARGV[1..$#ARGV];
+  }
+  my @gopts = ();
+  push @opts, q(-res) if $opt{reserved};
+  push @gopts, q(-unr) if $opt{unreserved};
+  push @gopts, q(-nma) if $opt{nmaster};
+  push @gopts, q(-out), $opt{out}     if $opt{out};
+  push @gopts, q(-nda) if $opt{ndata};
+  push @gopts, q(-pti) if $opt{ptime};
+  push @gopts, q(-nwa) if $opt{nwarn};
+  push @gopts, q(-cfi), $opt{cfile}   if $opt{cfile};
+  push @gopts, q(-cq)  if $opt{cq};
+  push @gopts, q(-cqe) if $opt{cqe};
+  push @gopts, q(-que) if $opt{query};
+  push @gopts, q(-nqu) if $opt{nquery};
+  push @gopts, q(-use) if $opt{usehijack};
+  my @copt = ();
+  push @copt, q(-c), $opt{c} if $opt{c};
+  push @copt, q(-nc)         if $opt{nc};
+  my @args = ();
+  if (MSWIN) {
+    for (@ARGV[1..$#ARGV]) {
+      push @args, glob($_);
     }
-    my $rc = 0;
-    my %pbrt = ();
-    foreach my $e (@args) {
-	if ($ct->argv(qw(des -fmt %m), $e)->qx !~ /version$/) {
-	    warn Msg('W', "Not a version: $e");
-	    next;
-	}
-	my ($ver, $bt) = ();
-	my $sel = $ct->argv('ls', '-d', "$e")->qx;
-	if ($sel =~ /^(.*?) +Rule:.*-mkbranch (.*?)\]?$/) {
-	    ($ver, $bt) = ($1, $2);
-	}
-	if (checkcs($ct, $e) and $bt) {
-	    my $main = ($ct->argv('lsvtree', $e)->qx)[0];
-	    $main =~ s%^[^@]*\@\@[\\/](.*)$%$1%;
-	    my $vob = $ct->argv('des', '-s', "vob:$e")->qx;
-	    my $re = pbrtype(\%pbrt, $ct, "$bt\@$vob") ?
-		qr([\\/]${main}[\\/]$bt[\\/]\d+$) : qr([\\/]$bt[\\/]\d+$);
-	    if ($ver =~ m%$re%) {
-		$ct->argv('co', @gopts, @copt, $e);
-		$rc |= $ct->system;
-	    } else {
-		my $r = $ct->argv('mkbranch', @copt,
-				  '-ver', "/${main}/0", $bt, $e)->system;
-		if ($r) {
-		    $rc = 1;
-		} else {
-		    if ($ver !~ m%\@\@[\\/]${main}[\\/]0$%) {
-		        $rc |= $ct->argv('merge', '-to', $e, $ver)->system;
-		    }
-		}
-	    }
+  } else {
+    @args = @ARGV[1..$#ARGV];
+  }
+  my $rc = 0;
+  my %pbrt = ();
+  foreach my $e (@args) {
+    if ($ct->argv(qw(des -fmt %m), $e)->qx !~ /version$/) {
+      warn Msg('W', "Not a version: $e");
+      next;
+    }
+    my ($ver, $bt) = ();
+    my $sel = $ct->argv('ls', '-d', "$e")->qx;
+    if ($sel =~ /^(.*?) +Rule:.*-mkbranch (.*?)\]?$/) {
+      ($ver, $bt) = ($1, $2);
+    }
+    if (checkcs($ct, $e) and $bt) {
+      my $main = ($ct->argv('lsvtree', $e)->qx)[0];
+      $main =~ s%^[^@]*\@\@[\\/](.*)$%$1%;
+      my $vob = $ct->argv('des', '-s', "vob:$e")->qx;
+      my $re = pbrtype(\%pbrt, $ct, "$bt\@$vob") ?
+	qr([\\/]${main}[\\/]$bt[\\/]\d+$) : qr([\\/]$bt[\\/]\d+$);
+      if ($ver =~ m%$re%) {
+	$ct->argv('co', @gopts, @copt, $e);
+	$rc |= $ct->system;
+      } else {
+	my $r = $ct->argv('mkbranch', @copt,
+			  '-ver', "/${main}/0", $bt, $e)->system;
+	if ($r) {
+	  $rc = 1;
 	} else {
-	    $rc |= $ct->argv('co', @gopts, @copt, $e)->system;
+	  if ($ver !~ m%\@\@[\\/]${main}[\\/]0$%) {
+	    $rc |= $ct->argv('merge', '-to', $e, $ver)->stdout(0)->system;
+	    unlink glob("$e.contrib*");
+	  }
 	}
+      }
+    } else {
+      $rc |= $ct->argv('co', @gopts, @copt, $e)->system;
     }
-    exit $rc;
+  }
+  exit $rc;
 }
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2007 IONA Technologies PLC (mgirod@iona.com). All rights
+Copyright (c) 2007 IONA Technologies PLC (until v0.05),
+2008 Marc Girod (marc.girod@gmail.com) for later versions. All rights
 reserved.  This Perl program is free software; you may redistribute it
 and/or modify it under the same terms as Perl itself.
 
