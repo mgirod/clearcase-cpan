@@ -2,7 +2,7 @@
 
 = Introduction =
 
-This wrapper is distributed via CPAN, and was documented [http://search.cpan.org/search?query=ClearCase%3A%3AWrapper%3A%3AMGi&mode=all there]
+This wrapper is distributed via CPAN, and was documented [http://search.cpan.org/perldoc?ClearCase::Wrapper::MGi there]
 ([http://www.cmwiki.com/IncrementalTypesImp sketched in the cm wiki]).
 It builds upon !ClearCase::Wrapper and thus upon [ClearCaseArgv ClearCase::Argv].
 It aims at supporting various novel usage patterns of (base) !ClearCase.
