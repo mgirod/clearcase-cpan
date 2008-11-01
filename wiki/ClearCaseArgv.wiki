@@ -3,7 +3,7 @@
 = Introduction =
 
 This is a module by David Boyce,
-published and documented in [http://search.cpan.org/search?query=ClearCase%3A%3AArgv&mode=all CPAN],
+published and documented in [http://search.cpan.org/perldoc?ClearCase::Argv CPAN],
 currently there as [http://search.cpan.org/~dsb/ClearCase-Argv-1.40/Argv.pm 1.40].
 
 This site aims only at coordinating contributional work on this module,
