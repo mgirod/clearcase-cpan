@@ -280,3 +280,7 @@ Revision history for Perl extension ClearCase::Argv.
 
 1.40 Mon Sep  8 12:46:08 EDT 2008
 	- Fixed merge skew in setview and CCreport example scripts.
+
+1.42 Tue Oct  7 15:28:25 BST 2008
+	- exit code in the END clause, from the cygwin branch
+	- restored cleartool -status, new workaround for ClearCase setview bug

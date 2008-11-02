@@ -1,6 +1,6 @@
 package ClearCase::Argv;
 
-$VERSION = '1.40';
+$VERSION = '1.42';
 
 use Argv 1.23;
 use Text::ParseWords;
@@ -19,7 +19,9 @@ use strict;
 my $class = __PACKAGE__;
 my %pidcount;
 END {
+  my $ret = $?;
   ClearCase::Argv->ipc(0); #Kill any remaining coprocess
+  $? |= $ret;
 }
 # For programming purposes we can't allow per-user preferences.
 if ($ENV{CLEARCASE_PROFILE}) {
@@ -159,7 +161,12 @@ sub system {
 	}
 	$rc = $ctc->status;
     } else {
-	$rc = $self->_ipc_cmd(undef, @cmd);
+        if ($cmd[0] eq 'setview') {
+            return $self->SUPER::system(@cmd) if $cmd[1] eq '-exec';
+	    $self->ipc(0);
+	    return $self->ipc($cmd[1]);
+	}
+        $rc = $self->_ipc_cmd(undef, @cmd);
     }
     open(STDOUT, '>&_O'); close(_O);
     open(STDERR, '>&_E'); close(_E);
@@ -237,6 +244,11 @@ sub qx {
 	    return $data;
 	}
     } else {
+        if ($cmd[0] eq 'setview') {
+            return $self->SUPER::qx(@cmd) if $cmd[1] eq '-exec';
+            $self->ipc(0);
+            return $self->ipc($cmd[1]);
+        }
 	my @data = ();
 	$rc = $self->_ipc_cmd(\@data, @cmd);
 	print STDERR "+ (\$? == $?)\n" if $dbg > 1;
@@ -455,7 +467,7 @@ sub ipc {
     if ($self->ctcmd) {
 	$self->ctcmd(0);	# shut down the CtCmd connection
     }
-    if (exists($class->{IPC})) {
+    if (exists($class->{IPC}) and $level =~ /^\d+$/) {
         if (($self ne $class) and !$self->ipc) {
 	    ++$pidcount{$class->{IPC}->{PID}};
 	    $self->{IPC}->{PID}  = $class->{IPC}->{PID};
@@ -469,7 +481,10 @@ sub ipc {
 
     # Dies on failure.
     my($down, $back);
-    my $pid = IPC::Open3::open3($down, $back, undef, @ct);
+    my @cmd = ($level =~ /^\d+$/) ? (@ct, '-status')
+        : (@ct, qw(setview -exec),
+	   q('/opt/rational/clearcase/bin/cleartool -status'), $level);
+    my $pid = IPC::Open3::open3($down, $back, undef, @cmd);
 
     # Set the "line discipline" to convert CRLF to \n.
     binmode $back, ':crlf';
@@ -503,8 +518,6 @@ sub _ipc_cmd {
 	print $down $input, "\n.\n";
 	delete $self->{IPC}->{COMMENT};
     }
-    # Hack to simulate 'cleartool -status', until ClearCase bug fix
-    print $down "des -fmt \"Command 0 returned status 0\\n\" .\n";
 
     # Read back the results and get command status.
     my $rc = 0;
@@ -512,8 +525,7 @@ sub _ipc_cmd {
     while($_ = <$back>) {
         my ($last, $next);
 	my $out = *STDOUT;
-	if (m%^cleartool: (Error|Warning):%) {      #Simulate -status
-	    $rc += 1 << 8 if $1 eq 'Error';
+	if (m%^cleartool: (Error|Warning):%) {
 	    if ($self->stderr) {
 	        $out = *STDERR;
 	    } else {
@@ -523,7 +535,7 @@ sub _ipc_cmd {
 	}
 	if (s%^(.*)Command \d+ returned status (\d+)%$1%) {
 	    # Shift the status up so it looks like an exit status.
-	    # $rc = $2 << 8;                        #-status disabled
+	    $rc = $2 << 8;
 	    chomp;
 	    $_ ? $last = 1 : last;
 	}
@@ -533,15 +545,6 @@ sub _ipc_cmd {
 	    push(@$disposition, $_);
 	} else {
 	    print $out $_;
-	}
-	if (/^Comments for /) {
-	    while (<>) {
-	        chomp;
-		print $down "$_\n";
-	        last if /^\.$/;
-	    }
-	    print $down ".\n" unless defined($_);
-	    print $down "des -fmt \"Command 0 returned status 0\\n\" .\n";
 	}
 	last if $last;
     }
@@ -747,7 +750,7 @@ I<ALTERNATE EXECUTION INTERFACES> below for how to invoke them. Sample
 scripts are packaged with I<ClearCase::Argv> in ./examples.
 
 I<As ClearCase::Argv is in most other ways identical to its base
-class, see C<perldoc Argv> for substantial further documentation.>
+class>, see C<perldoc Argv> for substantial further documentation.>
 
 =head2 OVERRIDDEN METHODS
 
@@ -1001,10 +1004,11 @@ performs correctly with GLOB objects... Work-around in place.
 The string 'cleartool' is hard-coded in many places, making it hard to
 implement additional support for multitool commands.
 
-The use of 'cleartool -status' needed to be disabled, and simulated,
-because of a ClearCase bug, with setview exiting the interactive session
-to the shell (Found from 2002.05.00 to 7.0.1).
-The result in an ipc mode using '-status' was: hang.
+The use of 'cleartool -status' was restored, because of the failure to
+handle interactive comments without it. The ClearCase bug, with setview
+exiting the interactive session to the shell (Found from 2002.05.00 to 7.0.1
+and resulting in a hang under the ipc mode) is worked around by starting a
+new coprocess in the new view.
 
 Cygwin is not supported on Windows.
 
