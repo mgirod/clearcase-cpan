@@ -26,6 +26,14 @@ I can detect the 'setview' request, and indeed start a second process with:
 
 (foo being the view).
 
+I tested the idea in the _status_ branch.
+Summary, at least for now:
+  * Interactive comments work fine with {{{cleartool -status}}}, e.g. from a wrapper.
+  * {{{setview -exec}}} can be handled by a fork. However, plain {{{Argv}}} does something strange trying to parse options into sets, which results in spurious warnings.
+  * {{{cleartool setview -exec "cleartool -status" foo}}} doesn't work with {{{IPC::Open3}}}: the pid and pipes returned are the ones to the transient process, not the {{{cleartool -status}}} one. Writing to {{{$down}}} results in 'Broken pipe'.
+
+Disabling the use of {{{setview}}} (unavailable anyway on Windows) may be the best compromise.
+
 == First Workaround ==
 
 The way the _ipc_ mode works is by sending commands to the running coprocess, and reading replies.
