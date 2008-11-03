@@ -482,8 +482,7 @@ sub ipc {
     # Dies on failure.
     my($down, $back);
     my @cmd = ($level =~ /^\d+$/) ? (@ct, '-status')
-        : (@ct, qw(setview -exec),
-	   q('/opt/rational/clearcase/bin/cleartool -status'), $level);
+        : (@ct, qw(setview -exec), q(cleartool -status), $level);
     my $pid = IPC::Open3::open3($down, $back, undef, @cmd);
 
     # Set the "line discipline" to convert CRLF to \n.
@@ -750,7 +749,7 @@ I<ALTERNATE EXECUTION INTERFACES> below for how to invoke them. Sample
 scripts are packaged with I<ClearCase::Argv> in ./examples.
 
 I<As ClearCase::Argv is in most other ways identical to its base
-class>, see C<perldoc Argv> for substantial further documentation.>
+class, see C<perldoc Argv> for substantial further documentation.>
 
 =head2 OVERRIDDEN METHODS
 
@@ -1025,7 +1024,7 @@ versions. It's currently maintained on Solaris 9 and Windows XP with CC
 7.0 using Perl5.8.x.  Viability on other platforms and/or earlier
 versions is untestable by me.
 
-Marc Girod's testing environment: Solaris 8 and 10, and Windows 2000, 
+Marc Girod's testing environment: Solaris 8 and 10, and Windows 2000,
 without CtCmd and IPC::ChildSafe, with Clone.
 Tatyana Shpichko's testing environment: RedHat Linux 4, with and without
 CtCmd, and Windows XP without CtCmd.
