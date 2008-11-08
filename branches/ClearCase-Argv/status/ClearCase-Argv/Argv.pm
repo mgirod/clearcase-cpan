@@ -3,7 +3,6 @@ package ClearCase::Argv;
 $VERSION = '1.42';
 
 use Argv 1.23;
-use Text::ParseWords;
 
 use constant MSWIN => $^O =~ /MSWin32|Windows_NT/i ? 1 : 0;
 my $NUL = MSWIN ? 'NUL' : '/dev/null';
@@ -83,7 +82,9 @@ sub prog {
     if (@_ || ref($prg) || $prg =~ m%^/|^\S*cleartool% || $self->ctcmd) {
 	return $self->SUPER::prog($prg, @_);
     } else {
-	return $self->SUPER::prog([@ct, parse_line('\s+', 1, $prg)], @_);
+	require Text::ParseWords;
+	return $self->SUPER::prog([@ct,
+	    Text::ParseWords::parse_line('\s+', 1, $prg)], @_);
     }
 }
 
@@ -467,7 +468,7 @@ sub ipc {
     if ($self->ctcmd) {
 	$self->ctcmd(0);	# shut down the CtCmd connection
     }
-    if (exists($class->{IPC}) and $level =~ /^\d+$/) {
+    if (exists($class->{IPC}) and $level =~ m%^\d+$%) {
         if (($self ne $class) and !$self->ipc) {
 	    ++$pidcount{$class->{IPC}->{PID}};
 	    $self->{IPC}->{PID}  = $class->{IPC}->{PID};
@@ -476,6 +477,7 @@ sub ipc {
 	}
 	return $self;
     }
+
     # This should never fail to load since it's built in.
     require IPC::Open3;
 
@@ -982,8 +984,8 @@ I suspect there are still some special quoting situations unaccounted
 for in the I<quote> method. This will need to be refined over time. Bug
 reports or patches gratefully accepted.
 
-Commands using a format option defining a multiline output fail in many
-cases in fork mode, because of the underlying Argv module.
+Commands using a format option defining a multi-line output fail in
+many cases in fork mode, because of the underlying Argv module.
 
 ClearCase::Argv will use IPC::ChildSafe if it finds it, which may 
 introduce differences of behavior with the newer code to replace it.
@@ -992,12 +994,12 @@ It should probably just drop it, unless explicitly driven to use it.
 Autochomp should be equivalent in all modes on all platforms, which
 is hard to test (ipc w/wo IPC::ChildSafe, ctcmd, on Unix and Windows,
 with system and qx...).
-The autochomp setting should not affect system calls in ipc mode!?
+The autochomp setting should not affect system() in ipc mode!?
 Hopefully it doesn't anymore. Problem: change not satisfactorily tested
 on Windows yet (where the output prior to the last change seemed ok...)
 
-Argv uses the first of three different methods for cloning, and I
-(Marc Girod) suspect that only the first one (Clone, in recent versions)
+Argv uses the first-found of three different modules for cloning, and
+Marc Girod suspects that only the first one (Clone, in recent versions)
 performs correctly with GLOB objects... Work-around in place.
 
 The string 'cleartool' is hard-coded in many places, making it hard to
