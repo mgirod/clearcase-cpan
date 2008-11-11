@@ -20,4 +20,4 @@ I started to work on it in a _cygwin_ branch, but the result so far is not quite
   * I need more than just tweaking the paths: also the config spec rules, for instance, or the version extended paths.
   * {{{lsvob}}} returns vob paths without any kind of view mapped drive.
   * I tried the wrapper, but it fails for now in simple cases such as: {{{ctx setcs /tmp/cs}}}
-  * Also {{{ctx lsgen ...}}} doesn't work correctly, probably because the regexps don't match (presence of remaining {{{\r}}}'s?)
+  * {{{ctx lsgen ...}}} seems to work at least in some cases.
