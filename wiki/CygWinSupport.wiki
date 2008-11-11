@@ -18,6 +18,6 @@ The problems to solve are:
 I started to work on it in a _cygwin_ branch, but the result so far is not quite convincing.
   * I see how to deal with {{{qx}}}, but not that well with {{{system}}} or {{{pipe}}}. {{{system}}} is required for a wrapper.
   * I need more than just tweaking the paths: also the config spec rules, for instance, or the version extended paths.
-  * {{{lsvob}}} returns vob paths without any kind of view mapped drive.
+  * {{{lsvob}}} returns vob paths without any kind of view mapped drive (OK).
   * I tried the wrapper, but it fails for now in simple cases such as: {{{ctx setcs /tmp/cs}}}
   * {{{ctx lsgen ...}}} seems to work at least in some cases.
