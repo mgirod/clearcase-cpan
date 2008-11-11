@@ -290,7 +290,7 @@ $final += printok($result[0] !~ m%\n%m);
 
 print qq(
 ************************************************************************
-Verify that, in ipc mode, the same co-process is shared by default between 
+Verify that, in ipc mode, the same co-process is shared by default between
 the different objects, with the same view, and the same current directory.
 Check that deleting one object does not affect the others.
 Check that using chdir affects a shared ipc coprocess.
@@ -316,10 +316,10 @@ my $view1 = $obj1->qx;
 }
 $view1 = $obj1->qx;
 $final += printok($view1);
+use Cwd;
+use constant MSWIN => $^O =~ /MSWin32|Windows_NT/i ? 1 : 0;
 {
-    use Cwd;
     my $cwd = getcwd();
-    use constant MSWIN => $^O =~ /MSWin32|Windows_NT/i ? 1 : 0;
     my $tmp = MSWIN ? $ENV{TEMP} : '/tmp';
     chdir($tmp);                     # overloaded chdir
     $tmp = $obj1->argv(pwd)->qx;     # existing sharing the global coprocessor
@@ -341,12 +341,13 @@ my $view2;
     my $pipeaview = ClearCase::Argv->new;
     $pipeaview->readonly('yes');
     $pipeaview->autofail(0);
+    $pipeaview->stderr(0);
     #Find a dynamic view different from $view1
     $pipeaview->pipecb(
 	sub {
 	    $view2 = shift;
 	    chomp $view2;
-	    return 'continue' if grep /View attributes:.*snaphot/,
+	    return 'continue' if grep /^View attributes:.*snapshot/,
 	        $obj1->argv(qw(lsview -l), $view2)->qx;
 	    return ($view2 eq $view1); # continue
 	});

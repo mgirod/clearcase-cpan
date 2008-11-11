@@ -689,7 +689,9 @@ sub new {
 # Clean up leftover cleartool processes if user forgot to.
 sub DESTROY {
     my $self = shift;
+    my $ret = $?;
     $self->ipc(0) if $self->ipc;
+    $? |= $ret;
 }
 
 1;
