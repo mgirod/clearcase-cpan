@@ -290,7 +290,7 @@ $final += printok($result[0] !~ m%\n%m);
 
 print qq(
 ************************************************************************
-Verify that, in ipc mode, the same co-process is shared by default between 
+Verify that, in ipc mode, the same co-process is shared by default between
 the different objects, with the same view, and the same current directory.
 Check that deleting one object does not affect the others.
 Check that using chdir affects a shared ipc coprocess.
@@ -316,10 +316,10 @@ my $view1 = $obj1->qx;
 }
 $view1 = $obj1->qx;
 $final += printok($view1);
+use Cwd;
+use constant MSWIN => $^O =~ /MSWin32|Windows_NT/i ? 1 : 0;
 {
-    use Cwd;
     my $cwd = getcwd();
-    use constant MSWIN => $^O =~ /MSWin32|Windows_NT/i ? 1 : 0;
     my $tmp = MSWIN ? $ENV{TEMP} : '/tmp';
     chdir($tmp);                     # overloaded chdir
     $tmp = $obj1->argv(pwd)->qx;     # existing sharing the global coprocessor
@@ -341,22 +341,32 @@ my $view2;
     my $pipeaview = ClearCase::Argv->new;
     $pipeaview->readonly('yes');
     $pipeaview->autofail(0);
-    #Find a view different from $view1
+    $pipeaview->stderr(0);
+    #Find a dynamic view different from $view1
     $pipeaview->pipecb(
 	sub {
 	    $view2 = shift;
 	    chomp $view2;
+	    return 'continue' if grep /^View attributes:.*snapshot/,
+	        $obj1->argv(qw(lsview -l), $view2)->qx;
 	    return ($view2 eq $view1); # continue
 	});
     $pipeaview->argv(qw(lsview -s))->pipe;
 }
-if ($view2 and ClearCase::Argv->ipc(1) and !MSWIN) {
+if ($view2 and ClearCase::Argv->ipc(1) and !(MSWIN or CYGWIN)) {
     my $obj3 = ClearCase::Argv->new;
-    $obj3->argv('setview', $view2)->system;
+    $obj3->argv('setview', $view2)->stderr(0)->system;
     $view1 = $obj1->argv(qw(pwv -s))->qx;
     $view2 = $obj3->argv(qw(pwv -s))->qx;
     print "Current views in two ipc objects: 1: $view1; 2: $view2\n";
     $final += printok($view1 and $view2 and ($view1 ne $view2));
+    my $cwd = $obj1->argv('pwd')->qx;
+    chdir('/');
+    my $v22 = $obj1->argv(qw(setview -exec),
+			  '/opt/rational/clearcase/bin/cleartool pwv -s',
+			  $view2)->qx;
+    chdir($cwd);
+    $final += printok($v22 eq $view2);
 }
 
 print qq(
