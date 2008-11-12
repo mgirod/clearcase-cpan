@@ -114,8 +114,19 @@ sub exec {
 sub system {
     return $class->new(@_)->system if !ref($_[0]) || ref($_[0]) eq 'HASH';
     my $self = shift;
+    my @rargs = @_;
+    $self->_cvt_input_cw() if CYGWIN;
 
-    return $self->SUPER::system(@_) unless $self->ctcmd || $self->ipc;
+    if (!$self->ctcmd && !$self->ipc) {
+        if (CYGWIN) {
+	    my @ret = $self->SUPER::qv(@rargs);
+	    $self->unixpath(@ret);
+	    print join("", @ret), "\n" if @ret;
+	    return;
+	} else {
+	    return $self->SUPER::system(@rargs);
+	}
+    }
 
     my $envp = $self->envp;
     my($ifd, $ofd, $efd) = ($self->stdin, $self->stdout, $self->stderr);
@@ -188,9 +199,11 @@ sub system {
 sub qx {
     return $class->new(@_)->qx if !ref($_[0]) || ref($_[0]) eq 'HASH';
     my $self = shift;
+    my @rargs = @_;
+    $self->_cvt_input_cw() if CYGWIN;
 
     unless ($self->ctcmd || $self->ipc) {
-        my @ret = $self->SUPER::qx(@_);
+        my @ret = $self->SUPER::qx(@rargs);
         if (CYGWIN) {
 	    $self->unixpath(@ret);
         }
@@ -316,9 +329,9 @@ sub unixpath {
     if (CYGWIN) {
         map {
 	    s%\r%%g;
-	    s%\\%/%g if m%(^|\s)[."]*\\%;
-	    s%(^|\s)([A-Za-z]):%/cygdrive/&lc($1)%g;
+	    s%\\%/%g if m%((^|\s)(\.*|"|[A-Za-z]:)?|\@)\\%;
 	} @_;
+	if (m%(?:^|\s)([A-Za-z]):(.*)$%) { $_ = "/cygdrive/" . lc($1) . $2 }
     } else {
         $self->SUPER::unixpath(@_);
     }
@@ -519,6 +532,17 @@ sub ipc {
     return $self;
 }
 
+sub _cvt_input_cw($) {
+    my $self = shift;
+    map {
+        s%^/cygdrive/([A-Za-z])%$1:%;
+	if (m%^/%) {
+	    $_ = "${cygpfx}$_" if -r $_;
+	    s%/%\\\\%g;
+	}
+    } @{$self->{AV_ARGS}};
+}
+
 sub _ipc_cmd {
     my $self = shift;
     my $disposition = shift;
@@ -528,9 +552,8 @@ sub _ipc_cmd {
     $self->_dbg($dbg, '=>', \*STDERR, @_) if $dbg;
 
     # Send the command to cleartool.
-    map { s%^/cygdrive/([A-Za-z])%$1:% or s%^/%$cygpfx/%; } @_ if CYGWIN;
     my $cmd =
-      join(' ', map {/\s/ && !(/^'.+'$/ || /^".+"$/) ? qq("$_") : $_} @_);
+        join(' ', map {/\s/ && !(/^'.+'$/ || /^".+"$/) ? qq("$_") : $_} @_);
     chomp $cmd;
     my $down = $self->{IPC}->{DOWN};
     print $down $cmd, "\n";
