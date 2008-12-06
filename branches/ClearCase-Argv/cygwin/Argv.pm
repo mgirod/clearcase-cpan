@@ -537,8 +537,8 @@ sub _cvt_input_cw($) {
     map {
         s%^/cygdrive/([A-Za-z])%$1:%;
 	if (m%^/%) {
-	    $_ = "${cygpfx}$_" if -r $_;
-	    s%/%\\\\%g;
+	    $_ = "${cygpfx}$_" if -r $_ and !m%^//% ;
+	    s%/%\\%g;
 	}
     } @{$self->{AV_ARGS}};
 }
