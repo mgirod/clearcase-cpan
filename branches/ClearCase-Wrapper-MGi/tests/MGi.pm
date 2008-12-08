@@ -222,7 +222,7 @@ sub lsgenealogy {
 	$ver =~ s%\\%/%g;
 	$pred =~ s%\\%/%g;
 	my $obsopt = $opt{obsolete}?' -obs':'';
-	my @vt = grep m%/([1-9]\d*|CHECKEDOUT)( .*)?$%,
+	my @vt = grep m%/([1-9]\d*|CHECKEDOUT)( .*)?$%, grep s%\\%/%g,
 	  $ct->argv('lsvtree', '-merge', "-all$obsopt", $ele)->qx;
 	map { s%\\%/%g } @vt;
 	my %gen = ();
