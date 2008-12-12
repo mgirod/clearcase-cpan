@@ -17,9 +17,9 @@ The code on this site is currently only found in a _tests_ branch.
   * I also acknowledge deficiencies in the support for the branch-no-merge strategy:
     * verbose output for {{{co}}}, and no cleanup of the {{{*.contrib}}} files
     * missing support for {{{diff -pred}}}; and {{{des -fmt "%PVn"}}} and {{{%PSn}}}
-    * missing support for graphical {{{lsgen}}}
-    * missing support for {{{annotate}}}
-    * suspicious effects with {{{merge}}}, maybe a !ClearCase bug.
+    * missing support for graphical {{{lsgen}}} (based on Tk)
+    * missing support for {{{annotate}}} (based on pruning the -all output)
+    * suspicious effects with {{{merge}}}, maybe a !ClearCase bug, maybe not: cannot reproduce.
   * No major [http://code.google.com/p/clearcase-cpan/issues/list known bugs] now, but:
     * {{{mkbranch}}} functionality could be reconsidered (with a type different from the one mentioned with {{{-mkbranch}}} in the config spec)
   * Intentions:
@@ -29,5 +29,6 @@ The code on this site is currently only found in a _tests_ branch.
       * lock/unlock (locking both. Note: possible ownership problems)
       * folding config specs (automatic generation of the cascading rules)
       * consolidation of sparse fixed labels
+      * consider global types (using admin vobs or not)
     * availability of functionality from !ClearCase::Wrapper:DSB, such as inclusion of config spec components
     * integration of {{{synctree}}} under {{{cleartool}}}, including via the graphical interface.
