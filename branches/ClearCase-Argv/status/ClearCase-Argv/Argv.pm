@@ -534,6 +534,18 @@ sub _ipc_cmd {
 	        $next = 1;
 	    }
 	}
+	if (m%^Comments for %) {
+	  if ($disposition) {
+	    push(@$disposition, $_);
+	  } else {
+	    print $out $_;
+	  }
+	  while (<>) {
+	        chomp;
+		print $down "$_\n";
+	        last if m%^\.$%;
+	    }
+	}
 	if (s%^(.*)Command \d+ returned status (\d+)%$1%) {
 	    # Shift the status up so it looks like an exit status.
 	    $rc = $2 << 8;
