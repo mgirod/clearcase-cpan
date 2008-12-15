@@ -1,6 +1,6 @@
 package ClearCase::Argv;
 
-$VERSION = '1.42';
+$VERSION = '1.43';
 
 use Argv 1.23;
 
@@ -99,6 +99,7 @@ sub prog {
 sub exec {
     $class->new(@_)->exec if !ref($_[0]) || ref($_[0]) eq 'HASH';
     my $self = shift;
+    $self->ipc(1) if CYGWIN;
     if ($self->ctcmd) {
 	exit $self->system(@_) >> 8;
     } elsif ($self->ipc) {
@@ -566,7 +567,7 @@ sub _ipc_cmd {
     my $rc = 0;
     my $back = $self->{IPC}->{BACK};
     while($_ = <$back>) {
-        my ($last, $next);
+      my ($last, $next);
 	my $out = *STDOUT;
 	if (m%^cleartool: (Error|Warning):%) {
 	    if ($self->stderr) {
@@ -574,6 +575,19 @@ sub _ipc_cmd {
 	    } else {
 	        $self->stderr(0); # Restore after destructive read
 	        $next = 1;
+	    }
+	}
+	if (m%^Comments for %) {
+	  if ($disposition) {
+	    push(@$disposition, $_);
+	  } else {
+	    print $out $_;
+	  }
+	  while (<>) {
+	        chomp;
+		s%\r$%% if MSWIN;
+		print $down "$_\n";
+	        last if m%^\.$%;
 	    }
 	}
 	if (s%^(.*)Command \d+ returned status (\d+)%$1%) {
