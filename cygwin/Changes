@@ -151,3 +151,6 @@ Revision history for Perl extension ClearCase::Wrapper.
 1.14 Fri Aug  3 12:26:29 EDT 2007
 	- Fixed rt.cpan.org bug #28648 "ct man query_language"
 	  does not work.
+
+1.15 Sun Dec 14 18:01:56 GMTST 2008
+	- Under CYGWIN as well, default to ipc mode.
