@@ -60,10 +60,10 @@ if (@ARGV && !$ENV{CLEARCASE_WRAPPER_NATIVE} &&
 # we must use it in in order to parse them. But otherwise, so as
 # to not unduly slow down a cmd that isn't being overridden anyway,
 # we skip all that overhead and just exec.
-if ($^O =~ /MSWin32|Windows/ || defined $Argv::{new} || grep(m%^-/%, @ARGV)) {
+if ($^O =~ /MSWin32|cygwin/ || defined $Argv::{new} || grep(m%^-/%, @ARGV)) {
     if (grep !m%^-/%, @ARGV) {
 	require ClearCase::Argv;
-	ClearCase::Argv->VERSION(1.07);
+	ClearCase::Argv->VERSION(1.43);
 	ClearCase::Argv->attropts;
 	# The -ver flag/cmd is a special case - must be exec-ed.
 	exit system('cleartool', @ARGV) if $ARGV[0] =~ /^-ver/i;
