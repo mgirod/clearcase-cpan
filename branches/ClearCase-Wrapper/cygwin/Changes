@@ -153,4 +153,4 @@ Revision history for Perl extension ClearCase::Wrapper.
 	  does not work.
 
 1.15 Sun Dec 14 18:01:56 GMTST 2008
-	- Under CYGWIN as well, default to ipc mode.
+	- Under CYGWIN as well, default to ClearCase::Argv.
