@@ -1,6 +1,6 @@
 package ClearCase::Wrapper::MGi;
 
-$VERSION = '0.07';
+$VERSION = '0.08';
 
 use AutoLoader 'AUTOLOAD';
 use ClearCase::Wrapper;
@@ -348,7 +348,8 @@ sub checkout {
 	$ct->argv('co', @gopts, @copt, $e);
 	$rc |= $ct->system;
       } else {
-	my $r = $ct->argv('mkbranch', @copt,
+	my @mkbcopt = @copt? @copt : qw(-nc);
+	my $r = $ct->argv('mkbranch', @mkbcopt,
 			  '-ver', "/${main}/0", $bt, $e)->system;
 	if ($r) {
 	  $rc = 1;
