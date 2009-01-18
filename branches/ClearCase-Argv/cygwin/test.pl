@@ -336,38 +336,6 @@ ClearCase::Argv->ipc(0);
     my $pid3 = $obj->{IPC}->{PID};
     $final += printok($pid3 != $pid1);
 }
-my $view2;
-{
-    my $pipeaview = ClearCase::Argv->new;
-    $pipeaview->readonly('yes');
-    $pipeaview->autofail(0);
-    $pipeaview->stderr(0);
-    #Find a dynamic view different from $view1
-    $pipeaview->pipecb(
-	sub {
-	    $view2 = shift;
-	    chomp $view2;
-	    return 'continue' if grep /^View attributes:.*snapshot/,
-	        $obj1->argv(qw(lsview -l), $view2)->qx;
-	    return ($view2 eq $view1); # continue
-	});
-    $pipeaview->argv(qw(lsview -s))->pipe;
-}
-if ($view2 and ClearCase::Argv->ipc(1) and !(MSWIN or CYGWIN)) {
-    my $obj3 = ClearCase::Argv->new;
-    $obj3->argv('setview', $view2)->stderr(0)->system;
-    $view1 = $obj1->argv(qw(pwv -s))->qx;
-    $view2 = $obj3->argv(qw(pwv -s))->qx;
-    print "Current views in two ipc objects: 1: $view1; 2: $view2\n";
-    $final += printok($view1 and $view2 and ($view1 ne $view2));
-    my $cwd = $obj1->argv('pwd')->qx;
-    chdir('/');
-    my $v22 = $obj1->argv(qw(setview -exec),
-			  '/opt/rational/clearcase/bin/cleartool pwv -s',
-			  $view2)->qx;
-    chdir($cwd);
-    $final += printok($v22 eq $view2);
-}
 
 print qq(
 ************************************************************************

@@ -182,7 +182,11 @@ sub system {
 	$rc = $ctc->status;
     } else {
         if ($cmd[0] eq 'setview') {
-            return $self->SUPER::system(@cmd) if $cmd[1] eq '-exec';
+	    if ($cmd[1] eq '-exec') {
+	        my @c = @cmd;
+		unshift @c, @ct;
+		return system(@c);
+	    }
 	    $self->ipc(0);
 	    return $self->ipc($cmd[1]);
 	}
@@ -273,7 +277,14 @@ sub qx {
 	}
     } else {
         if ($cmd[0] eq 'setview') {
-            return $self->SUPER::qx(@cmd) if $cmd[1] eq '-exec';
+	    if ($cmd[1] eq '-exec') {
+	        my @c = @cmd;
+		$c[2] = q(') . $c[2] . q(');
+		unshift @c, @ct;
+		my $ret = qx(@c);
+		chomp($ret) if $self->autochomp;
+		return wantarray? split(/\n/, $ret) : $ret;
+	    }
             $self->ipc(0);
             return $self->ipc($cmd[1]);
         }
@@ -332,7 +343,9 @@ sub unixpath {
 	    s%\r%%g;
 	    s%\\%/%g if m%((^|\s)(\.*|"|[A-Za-z]:)?|\@)\\%;
 	} @_;
-	if (m%(?:^|\s)([A-Za-z]):(.*)$%) { $_ = "/cygdrive/" . lc($1) . $2 }
+	if (m%(?:^|\s)([A-Za-z]):(.*)(\n)?$%) {
+	  $_ = "/cygdrive/" . lc($1) . $2 . ($3?$3:'')
+	}
     } else {
         $self->SUPER::unixpath(@_);
     }
