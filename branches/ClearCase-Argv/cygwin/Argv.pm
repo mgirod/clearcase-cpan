@@ -131,7 +131,6 @@ sub system {
 
     my $envp = $self->envp;
     my($ifd, $ofd, $efd) = ($self->stdin, $self->stdout, $self->stderr);
-    $self->stderr(0) unless $efd; #workaround for destructive reading
     $self->args($self->glob) if $self->autoglob;
     my @prog = @{$self->{AV_PROG}};
     shift(@prog) if $prog[0] =~ m%cleartool%;
@@ -190,7 +189,7 @@ sub system {
 	    $self->ipc(0);
 	    return $self->ipc($cmd[1]);
 	}
-        $rc = $self->_ipc_cmd(undef, @cmd);
+        $rc = $self->_ipc_cmd(undef, $ofd, $efd, @cmd);
     }
     open(STDOUT, '>&_O'); close(_O);
     open(STDERR, '>&_E'); close(_E);
@@ -220,7 +219,6 @@ sub qx {
 
     my $envp = $self->envp;
     my($ifd, $ofd, $efd) = ($self->stdin, $self->stdout, $self->stderr);
-    $self->stderr(0) unless $efd; #workaround for destructive reading
     $self->args($self->glob) if $self->autoglob;
     my @prog = @{$self->{AV_PROG}};
     shift(@prog) if $prog[0] =~ m%cleartool%;
@@ -289,7 +287,7 @@ sub qx {
             return $self->ipc($cmd[1]);
         }
 	my @data = ();
-	$rc = $self->_ipc_cmd(\@data, @cmd);
+	$rc = $self->_ipc_cmd(\@data, $ofd, $efd, @cmd);
 	print STDERR "+ (\$? == $?)\n" if $dbg > 1;
 	if (wantarray) {
 	    chomp(@data) if $self->autochomp;
@@ -554,17 +552,17 @@ sub _cvt_input_cw($) {
     } @{$self->{AV_ARGS}};
 }
 
-sub _ipc_cmd {
+sub _ipc_cmd($$$$@) {
     my $self = shift;
-    my $disposition = shift;
+    my ($disposition, $stdout, $stderr, @cmd) = @_;
 
     # Handle verbosity.
     my $dbg = $self->dbglevel;
-    $self->_dbg($dbg, '=>', \*STDERR, @_) if $dbg;
+    $self->_dbg($dbg, '=>', \*STDERR, @cmd) if $dbg;
 
     # Send the command to cleartool.
     my $cmd =
-        join(' ', map {/\s/ && !(/^'.+'$/ || /^".+"$/) ? qq("$_") : $_} @_);
+        join(' ', map {/\s/ && !(/^'.+'$/ || /^".+"$/) ? qq("$_") : $_} @cmd);
     chomp $cmd;
     my $down = $self->{IPC}->{DOWN};
     print $down $cmd, "\n";
@@ -580,13 +578,13 @@ sub _ipc_cmd {
     my $rc = 0;
     my $back = $self->{IPC}->{BACK};
     while($_ = <$back>) {
-      my ($last, $next);
+        my ($last, $next, $err);
 	my $out = *STDOUT;
 	if (m%^cleartool: (Error|Warning):%) {
-	    if ($self->stderr) {
+	    if ($stderr) {
 	        $out = *STDERR;
+	        $err = 1;
 	    } else {
-	        $self->stderr(0); # Restore after destructive read
 	        $next = 1;
 	    }
 	}
@@ -612,14 +610,15 @@ sub _ipc_cmd {
 	print '+ <=', $_ if $_ && $dbg >= 2;
 	next if $next;
 	$self->unixpath($_) if CYGWIN;
-	if ($disposition) {
-	    push(@$disposition, $_);
-	} else {
-	    print $out $_;
+	if ($stdout or $err) {
+	    if ($disposition) {
+	        push(@$disposition, $_);
+	    } else {
+	        print $out $_;
+	    }
 	}
 	last if $last;
     }
-
     return $rc;
 }
 

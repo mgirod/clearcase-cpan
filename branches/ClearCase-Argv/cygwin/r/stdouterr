@@ -1,0 +1,20 @@
+# -*- perl -*-
+use strict;
+use Benchmark;
+select(STDERR); $| = 1; select(STDOUT); $| = 1;
+use ClearCase::Argv qw(chdir);
+
+ClearCase::Argv->summary;      # start keeping stats
+ClearCase::Argv->ipc(1);
+my $ct = ClearCase::Argv->new({autochomp=>1});
+print "The following command should fail silently...\n";
+$ct->argv(qw(des /tmp@@))->stderr(0)->system;
+print "End of the silent failure\n\n";
+my $err = $ct->argv(qw(des /tmp@@))->stdout(0)->qx;
+if ($err) {
+  print "The message we missed would have been:\n$err\n\nPassed.\n\n";
+} else {
+  print STDERR
+    "Failed: silencing the system call was sticky, and shouldn't have been\n";
+}
+print STDERR "\n", ClearCase::Argv->summary;   # print out the stats we kept

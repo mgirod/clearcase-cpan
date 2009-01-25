@@ -296,3 +296,6 @@ Revision history for Perl extension ClearCase::Argv.
 	- under CYGWIN, force the default to ipc mode (in exec)
 	- extracted the setview tests under a t directory (regression)
 	- setview handling in unix directly via system and qx
+	- removed a case of stickiness of stderr(0)
+	- support for stdout(0)->qx: rturning only stderr
+	- removed testing for bad quoting patterns

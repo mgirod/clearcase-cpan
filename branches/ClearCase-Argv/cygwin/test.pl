@@ -361,25 +361,12 @@ Quoting: exploring the options in a command with a multiline format.
 ************************************************************************
 );
 sub quotetest {
-    my ($desc, $aq, $l, $q, $s, $x) = @_;
+    my ($desc, $aq, $s, $x) = @_;
     my ($tc, $ret);
     my @okret = qw(a b);
     my $c = ClearCase::Argv->new;
-    print "$desc: ";
-    print $l ? "list, " : "single quoted string, ";
-    print "non" unless $q;
-    print " quoted format; autoquote: $aq\n";
-    if ($l and $q) {
-	$c->argv(qw(des -fmt "a\nb\n" .));
-    } elsif ($l and !$q) {
-	$c->argv(qw(des -fmt a\nb\n .));
-    } elsif (!$l and $q) {
-	$c->argv('des -fmt "a\nb\n" .');
-    } elsif (!$l and !$q) {
-	$c->argv('des -fmt a\nb\n .');
-    } else {
-	print "Non supported case\n";
-    }
+    print "$desc: autoquote: $aq\n";
+    $c->argv(qw(des -fmt), 'a\nb\n', '.');
     $rc = $c->stdout(0)->system if $s;
     if ($x) {
 	@ret = $c->qx;
@@ -389,19 +376,12 @@ sub quotetest {
 }
 ClearCase::Argv->ipc(0);
 ClearCase::Argv->ctcmd(0);
-quotetest('Fork model', 1, 1, 1, 0, 0);
-quotetest('Fork model', 1, 1, 0, 1, 0);
-quotetest('Fork model', 1, 0, 1, 0, 0);
-quotetest('Fork model', 1, 0, 0, 0, 0);
+quotetest('Fork model', 1, 0, 0);
+quotetest('Fork model', 1, 1, 0);
+quotetest('Fork model', 1, 0, 0);
 ClearCase::Argv->ipc(1);
-quotetest('IPC model', 1, 1, 1, 1, 1);
-quotetest('IPC model', 1, 1, 0, 1, 1);
-quotetest('IPC model', 1, 0, 1, 1, 1);
-quotetest('IPC model', 1, 0, 0, 1, 1);
-quotetest('IPC model', 0, 1, 1, 1, 1);
-quotetest('IPC model', 0, 1, 0, 1, 1);
-quotetest('IPC model', 0, 0, 1, 1, 1);
-quotetest('IPC model', 0, 0, 0, 1, 1);
+quotetest('IPC model', 1, 1, 1);
+quotetest('IPC model', 0, 1, 1);
 
 print qq(
 ************************************************************************

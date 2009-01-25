@@ -215,3 +215,11 @@ So, bottom line, C<ClearCase::Argv> now can be told to execute
 cleartool commands via the traditional C<process spawning> model OR via
 the specialty APIs (B<IPC> or B<ClearCase::CtCmd>).  Writing to the
 ClearCase::Argv API sets you free from that decision until runtime.
+
+=head1 TESTING
+
+Some regression testing cases were extracted from the main test.pl, which
+is meant as a fast smoke test, into an C<r> sub-directory.
+
+They are accessible one by one with e.g.:
+C<make test TEST_FILE=r/setup>
