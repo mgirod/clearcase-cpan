@@ -396,24 +396,6 @@ Quoting: exploring the options in a command with a whitespace in format.
 
 print qq(
 ************************************************************************
-Skipping error reporting, especially in ipc mode
-The system command is there to check that the label type is really
-not defined...
-************************************************************************
-);
-{
-  ClearCase::Argv->ipc(1);
-  my $ct = ClearCase::Argv->new;
-  print "Expected: one single report about NON_EXISTING_TYPE\n";
-  $ct->argv(qw(des -s lbtype:NON_EXISTING_TYPE))->system;
-  my $r1 = $ct->argv(qw(des -s lbtype:NON_EXISTING_TYPE))->stderr(0)->qx;
-  $ct->ctcmd(1); #works or not...
-  my $r2 = $ct->argv(qw(des -s lbtype:NON_EXISTING_TYPE))->stderr(0)->qx;
-  $final += printok(!$r1 and !$r2);
-}
-
-print qq(
-************************************************************************
 Before ending we'll use the 'summary' class method to see what cmds were run:
 ************************************************************************
 );

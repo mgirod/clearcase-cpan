@@ -364,6 +364,9 @@ sub ctcmd {
     my $level = shift;
     $level = 2 if !defined($level) && !defined(wantarray);
     if ($level) {
+        if ($self->ipc and !CYGWIN) {
+	    $self->ipc(0);	# shut the ipc down
+	}
 	eval { require ClearCase::CtCmd };
 	if ($@) {
 	    my $msg = $@;
@@ -391,8 +394,8 @@ sub ctcmd {
 			Win32::OLE->Option(Warn => 0);
 		    }
 		} else {
-		    warn("Warning: $msg, using fork/exec instead\n")
-			if $level == 2;
+		    my $rep = CYGWIN? "ipc" : "fork/exec";
+		    warn("Warning: $msg, using $rep instead\n") if $level == 2;
 		    return undef;
 		}
 	    } else {
@@ -406,9 +409,6 @@ sub ctcmd {
     if (defined($level)) {
 	if ($level) {
 	    ClearCase::CtCmd->VERSION(1.01) if $ClearCase::CtCmd::VERSION;
-	    if ($self->ipc) {
-		$self->ipc(0);	# shut the ipc down
-	    }
 	    $self->{CCAV_CTCMD} = 1;
 	    # If setting a class attribute, export it to the
 	    # env in case we fork a child using ClearCase::Argv.
