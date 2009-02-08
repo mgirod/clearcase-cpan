@@ -61,7 +61,7 @@ ok ($err, 'qx: stdout ignored, stderr ok.');
 @lastout = $ct->argv(@cmd)->stderr(0)->qx;
 ok (@lastout eq @expout, 'qx: stderr ignored, stdout ok.');
 TODO: {
-  eval { require ClearCase::Cmd };
+  eval { require ClearCase::CtCmd };
   local $TODO = "redirection not supported in fork model" if $@;
 # Test 6 -- same thing for ctcmd mode, or what emulates it
 $ct->ctcmd(2); #Gives a warning if CtCmd not installed
