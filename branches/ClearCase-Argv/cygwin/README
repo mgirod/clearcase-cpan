@@ -15,7 +15,7 @@ file is an accompanying overview and chronology.
 
 =head1 SUMMARY OF FEATURES
 
-=over 4
+=over 7
 
 =item * Interoperability/Portability
 
@@ -73,6 +73,16 @@ And remove the 'use ClearCase::Argv' line of course.
 There's a great deal of option-processing power inherited from the
 base class, much more in fact than most users will care about. Look
 in the PODs for more.
+
+=item * Cygwin Support
+
+The last version introduces experimental supports for Cygwin, on Windows
+platforms. This is meant to be installed on the Cygwin perl, and used under
+it (and not the Windows installation of perl).
+
+The support concerns the conversion of paths between Windows and Cygwin
+syntaxes, as well as the standardization of end-of-lines conventions.
+It is mostly useful under a ClearCase::Wrapper.
 
 =back
 

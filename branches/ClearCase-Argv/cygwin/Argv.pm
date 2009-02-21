@@ -19,6 +19,7 @@ use strict;
 my $class = __PACKAGE__;
 my $cygpfx = '';
 if (CYGWIN) {
+    require Text::ParseWords;
     $class->inpathnorm(1);
     $class->outpathnorm(1);
     $cygpfx = (split/ +/,(`df /tmp`)[1])[0];
@@ -48,8 +49,8 @@ my @ct = ('cleartool');
 # try excruciatingly hard, it would take unwarranted time. And don't
 # do so at all if running setuid or as root. If this doesn't work,
 # the path can be set explicitly via the 'cleartool_path' class method.
-if (!MSWIN && ($< == 0 || $< != $>)) {
-    # running setuid or as root
+if (!MSWIN && ($< == 0 || $< != $>  || !grep{$_}@ENV{qw(PATH ATRIAHOME)})) {
+    # running as root, or setuid, even if the same user as the suid one...
     @ct = ('/opt/rational/clearcase/bin/cleartool');
 } elsif ($ENV{PATH} !~ m%\W(atria|ClearCase)\Wbin\b%i) {
     if (!MSWIN) {
@@ -337,12 +338,17 @@ sub pipe {
 sub unixpath {
     my $self = shift;
     if (CYGWIN) {
-        map {
-	    s%\r%%g;
-	    s%\\%/%g if m%((^|\s)(\.*|"|[A-Za-z]:)?|\@)\\%;
-	} @_;
-	if (m%(?:^|\s)([A-Za-z]):(.*)(\n)?$%) {
-	  $_ = "/cygdrive/" . lc($1) . $2 . ($3?$3:'')
+	for my $line (@_) {
+	    my $nl = chomp $line;
+	    my @words = Text::ParseWords::parse_line('\s+', 1, $line);
+	    map {
+	        s%\\%/%g if m%(^(\..*|"|[A-Za-z]:|\w+)|\@)\\%;
+	        if (m%\A([A-Za-z]):(.*)\Z%) {
+		    $_ = "/cygdrive/" . lc($1) . $2;
+		}
+	    } @words;
+	    $line = join ' ', @words;
+	    $line .= "\n" if $nl;
 	}
     } else {
         $self->SUPER::unixpath(@_);

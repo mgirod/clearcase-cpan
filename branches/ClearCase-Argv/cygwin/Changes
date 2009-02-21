@@ -292,7 +292,7 @@ Revision history for Perl extension ClearCase::Argv.
 	- fix (Tatiana Shpichko) to bmccug example
 	- reintroduced the handling of interactive comments in ipc mode
 
-1.43 Sun Jan 11 17:25:37 GMTST 2009
+1.43 Sat Feb 21 19:19:26 GMTST 2009
 	- under CYGWIN, force the default to ipc mode (in exec)
 	- extracted the setview tests under an r directory (regression)
 	- moved the stout/stderr test cases there as well
@@ -301,3 +301,4 @@ Revision history for Perl extension ClearCase::Argv.
 	- support for stdout(0)->qx: returning only stderr
 	- removed testing for bad quoting patterns
 	- under ctcmd, reset ipc apart on cygwin (CtCmd won't install there)
+	- fix to respect \n in comments under cygwin, and testing
