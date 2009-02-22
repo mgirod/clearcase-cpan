@@ -2,7 +2,7 @@
 
 = Introduction =
 
-In the current version, commands prompting for a comment hang on Windows (and CygWin),
+In the current version, commands prompting for a comment hang on Windows (and !CygWin),
 but work on unix (not tested in ctcmd mode)
 
 There are two distinct problems in !ClearCase which interfere with the code:
