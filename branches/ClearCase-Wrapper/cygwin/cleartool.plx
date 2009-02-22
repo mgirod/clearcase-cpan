@@ -5,6 +5,9 @@ use vars '$prog';
 
 # The bulk of the code comes from ClearCase::Wrapper ...
 BEGIN {
+    # Helpful when discriminating between Windows and good OSes.
+    use constant MSWIN => $^O =~ /MSWin32|Windows_NT/i ? 1 : 0;
+
     # Derive the name we were run as and make it available globally for msgs.
     $prog = $ENV{CLEARCASE_WRAPPER_PROG} || (split m%[/\\]+%, $0)[-1];
 
