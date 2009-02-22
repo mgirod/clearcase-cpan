@@ -4,9 +4,10 @@ $VERSION = '1.43';
 
 use Argv 1.23;
 
-use constant MSWIN => $^O =~ /MSWin32|Windows_NT/i ? 1 : 0;
-use constant CYGWIN => $^O eq 'cygwin';
-my $NUL = MSWIN ? 'NUL' : '/dev/null';
+use constant MSWIN	=> $^O =~ /MSWin32|Windows_NT/i ? 1 : 0;
+use constant CYGWIN	=> $^O =~ /cygwin/i ? 1 : 0;
+
+my $NUL = MSWIN && !CYGWIN ? 'NUL' : '/dev/null';
 
 @ISA = qw(Argv);
 %EXPORT_TAGS = ( 'functional' => [ qw(ctsystem ctexec ctqx ctqv ctpipe chdir) ] );

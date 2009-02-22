@@ -30,4 +30,5 @@ examples/bench/read-bm.pl
 examples/bench/write-bm.pl
 r/setview
 r/stdouterr
+r/cygwin
 test.pl

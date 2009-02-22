@@ -302,3 +302,4 @@ Revision history for Perl extension ClearCase::Argv.
 	- removed testing for bad quoting patterns
 	- under ctcmd, reset ipc apart on cygwin (CtCmd won't install there)
 	- fix to respect \n in comments under cygwin, and testing
+	- All changes from 1.41 through here contributed by Marc Girod.

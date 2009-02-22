@@ -76,13 +76,13 @@ in the PODs for more.
 
 =item * Cygwin Support
 
-The last version introduces experimental supports for Cygwin, on Windows
-platforms. This is meant to be installed on the Cygwin perl, and used under
-it (and not the Windows installation of perl).
+Version 1.43 introduces experimental support for Cygwin on Windows
+platforms. This is meant to be installed on the Cygwin perl, and
+used under it (and not the Windows installation of perl).
 
-The support concerns the conversion of paths between Windows and Cygwin
-syntaxes, as well as the standardization of end-of-lines conventions.
-It is mostly useful under a ClearCase::Wrapper.
+The new support concerns the conversion of paths between Windows
+and Cygwin syntaxes, as well as the standardization of end-of-lines
+conventions.  It is particularly useful under a ClearCase::Wrapper.
 
 =back
 
