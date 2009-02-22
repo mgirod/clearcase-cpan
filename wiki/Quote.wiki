@@ -2,10 +2,10 @@
 
 = Introduction =
 
-We know of quoting issues in !ClearCase::Argv,
-e.g. [http://code.google.com/p/clearcase-cpan/issues/detail?id=13 issue 13].
+We know of quoting issues in !ClearCase::Argv but not in ipc mode.
+[http://code.google.com/p/clearcase-cpan/issues/detail?id=13 issue 13] was finally considered 'not a bug'.
 
-Some usage patterns must however be identified and discouraged.
+Some usage patterns must be identified and discouraged.
 
 = Details =
 
@@ -13,6 +13,3 @@ The main mechanism to deal with quoting issue is via the quote member function, 
 It is called for now from Argv::system readpipe, qx, under testing the autoquote variable.
 
 Now, those functions are not called from the !ClearCase::Argv overloaded members, in ipc or ctcmd mode.
-
-The problem in [http://code.google.com/p/clearcase-cpan/issues/detail?id=13 issue 13] is to remove double-quotes from the input.
-It seems at least easy, and portable, to avoid them in the first place...
