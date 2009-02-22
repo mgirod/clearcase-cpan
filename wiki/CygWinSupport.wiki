@@ -3,21 +3,39 @@
 = Introduction =
 
 !ClearCase is available on Windows, but not on !CygWin.
-Supporting !CygWin in !ClearCase::Argv would result in a wrapper offering the illusion of a port of !ClearCase onto !CygWin.
+Supporting !CygWin in !ClearCase::Argv should result in a wrapper offering the illusion of a port of !ClearCase onto !CygWin.
+
+This support is available now in the 1.43 version on CPAN.
 
 = Details =
 
-The support should be exclusively in !ClearCase::Argv, not in Argv: the bulk of the applications one might want to use via Argv are !CygWin, not Windows, applications.
+The support is exclusively in !ClearCase::Argv, not in Argv: the bulk of the applications one might want to use via Argv are !CygWin, not Windows, applications.
 The interest of the port is the usage of cleartool via a wrapper.
 
-The problems to solve are:
+The problems to solve were:
   * input paths
   * output paths
   * end-of-line convention in cleartool output
 
-I started to work on it in a _cygwin_ branch, but the result so far is not quite convincing.
-  * I see how to deal with {{{qx}}}, but not that well with {{{system}}} or {{{pipe}}}. {{{system}}} is required for a wrapper.
-  * I need more than just tweaking the paths: also the config spec rules, for instance, or the version extended paths.
-  * {{{lsvob}}} returns vob paths without any kind of view mapped drive (OK).
-  * I tried the wrapper, but it fails for now in simple cases such as: {{{ctx setcs /tmp/cs}}} -- the problem being that the wrapper reverts to the underlying cleartool
-  * {{{ctx lsgen ...}}} and {{{ctx co}}} seem to work at least in some cases.
+Note that perl can be installed both on Windows and on Cygwin.
+In fact, it is available in pre-compiled format for both, for Windows from Active State,
+for cygwin ...from Cygwin.
+These two installations cannot really be used 'on the other side'. To convince yourself,
+try on cygwin (with Perl installed on Windows under C:\Perl):
+{{{
+/cygdrive/c/Perl/bin/perl -e 'print "$^O\n"'
+MSWin32
+}}}
+and on Windows (with cygwin installed in C:\cygwin):
+{{{
+C:\cygwin\bin\perl -e "print qq($^O\n)"
+cygwin
+}}}
+I.e. they both seem to work, but do not detect the real environment under which they were
+invoked, but rather enforce the one under which they were built.
+
+I started to work on it in a _cygwin_ branch.
+  * In order to deal with {{{system}}} or {{{pipe}}} ({{{system}}} is required for a wrapper), I forced the use of the {{{ipc}}} mode, allowing me to post-process the results.
+  * {{{lsvob}}} returns vob paths without any kind of view mapped drive. For now, I accepted this and did not attempt to change it. Vob tags should thus be used quoted as {{{'\vobtag'}}}. The exception being in vob specifications for vob objects, such as {{{'lbtype:FOO@/vobtag'}}} (accepted as input and returned as output).
+  * To try the ClearCase::Wrapper wrapper, you need a version explicitely supporting cygwin (from 1.15), which will force the use of ClearCase::Argv instead of reverting to the underlying cleartool: this will handle {{{ctx setcs /tmp/cs}}}.
+  * {{{ctx lsgen ...}}} and {{{ctx co}}} seem to work. Note that interactive comments are not supported, because of a problem to communicate about user input with the Windows cleartool process.
