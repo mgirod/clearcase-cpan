@@ -4,7 +4,7 @@
 
 This is a module by David Boyce,
 published and documented in [http://search.cpan.org/perldoc?ClearCase::Argv CPAN],
-currently there as [http://search.cpan.org/~dsb/ClearCase-Argv-1.40/Argv.pm 1.40].
+currently there as [http://search.cpan.org/~dsb/ClearCase-Argv-1.43/Argv.pm 1.43].
 
 This site aims only at coordinating contributional work on this module,
 with a bias toward using it within and as a basis for some other modules
@@ -16,10 +16,8 @@ mentioned here.
     * [CavComments interactive comments]
     * test cases
     * quoting
-    * setview
     * ccreport
     * multitool
-    * no [CygWinSupport support for cygwin] on Windows
 
 = General =
 
