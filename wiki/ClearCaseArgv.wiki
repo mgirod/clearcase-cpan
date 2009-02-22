@@ -14,7 +14,7 @@ mentioned here.
 
   * There are known problems and limitations (see issues)
     * [CavComments interactive comments]
-    * test cases
+    * test cases: some cases provided in an 'r' sub-directory. Run with {{{perl -Mblib}}}
     * quoting
     * ccreport
     * multitool
