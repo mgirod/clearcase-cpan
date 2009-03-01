@@ -36,6 +36,6 @@ invoked, but rather enforce the one under which they were built.
 
 I started to work on it in a _cygwin_ branch.
   * In order to deal with {{{system}}} or {{{pipe}}} ({{{system}}} is required for a wrapper), I forced the use of the {{{ipc}}} mode, allowing me to post-process the results.
-  * {{{lsvob}}} returns vob paths without any kind of view mapped drive. For now, I accepted this and did not attempt to change it. Vob tags should thus be used quoted as {{{'\vobtag'}}}. The exception being in vob specifications for vob objects, such as {{{'lbtype:FOO@/vobtag'}}} (accepted as input and returned as output).
+  * {{{lsvob}}} returns vob paths without any kind of view mapped drive. For now, I accepted this and did not attempt to change it, but I converted the slashes for consistency with the vob specifications for vob objects, such as {{{'lbtype:FOO@/vobtag'}}} (accepted as input and returned as output).
   * To try the !ClearCase::Wrapper wrapper, you need a version explicitely supporting cygwin (from 1.15), which will force the use of !ClearCase::Argv instead of reverting to the underlying cleartool: this will handle {{{ctx setcs /tmp/cs}}}.
   * {{{ctx lsgen ...}}} and {{{ctx co}}} seem to work. Note that interactive comments are not supported, because of a problem to communicate about user input with the Windows cleartool process.
