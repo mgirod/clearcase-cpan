@@ -29,20 +29,17 @@ chomp @out;
 ok (($out[0] eq 'des -s .@@/LB \n' and $out[1] eq 'des -s aa/bb/cc \n'),
     "Same thing in list\n");
 #4
-SKIP: {
-skip "Output: \\r removed\n\\r's stripped before unixpath is invoked.\n"
-  . "This one would replace them with a space (bug?)", 1 if 1;
 $out = "aaa\r\n";
 $ct->unixpath($out);
 chomp $out;
 ok $out =~ /\w$/, "Output: \\r removed\n";
-}
+#5
 $out = q(des -s o:\aa\bb@@\main\br\2) . "\n";
 $ct->unixpath($out);
 chomp $out;
 ok $out eq 'des -s /cygdrive/o/aa/bb@@/main/br/2',
   "Output: drive changed into /cygdrive path\n";
-
+#6
 @out = (q(o:\aa\bb@@\main\1) . "\n",
 	q(o:\aa\bb@@\main\1) . "\n");
 $ct->unixpath(@out);

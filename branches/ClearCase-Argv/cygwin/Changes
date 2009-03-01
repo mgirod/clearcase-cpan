@@ -303,3 +303,7 @@ Revision history for Perl extension ClearCase::Argv.
 	- under ctcmd, reset ipc apart on cygwin (CtCmd won't install there)
 	- fix to respect \n in comments under cygwin, and testing
 	- All changes from 1.41 through here contributed by Marc Girod.
+
+1.44 Mon Feb 23 13:16:56 GMTST 2009
+	- cygwin: restored \r removal at the end of lines, unskipped test
+	- ctcmd: skipped the failing test in stdouterr
