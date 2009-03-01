@@ -308,3 +308,4 @@ Revision history for Perl extension ClearCase::Argv.
 	- cygwin: restored \r removal at the end of lines, unskipped test
 	- ctcmd: skipped the failing test in stdouterr
 	- cygwin: respect the whitespace in cleartool output
+	- cygwin: convert the backslashes of vob tags as well (I/O)

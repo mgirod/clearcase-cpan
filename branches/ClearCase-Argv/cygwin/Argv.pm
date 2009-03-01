@@ -345,7 +345,7 @@ sub unixpath {
 	    $line =~ s/\r$//;
 	    my @bit = Text::ParseWords::parse_line('\s+', 'delimiters', $line);
 	    map {
-	        s%\\%/%g if m%(?:^(?:\..*|\"|[A-Za-z]:|\w+)|\@)\\%;
+	        s%\\%/%g if m%(?:^(?:\..*|"|[A-Za-z]:|\w*)|\@)\\%;
 		$_ = "/cygdrive/" . lc($1) . $2 if m%\A([A-Za-z]):(.*)\Z%;
 	    } grep{\S} @bit;
 	    $line = join '', @bit;
@@ -555,7 +555,13 @@ sub _cvt_input_cw($) {
     my $self = shift;
     map {
         s%^/cygdrive/([A-Za-z])%$1:%;
-	$_ = "${cygpfx}$_" if m%^/[^/]% and -r $_;
+	if (m%^/[^/]%) {
+	    if (-r $_) {
+	        $_ = "${cygpfx}$_";
+	    } else {
+	        s%^/%\\%; # case of vob tags
+	    }
+	}
     } @{$self->{AV_ARGS}};
 }
 
