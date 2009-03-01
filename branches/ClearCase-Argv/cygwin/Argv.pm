@@ -339,30 +339,29 @@ sub pipe {
 sub unixpath {
     my $self = shift;
     if (CYGWIN) {
+        no strict 'subs';
 	for my $line (@_) {
 	    my $nl = chomp $line;
 	    $line =~ s/\r$//;
-	    my @words = Text::ParseWords::parse_line('\s+', 1, $line);
+	    my @bit = Text::ParseWords::parse_line('\s+', 'delimiters', $line);
 	    map {
-	        s%\\%/%g if m%(^(\..*|"|[A-Za-z]:|\w+)|\@)\\%;
-	        if (m%\A([A-Za-z]):(.*)\Z%) {
-		    $_ = "/cygdrive/" . lc($1) . $2;
-		}
-	    } @words;
-	    $line = join ' ', @words;
+	        s%\\%/%g if m%(?:^(?:\..*|\"|[A-Za-z]:|\w+)|\@)\\%;
+		$_ = "/cygdrive/" . lc($1) . $2 if m%\A([A-Za-z]):(.*)\Z%;
+	    } grep{\S} @bit;
+	    $line = join '', @bit;
 	    $line .= "\n" if $nl;
 	}
     } else {
         $self->SUPER::unixpath(@_);
-    }
-    # Now apply CC-specific, @@-sensitive transforms to partial lines.
-    for my $line (@_) {
-	my $fixed = '';
-	for (split(m%(\S+@@\S*)%, $line)) {
-	    s%\\%/%g if m%^.*?\S+@@%;
-	    $fixed .= $_;
+	# Now apply CC-specific, @@-sensitive transforms to partial lines.
+	for my $line (@_) {
+	    my $fixed = '';
+	    for (split(m%(\S+@@\S*)%, $line)) {
+	        s%\\%/%g if m%^.*?\S+@@%;
+		$fixed .= $_;
+	    }
+	    $line = $fixed;
 	}
-	$line = $fixed;
     }
 }
 
