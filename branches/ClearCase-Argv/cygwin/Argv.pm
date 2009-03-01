@@ -1,13 +1,13 @@
 package ClearCase::Argv;
 
-$VERSION = '1.43';
+$VERSION = '1.44';
 
 use Argv 1.23;
 
 use constant MSWIN	=> $^O =~ /MSWin32|Windows_NT/i ? 1 : 0;
 use constant CYGWIN	=> $^O =~ /cygwin/i ? 1 : 0;
 
-my $NUL = MSWIN && !CYGWIN ? 'NUL' : '/dev/null';
+my $NUL = MSWIN ? 'NUL' : '/dev/null';
 
 @ISA = qw(Argv);
 %EXPORT_TAGS = ( 'functional' => [ qw(ctsystem ctexec ctqx ctqv ctpipe chdir) ] );
@@ -341,6 +341,7 @@ sub unixpath {
     if (CYGWIN) {
 	for my $line (@_) {
 	    my $nl = chomp $line;
+	    $line =~ s/\r$//;
 	    my @words = Text::ParseWords::parse_line('\s+', 1, $line);
 	    map {
 	        s%\\%/%g if m%(^(\..*|"|[A-Za-z]:|\w+)|\@)\\%;
