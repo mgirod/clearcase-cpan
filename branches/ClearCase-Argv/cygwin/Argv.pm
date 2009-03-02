@@ -575,7 +575,8 @@ sub _ipc_cmd($$$$@) {
 
     # Send the command to cleartool.
     my $cmd =
-        join(' ', map {/\s/ && !(/^'.+'$/ || /^".+"$/) ? qq("$_") : $_} @cmd);
+        join(' ', map {/\s|%\[/ && !(/^'.+'$/ || /^".+"$/) ? qq("$_") : $_}
+	       @cmd);
     chomp $cmd;
     my $down = $self->{IPC}->{DOWN};
     print $down $cmd, "\n";
