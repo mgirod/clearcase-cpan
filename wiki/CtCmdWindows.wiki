@@ -16,13 +16,13 @@ Go to: [http://www.microsoft.com/express/]
 Get the version suitable for your Windows flavour:
 2005 for Windows 2000, 2008 for newer.
 
-But this is not enough: you need in addition the Windows (or Platform) SDK.
+With the 2008 version on Vista, I just start a command shell from the VC++ menu and it is enough.
+With the 2005 version on Windows 2000, I had in addition to install the Windows (or Platform) SDK.
 Search for it on the previous page.
 Get again the one suitable for you.
 
-You need to set a few paths to make use of them.
-I just started a command shell from the VC++ menu.
-But I had then to set two environment strings (on w2k - on Vista, it may go easier):
+I needed to set a few paths to make use of them.
+But I had then to set two environment strings (on w2k):
 {{{
 set lib=C:\PROGRA~1\MIC977~1\Lib;C:\Progra~1\MICROS~4\VC\lib
 set inc=-I"C:\PROGRA~1\MIC977~1\Include"
