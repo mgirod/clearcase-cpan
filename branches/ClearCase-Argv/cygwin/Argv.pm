@@ -574,9 +574,9 @@ sub _ipc_cmd($$$$@) {
     $self->_dbg($dbg, '=>', \*STDERR, @cmd) if $dbg;
 
     # Send the command to cleartool.
-    my $cmd =
-        join(' ', map {/\s|%\[/ && !(/^'.+'$/ || /^".+"$/) ? qq("$_") : $_}
-	       @cmd);
+    my $cmd = join(' ', map {
+        /\s|[%\[\]\*]]/ && !(/^'.+'$/ || /^".+"$/) ? qq("$_") : $_
+    } @cmd);
     chomp $cmd;
     my $down = $self->{IPC}->{DOWN};
     print $down $cmd, "\n";
