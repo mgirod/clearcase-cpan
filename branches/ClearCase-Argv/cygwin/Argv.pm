@@ -347,8 +347,8 @@ sub unixpath {
 	    map {
 	        s%\\%/%g if m%(?:^(?:\..*|"|[A-Za-z]:|\w*)|\@)\\%;
 		$_ = "/cygdrive/" . lc($1) . $2 if m%\A([A-Za-z]):(.*)\Z%;
-	    } grep{\S} @bit;
-	    $line = join '', @bit;
+	    } grep{$_ and /\S/} @bit;
+	    $line = join '', grep {$_} @bit;
 	    $line .= "\n" if $nl;
 	}
     } else {
