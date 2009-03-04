@@ -5,9 +5,9 @@ ClearCase::Argv->ipc(1);
 use File::Spec::Functions;
 use vars qw($acc $cmp);
 
-# Config spec may use 'include' clauses.
-# These are only evaluated as the view is set, or explicitly with:
-# setcs -current
+# There is some concern about the time when config specs are evaluated, either
+# as the view is set, or explicitly with 'setcs -current', and about the 
+# impact of this evaluation, in relation to brtype names or include clauses.
 # This script attempts to show when have the views in current use (during the
 # past week) evaluated their config spec last.
 # It incidently reports of all questionable views (storage not reachable, or
@@ -23,10 +23,11 @@ my @view = grep {
     if (!($t and $s) or $t !~ /^\w+$/ or ! -r $s) {
       print "Corrupted/unreachable: $_\n";
       $_ = 0;
+    } else {
+      $_ = [ ($t, $s) ];
     }
-    $_ = [ ($t, $s) ];
   }
-} $ct->argv('lsview')->qx;
+} $ct->argv('lsview', 'em*')->qx;
 my %v;
 foreach (@view) {
   my $tag = $_->[0];
