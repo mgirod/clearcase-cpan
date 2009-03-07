@@ -21,6 +21,8 @@ The code on this site is currently only found in a _tests_ branch.
     * I could remove an empty branch on {{{unco}}}, instead of letting this task to a wrapper
     * the {{{-all}}} flag seems not to work in {{{lsgen}}}
     * {{{setdepth}}} recursion could be shortened (performance) when a depth is given, e.g. supporting {{{diff -pred}}} but there is an ambiguity with 'depth': currently, it is the number of levels _displayed_ (intuitive, so probably to be kept).
+    * {{{co}}} forces in practice a {{{-nc}}} in the absence of user option. This is wrong on unix, where interactive comments in ipc mode would work. It is in practice acceptable on Windows/cygwin, but probably not done at the right level: should be generalized.
+    * the ipc mode is forced, but should only be defaulted. I missed the existence in !ClearCase::Wrapper for flags such as {{{-/ipc=1}}}.
   * Intentions:
     * support for incremental types, and first for label types, including:
       * {{{mklbtype -family}}}
