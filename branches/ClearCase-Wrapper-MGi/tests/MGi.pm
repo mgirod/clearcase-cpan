@@ -5,6 +5,7 @@ $VERSION = '0.08';
 use AutoLoader 'AUTOLOAD';
 use ClearCase::Wrapper;
 use strict;
+use vars qw($ct);
 
 #############################################################################
 # Usage Message Extensions
@@ -126,26 +127,54 @@ sub setdepths {
   }
 }
 sub checkcs {
-    use File::Basename;
-    use Cwd;
-    my ($ct, $v) = @_;
-    $ct = $ct->clone();
-    $v =~ s/^(.*?)\@\@.*$/$1/;
-    my $dest = dirname($v);
-    my $pwd = getcwd();
-    chdir($dest);
-    my @cs = grep /^\#\#:BranchOff: *root/, $ct->argv('catcs')->qx;
-    chdir($pwd) if $pwd;
-    return scalar @cs;
+  use File::Basename;
+  use Cwd;
+  my ($v) = @_;
+  $ct = $ct->clone();
+  $v =~ s/^(.*?)\@\@.*$/$1/;
+  my $dest = dirname($v);
+  my $pwd = getcwd();
+  chdir($dest);
+  my @cs = grep /^\#\#:BranchOff: *root/, $ct->argv('catcs')->qx;
+  chdir($pwd) if $pwd;
+  return scalar @cs;
 }
 sub pbrtype {
-    my ($pbrt, $ct, $bt) = @_;
-    if (!defined($pbrt->{$bt})) {
-	my $tc = $ct->argv('des', qw(-fmt %[type_constraint]p),
-			   "brtype:$bt")->qx;
-	$pbrt->{$bt} = ($tc =~ /one version per branch/);
+  my ($pbrt, $bt) = @_;
+  if (!defined($pbrt->{$bt})) {
+    my $tc = $ct->argv('des', qw(-fmt %[type_constraint]p),
+		       "brtype:$bt")->qx;
+    $pbrt->{$bt} = ($tc =~ /one version per branch/);
+  }
+  return $pbrt->{$bt};
+}
+sub parsevtree($$) {
+  my ($ele, $obsopt) = @_;
+  my @vt = grep m%[\\/]([1-9]\d*|CHECKEDOUT)( .*)?$%,
+    $ct->argv('lsvtree', '-merge', "-all$obsopt", $ele)->qx;
+  map { s%\\%/%g } @vt;
+  my %gen = ();
+  my @stack = ();
+  foreach my $g (@vt) {
+    $g =~ s%^(.*/CHECKEDOUT) view ".*"(.*)$%$1$2%;
+    if ($g =~ m%^(.*) (\(.*\))$%) {
+      $g = $1;
+      $gen{$g}{labels} = $2;
     }
-    return $pbrt->{$bt};
+    if ($g =~ /^  -> (.*)$/) {
+      my $v = $1;
+      my $n = "$ele\@\@$v";
+      push @{ $gen{$stack[-1]}{children} }, $n;
+      push @{ $gen{$n}{parents} }, $stack[-1];
+      next;
+    }
+    if (findpredinstack($g, \@stack)) {
+      push @{ $gen{$g}{parents} }, $stack[-1];
+      push @{ $gen{$stack[-1]}{children} }, $g;
+    }
+    push @stack, $g;
+  }
+  return %gen;
 }
 
 =head1 NAME
@@ -208,7 +237,7 @@ sub lsgenealogy {
 	$_ = readlink if -l && defined readlink;
 	push @argv, MSWIN ? glob($_) : $_;
     }
-    my $ct = ClearCase::Argv->new({autofail=>0,autochomp=>1,stderr=>0});
+    $ct = ClearCase::Argv->new({autofail=>0,autochomp=>1,stderr=>0});
     $ct->ipc(1) unless $ct->ctcmd(1);
 
     while (my $e = shift @argv) {
@@ -221,31 +250,7 @@ sub lsgenealogy {
 	$ele =~ s%\\%/%g;
 	$ver =~ s%\\%/%g;
 	$pred =~ s%\\%/%g;
-	my $obsopt = $opt{obsolete}?' -obs':'';
-	my @vt = grep m%[\\/]([1-9]\d*|CHECKEDOUT)( .*)?$%,
-	  $ct->argv('lsvtree', '-merge', "-all$obsopt", $ele)->qx;
-	map { s%\\%/%g } @vt;
-	my %gen = ();
-	my @stack = ();
-	foreach my $g (@vt) {
-	  $g =~ s%^(.*/CHECKEDOUT) view ".*"(.*)$%$1$2%;
-	  if ($g =~ m%^(.*) (\(.*\))$%) {
-	    $g = $1;
-	    $gen{$g}{labels} = $2;
-	  }
-	  if ($g =~ /^  -> (.*)$/) {
-	    my $v = $1;
-	    my $n = "$ele\@\@$v";
-	    push @{ $gen{$stack[-1]}{children} }, $n;
-	    push @{ $gen{$n}{parents} }, $stack[-1];
-	    next;
-	  }
-	  if (findpredinstack($g, \@stack)) {
-	    push @{ $gen{$g}{parents} }, $stack[-1];
-	    push @{ $gen{$stack[-1]}{children} }, $g;
-	  }
-	  push @stack, $g;
-	}
+	my %gen = parsevtree($ele, $opt{obsolete}?' -obs':'');
 	setdepths($ver, 0, \%gen);
 	my %seen = ();
 	printparents($ver, \%gen, \%seen, 0);
@@ -277,7 +282,7 @@ sub checkout {
   for (@ARGV[1..$#ARGV]) {
     $_ = readlink if -l && defined readlink;
   }
-  my $ct = ClearCase::Argv->new({autochomp=>1});
+  $ct = ClearCase::Argv->new({autochomp=>1});
   $ct->ipc(1) unless $ct->ctcmd(1);
   # Duplicate the base Wrapper checkout functionality.
   my @agg = grep /^-(?:dir|rec|all|avo)/, @ARGV;
