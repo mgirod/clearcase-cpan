@@ -375,6 +375,11 @@ sub checkout {
 
 Evaluate the predecessor from the genealogy, i.e. take into account merges on
 an equal basis as parents on the same physical branch.
+In case there are multiple parents, consider the one on the same branch as
+'more equal than the others' (least surprise principle).
+
+Preserve the (Wrapper default) assumption of a B<-pred> flag, is only one
+argument is given.
 
 =back
 
@@ -382,6 +387,7 @@ an equal basis as parents on the same physical branch.
 
 sub diff {
   for (@ARGV[1..$#ARGV]) { $_ = readlink if -l && defined readlink }
+  push(@ARGV, qw(-dir)) if @ARGV == 1;
   my $diff = ClearCase::Argv->new(@ARGV);
   $diff->autochomp(1);
   $diff->ipc(1) unless $diff->ctcmd(1);
@@ -390,10 +396,10 @@ sub diff {
   my @args = $diff->args;
   my @opts = $diff->opts;
   my $pred = grep /^-(pred)/, @opts;
-  my $auto = grep /^-(?:dir|rec|all|avo)/, @opts;
-  return 0 unless $pred or $auto;
-  $diff->opts(grep !/-pred/, @opts) if $pred;
+  my $auto = grep /^-(?:dir|rec|all|avo)/, @args;
   my @elems = AutoCheckedOut(0, @args);
+  return 0 unless $pred or $auto or (scalar @elems == 1);
+  $diff->opts(grep !/-pred/, @opts) if $pred;
   $diff->args(@elems);
   $ct = $diff->clone();
   for my $e (@elems) {
@@ -405,7 +411,7 @@ sub diff {
     }
     $ele =~ s%\\%/%g;
     $ver =~ s%\\%/%g;
-    my $bra = $1 if $ver =~ m%^(.*?)/\d+$%;
+    my $bra = $1 if $ver =~ m%^(.*?)/(?:\d+|CHECKEDOUT)$%;
     my %gen = parsevtree($ele, 1);
     my $p = $gen{$ver}{'parents'};
     my ($brp) = grep { m%^$bra/\d+$% } @{$p};
