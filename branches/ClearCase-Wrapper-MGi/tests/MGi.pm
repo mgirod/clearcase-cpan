@@ -151,9 +151,11 @@ sub pbrtype {
 }
 sub parsevtree($$) {
   my ($ele, $obs) = @_;
-  my $obsopt = '-obs' if $obs;
-  my @vt = grep m%[\\/]([1-9]\d*|CHECKEDOUT)( .*)?$%,
-    $ct->argv('lsvtree', '-merge', '-all', $obsopt, $ele)->qx;
+  $ct->argv('lsvtree');
+  my @opt = qw(-merge -all);
+  push @opt, '-obs' if $obs;
+  $ct->opts(@opt);
+  my @vt = grep m%[\\/]([1-9]\d*|CHECKEDOUT)( .*)?$%, $ct->args($ele)->qx;
   map { s%\\%/%g } @vt;
   my %gen = ();
   my @stack = ();
