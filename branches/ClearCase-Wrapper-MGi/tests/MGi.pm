@@ -1,6 +1,6 @@
 package ClearCase::Wrapper::MGi;
 
-$VERSION = '0.08';
+$VERSION = '0.09';
 
 use AutoLoader 'AUTOLOAD';
 use ClearCase::Wrapper;
@@ -11,13 +11,14 @@ use vars qw($ct);
 # Usage Message Extensions
 #############################################################################
 {
-   local $^W = 0;
-   no strict 'vars';
+  local $^W = 0;
+  no strict 'vars';
 
-   $checkout = '';
-   my $z = $ARGV[0] || '';
-   $lsgenealogy =
-       "$z [-short] [-all] [-obsolete] [-depth gen-depth] pname ...";
+  $checkout = '';
+  my $z = $ARGV[0] || '';
+  $lsgenealogy =
+    "$z [-short] [-all] [-obsolete] [-depth gen-depth] pname ...";
+  $diff = '';
 }
 
 #############################################################################
@@ -149,9 +150,10 @@ sub pbrtype {
   return $pbrt->{$bt};
 }
 sub parsevtree($$) {
-  my ($ele, $obsopt) = @_;
+  my ($ele, $obs) = @_;
+  my $obsopt = '-obs' if $obs;
   my @vt = grep m%[\\/]([1-9]\d*|CHECKEDOUT)( .*)?$%,
-    $ct->argv('lsvtree', '-merge', "-all$obsopt", $ele)->qx;
+    $ct->argv('lsvtree', '-merge', '-all', $obsopt, $ele)->qx;
   map { s%\\%/%g } @vt;
   my %gen = ();
   my @stack = ();
@@ -189,7 +191,7 @@ David Boyce) for more details.
 
 =head1 CLEARTOOL EXTENSIONS
 
-=over 2
+=over 3
 
 =item * LSGENEALOGY
 
@@ -241,16 +243,15 @@ sub lsgenealogy {
     $ct->ipc(1) unless $ct->ctcmd(1);
 
     while (my $e = shift @argv) {
-	my ($ele, $ver, $type, $pred) =
-	  $ct->argv(qw(des -fmt), '%En\n%En@@%Vn\n%m\n%En@@%PVn', $e)->qx;
+	my ($ele, $ver, $type) =
+	  $ct->argv(qw(des -fmt), '%En\n%En@@%Vn\n%m', $e)->qx;
 	if (!defined($type) or ($type !~ /version$/)) {
 	    warn Msg('W', "Not a version: $e");
 	    next;
 	}
 	$ele =~ s%\\%/%g;
 	$ver =~ s%\\%/%g;
-	$pred =~ s%\\%/%g;
-	my %gen = parsevtree($ele, $opt{obsolete}?' -obs':'');
+	my %gen = parsevtree($ele, $opt{obsolete});
 	setdepths($ver, 0, \%gen);
 	my %seen = ();
 	printparents($ver, \%gen, \%seen, 0);
@@ -273,8 +274,6 @@ This allows to avoid both merging back to /main or to a delivery
 branch, and to cascade branches indefinitely.  The logical version tree
 is restituted by navigating the merge arrows, to find all the direct or
 indirect contributors.
-
-=back
 
 =cut
 
@@ -370,6 +369,49 @@ sub checkout {
     }
   }
   exit $rc;
+}
+
+=item * DIFF
+
+Evaluate the predecessor from the genealogy, i.e. take into account merges on
+an equal basis as parents on the same physical branch.
+
+=back
+
+=cut
+
+sub diff {
+  for (@ARGV[1..$#ARGV]) { $_ = readlink if -l && defined readlink }
+  my $diff = ClearCase::Argv->new(@ARGV);
+  $diff->autochomp(1);
+  $diff->ipc(1) unless $diff->ctcmd(1);
+  $diff->parse(qw(options=s serial_format|diff_format|window
+		  graphical|tiny|hstack|vstack|predecessor));
+  my @args = $diff->args;
+  my @opts = $diff->opts;
+  my $pred = grep /^-(pred)/, @opts;
+  my $auto = grep /^-(?:dir|rec|all|avo)/, @opts;
+  return 0 unless $pred or $auto;
+  $diff->opts(grep !/-pred/, @opts) if $pred;
+  my @elems = AutoCheckedOut(0, @args);
+  $diff->args(@elems);
+  $ct = $diff->clone();
+  for my $e (@elems) {
+    my ($ele, $ver, $type) =
+      $ct->argv(qw(des -fmt), '%En\n%En@@%Vn\n%m', $e)->qx;
+    if (!defined($type) or ($type !~ /version$/)) {
+      warn Msg('W', "Not a version: $e");
+      next;
+    }
+    $ele =~ s%\\%/%g;
+    $ver =~ s%\\%/%g;
+    my $bra = $1 if $ver =~ m%^(.*?)/\d+$%;
+    my %gen = parsevtree($ele, 1);
+    my $p = $gen{$ver}{'parents'};
+    my ($brp) = grep { m%^$bra/\d+$% } @{$p};
+    $diff->args($brp? $brp : $p->[0], $ele)->system;
+  }
+  exit $?;
 }
 
 =head1 COPYRIGHT AND LICENSE
