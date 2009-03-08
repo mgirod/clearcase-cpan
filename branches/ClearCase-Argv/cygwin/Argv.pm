@@ -551,7 +551,7 @@ sub ipc {
     return $self;
 }
 
-sub _cvt_input_cw($) {
+sub _cvt_input_cw {
     my $self = shift;
     map {
         s%^/cygdrive/([A-Za-z])%$1:%;
@@ -562,10 +562,10 @@ sub _cvt_input_cw($) {
 	        s%^/%\\%; # case of vob tags
 	    }
 	}
-    } grep {$_} @{$self->{AV_ARGS}};
+    } @{$self->{AV_ARGS}};
 }
 
-sub _ipc_cmd($$$$@) {
+sub _ipc_cmd {
     my $self = shift;
     my ($disposition, $stdout, $stderr, @cmd) = @_;
 
@@ -576,7 +576,7 @@ sub _ipc_cmd($$$$@) {
     # Send the command to cleartool.
     my $cmd = join(' ', map {
         /\s|[\[\]\*]/ && !(/^'.+'$/ || /^".+"$/) ? qq("$_") : $_
-    } grep {$_} @cmd);
+    } @cmd);
     chomp $cmd;
     my $down = $self->{IPC}->{DOWN};
     print $down $cmd, "\n";
