@@ -13,7 +13,7 @@ The code on this site is currently only found in a _tests_ branch.
   * My own test environment moved from _ctcmd_ to _ipc_ mode, after which I noticed major problems, which were fixed in !ClearCase::Argv. I do not test _ctcmd_ on Unix anymore for the time being. I currently use mostly cygwin, and the port has delayed my main work.
   * My intention was to develop a regression testing suite, which I started to do on !ClearCase::!SyncTree (still pending)
   * I also acknowledge deficiencies in the support for the branch-no-merge strategy:
-    * missing support for {{{diff -pred}}}; and {{{des -fmt "%PVn"}}} and {{{%PSn}}}
+    * missing support for {{{des -fmt "%PVn"}}} and {{{%PSn}}}
     * missing support for graphical {{{lsgen}}} (based on Tk)
     * missing support for {{{annotate}}} (based on pruning the -all output)
   * No major [http://code.google.com/p/clearcase-cpan/issues/list known bugs] now, but:
