@@ -562,7 +562,7 @@ sub _cvt_input_cw($) {
 	        s%^/%\\%; # case of vob tags
 	    }
 	}
-    } @{$self->{AV_ARGS}};
+    } grep {$_} @{$self->{AV_ARGS}};
 }
 
 sub _ipc_cmd($$$$@) {
@@ -576,7 +576,7 @@ sub _ipc_cmd($$$$@) {
     # Send the command to cleartool.
     my $cmd = join(' ', map {
         /\s|[\[\]\*]/ && !(/^'.+'$/ || /^".+"$/) ? qq("$_") : $_
-    } @cmd);
+    } grep {$_} @cmd);
     chomp $cmd;
     my $down = $self->{IPC}->{DOWN};
     print $down $cmd, "\n";
