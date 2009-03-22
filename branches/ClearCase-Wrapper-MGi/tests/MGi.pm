@@ -94,7 +94,7 @@ sub printparents {
     }
     return if (defined($opt{depth})) and ($opt{depth} < $ind);
     foreach my $p (@p) {
-	if ($$gen{$id}{depth} <= $$gen{$p}{depth}) {
+	if ($$gen{$id}{depth} < $$gen{$p}{depth}) {
 	    printparents($p, $gen, $seen, $ind);
 	} else {
 	    printf("%${ind}s\[alternative path: ${p}\]\n", '')
@@ -417,7 +417,7 @@ sub diff {
     my %gen = parsevtree($ele, 1);
     my $p = $gen{$ver}{'parents'};
     my ($brp) = grep { m%^$bra/\d+$% } @{$p};
-    $diff->args($brp? $brp : $p->[0], $ele)->system;
+    $diff->args($brp? $brp : $p->[0], $ver)->system;
   }
   exit $?;
 }

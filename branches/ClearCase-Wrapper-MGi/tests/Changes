@@ -35,6 +35,8 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- co: the internal mkbranch defaults to -nc
 	- lsgen: extracted the parsing of the version tree
 
-0.09 Sun Mar  8 10:35:03 GMTST 2009
+0.09 Sun Mar 22 17:50:40 GMTST 2009
 	- lsgen: fix to the handling of -obs
-	- diff: initial implementation of -pred from the genealogy
+	- lsgen: indentation of incestual parent
+	- diff: -predecessor from the genealogy
+	
