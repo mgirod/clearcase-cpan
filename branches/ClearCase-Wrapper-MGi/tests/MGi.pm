@@ -33,74 +33,77 @@ __END__
 
 ## Internal service routines, undocumented.
 sub sosbranch($$) { # same or sub- branch
-    my ($cur, $prd) = @_;
-    $cur =~ s:/([0-9]+|CHECKEDOUT)$:/:;
-    $prd =~ s:/([0-9]+|CHECKEDOUT)$:/:;
-    return ($cur =~ qr(^$prd));
+  my ($cur, $prd) = @_;
+  $cur =~ s:/([0-9]+|CHECKEDOUT)$:/:;
+  $prd =~ s:/([0-9]+|CHECKEDOUT)$:/:;
+  return ($cur =~ qr(^$prd));
 }
 sub printparents {
-    my ($id, $gen, $seen, $ind) = @_;
-    if ($$seen{$id}++) {
-	printf("%${ind}s\[alternative path: ${id}\]\n", '')
-	    unless $opt{short};
-	return;
+  my ($id, $gen, $seen, $ind) = @_;
+  if ($$seen{$id}++) {
+    printf("%${ind}s\[alternative path: ${id}\]\n", '')
+      unless $opt{short};
+    return;
+  }
+  my @p = defined($$gen{$id}{parents}) ? @{ $$gen{$id}{parents} } : ();
+  my @c = defined($$gen{$id}{children}) ? @{ $$gen{$id}{children} } : ();
+  my $l = defined($$gen{$id}{labels}) ? " $$gen{$id}{labels}" : '';
+  my (@s, @u) = ();
+  foreach my $c (@c) {
+    if ($$seen{$c}) {
+      push @s, $c;
+    } else {
+      push @u, $c;
     }
-    my @p = defined($$gen{$id}{parents}) ? @{ $$gen{$id}{parents} } : ();
-    my @c = defined($$gen{$id}{children}) ? @{ $$gen{$id}{children} } : ();
-    my $l = defined($$gen{$id}{labels}) ? " $$gen{$id}{labels}" : '';
-    my (@s, @u) = ();
-    foreach my $c (@c) {
-	if ($$seen{$c}) {
-	    push @s, $c;
-	} else {
-	    push @u, $c;
-	}
+  }
+  if (scalar(@u) and !$opt{short}) {
+    my $cprinted = 0;
+    for my $c (@s) {
+      $cprinted++ if $$gen{$c}{printed};
     }
-    if (scalar(@u) and !$opt{short}) {
-	my $cprinted = 0;
-	for my $c (@s) { $cprinted++ if $$gen{$c}{printed}; }
-	if ($cprinted) {
-	    if ($ind == 0) {
-		print "\[offsprings:";
-	    } else {
-		my $pind = $ind - 1;
-		printf("%${pind}s\[siblings:", '');
-	    }
-	    foreach (@u) { print " $_"; }
-	    print "\]\n";
-	}
+    if ($cprinted) {
+      if ($ind == 0) {
+	print "\[offsprings:";
+      } else {
+	my $pind = $ind - 1;
+	printf("%${pind}s\[siblings:", '');
+      }
+      foreach (@u) {
+	print " $_";
+      }
+      print "\]\n";
     }
-    if ($opt{all}
-	or $l
-	or (scalar(@p) != 1)
-	or (scalar(@s) != 1)
-	or !sosbranch($id, $s[0])
-	or !sosbranch($p[0], $id))
-    {
-	if ($opt{short}) {
-	    if ((scalar(@p) != 1)
-		or (scalar(@s) != 1)
-		or !sosbranch($id, $s[0])
-		or !sosbranch($p[0], $id)) {
-		printf("%${ind}s${id}\n", '');
-		$$gen{$id}{printed}++;
-		${ind}++;
-	    }
-	} else {
-	    printf("%${ind}s${id}${l}\n", '');
-	    $$gen{$id}{printed}++;
-	    ${ind}++;
-	}
+  }
+  if ($opt{all}
+      or $l
+      or (scalar(@p) != 1)
+      or (scalar(@s) != 1)
+      or !sosbranch($id, $s[0])
+      or !sosbranch($p[0], $id)) {
+    if ($opt{short}) {
+      if ((scalar(@p) != 1)
+	  or (scalar(@s) != 1)
+	  or !sosbranch($id, $s[0])
+	  or !sosbranch($p[0], $id)) {
+	printf("%${ind}s${id}\n", '');
+	$$gen{$id}{printed}++;
+	${ind}++;
+      }
+    } else {
+      printf("%${ind}s${id}${l}\n", '');
+      $$gen{$id}{printed}++;
+      ${ind}++;
     }
-    return if (defined($opt{depth})) and ($opt{depth} < $ind);
-    foreach my $p (@p) {
-	if ($$gen{$id}{depth} < $$gen{$p}{depth}) {
-	    printparents($p, $gen, $seen, $ind);
-	} else {
-	    printf("%${ind}s\[alternative path: ${p}\]\n", '')
-		unless $opt{short};
-	}
+  }
+  return if (defined($opt{depth})) and ($opt{depth} < $ind);
+  foreach my $p (@p) {
+    if ($$gen{$id}{depth} < $$gen{$p}{depth}) {
+      printparents($p, $gen, $seen, $ind);
+    } else {
+      printf("%${ind}s\[alternative path: ${p}\]\n", '')
+	unless $opt{short};
     }
+  }
 }
 sub findpredinstack($$) {
   my ($g, $stack) = @_;
@@ -155,7 +158,8 @@ sub parsevtree($$$) {
   my @opt = qw(-merge -all);
   push @opt, '-obs' if $obs;
   $ct->opts(@opt);
-  my @vt = grep m%$sel|[\\/]([1-9]\d*|CHECKEDOUT)( .*)?$%, $ct->args($ele)->qx;
+  my @vt = grep m%(^$sel|[\\/]([1-9]\d*|CHECKEDOUT))( .*)?$%,
+    $ct->args($ele)->qx;
   map { s%\\%/%g } @vt;
   my %gen = ();
   my @stack = ();
@@ -180,6 +184,51 @@ sub parsevtree($$$) {
   }
   return %gen;
 }
+sub mkbco {
+  my ($e, $bt, $pbrt) = @_;
+  my $typ = $ct->argv(qw(des -fmt %m), $e)->qx;
+  if ($typ !~ /(branch|version)$/) {
+    warn Msg('W', "Neither a version nor a branch: $e");
+    next;
+  }
+  my $ver;
+  if ($e =~ m%^(.*?)\@\@(.*)$%) {
+    $e = $1;
+    $ver = "$e\@\@$2";
+    $ver .= '/LATEST' if $ct->argv(qw(des -fmt %m), $ver)->qx eq 'branch';
+  }
+  my $sel = $ct->argv('ls', '-d', "$e")->qx;
+  if ($sel =~ /^(.*?) +Rule:.*-mkbranch (.*?)\]?$/) {
+    ($ver, $bt) = ($ver? $ver : $1, $bt? $bt : $2);
+  }
+  if (checkcs($ct, $e) and $bt) {
+    my $main = ($ct->argv('lsvtree', $e)->qx)[0];
+    $main =~ s%^[^@]*\@\@[\\/](.*)$%$1%;
+    my $vob = $ct->argv('des', '-s', "vob:$e")->qx;
+    my $re = pbrtype($pbrt, $ct, "$bt\@$vob") ?
+      qr([\\/]${main}[\\/]$bt[\\/]\d+$) : qr([\\/]$bt[\\/]\d+$);
+    if ($ver =~ m%$re%) {
+      $ct->argv('co', @gopts, @copt, $e);
+      return $ct->system;
+    } else {
+      my @mkbcopt = @copt? @copt : qw(-nc);
+      my $r = $ct->argv('mkbranch', @mkbcopt,
+			'-ver', "/${main}/0", $bt, $e)->system;
+      if ($r) {
+	return 1;
+      } else {
+	if ($ver !~ m%\@\@[\\/]${main}[\\/]0$%) {
+	  my $rc = $ct->argv('merge', '-to', $e, $ver)->stdout(0)->system;
+	  unlink glob("$e.contrib*");
+	  return $rc;
+	}
+      }
+    }
+  } else {
+    push @gopts, @bopts, @copts;
+    return $ct->argv('co', @gopts, $e)->system;
+  }
+}
 
 =head1 NAME
 
@@ -193,7 +242,7 @@ David Boyce) for more details.
 
 =head1 CLEARTOOL EXTENSIONS
 
-=over 3
+=over 4
 
 =item * LSGENEALOGY
 
@@ -233,32 +282,31 @@ the element.
 =cut
 
 sub lsgenealogy {
-    GetOptions(\%opt, qw(short all obsolete depth=i));
-    Assert(@ARGV > 1);	# die with usage msg if untrue
-    shift @ARGV;
-    my @argv = ();
-    for (@ARGV) {
-	$_ = readlink if -l && defined readlink;
-	push @argv, MSWIN ? glob($_) : $_;
+  GetOptions(\%opt, qw(short all obsolete depth=i));
+  Assert(@ARGV > 1);		# die with usage msg if untrue
+  shift @ARGV;
+  my @argv = ();
+  for (@ARGV) {
+    $_ = readlink if -l && defined readlink;
+    push @argv, MSWIN ? glob($_) : $_;
+  }
+  $ct = ClearCase::Argv->new({autofail=>0,autochomp=>1,stderr=>0});
+  $ct->ipc(1) unless $ct->ctcmd(1);
+  while (my $e = shift @argv) {
+    my ($ele, $ver, $type) =
+      $ct->argv(qw(des -fmt), '%En\n%En@@%Vn\n%m', $e)->qx;
+    if (!defined($type) or ($type !~ /version$/)) {
+      warn Msg('W', "Not a version: $e");
+      next;
     }
-    $ct = ClearCase::Argv->new({autofail=>0,autochomp=>1,stderr=>0});
-    $ct->ipc(1) unless $ct->ctcmd(1);
-
-    while (my $e = shift @argv) {
-	my ($ele, $ver, $type) =
-	  $ct->argv(qw(des -fmt), '%En\n%En@@%Vn\n%m', $e)->qx;
-	if (!defined($type) or ($type !~ /version$/)) {
-	    warn Msg('W', "Not a version: $e");
-	    next;
-	}
-	$ele =~ s%\\%/%g;
-	$ver =~ s%\\%/%g;
-	my %gen = parsevtree($ele, $opt{obsolete}, $ver);
-	setdepths($ver, 0, \%gen);
-	my %seen = ();
-	printparents($ver, \%gen, \%seen, 0);
-    }
-    exit 0;
+    $ele =~ s%\\%/%g;
+    $ver =~ s%\\%/%g;
+    my %gen = parsevtree($ele, $opt{obsolete}, $ver);
+    setdepths($ver, 0, \%gen);
+    my %seen = ();
+    printparents($ver, \%gen, \%seen, 0);
+  }
+  exit 0;
 }
 
 =item * CO/CHECKOUT
@@ -276,6 +324,11 @@ This allows to avoid both merging back to /main or to a delivery
 branch, and to cascade branches indefinitely.  The logical version tree
 is restituted by navigating the merge arrows, to find all the direct or
 indirect contributors.
+
+-ver/sion option: ignored under a BranchOff config spec, but the version
+specified in the pname is obeyed, as a branch may always be spawn.
+
+-bra/nch option: modified under the BranchOff strategy.
 
 =cut
 
@@ -296,10 +349,9 @@ sub checkout {
     my @added = AutoNotCheckedOut($agg[0], $opt{ok}, 'f', @ARGV);
     push(@ARGV, @added);
   }
-  return 0 if grep /^-(bra|ver)/, @ARGV[1..$#ARGV];
   my %opt;
   GetOptions(\%opt, qw(reserved unreserved nmaster out=s ndata ptime
-		       nwarn c=s cfile=s cq cqe nc
+		       nwarn c=s cfile=s cq cqe nc version branch=s
 		       query nquery usehijack));
   if (my @o = grep /^-/, @ARGV) {
     if (!(grep /^--$/, @o)) {
@@ -307,8 +359,11 @@ sub checkout {
       exit(1);
     }
   }
+  my @bopts = ();
+  push @bopts, q(-ver) if $opt{version};
+  push @bopts, q(-bra), $opt{branch} if $opt{branch};
   my @gopts = ();
-  push @opts, q(-res) if $opt{reserved};
+  push @gopts, q(-res) if $opt{reserved};
   push @gopts, q(-unr) if $opt{unreserved};
   push @gopts, q(-nma) if $opt{nmaster};
   push @gopts, q(-out), $opt{out}     if $opt{out};
@@ -335,40 +390,68 @@ sub checkout {
   my $rc = 0;
   my %pbrt = ();
   foreach my $e (@args) {
-    if ($ct->argv(qw(des -fmt %m), $e)->qx !~ /version$/) {
-      warn Msg('W', "Not a version: $e");
-      next;
+    $rc |= mkbco($e, undef, \%pbrt);
+  }
+  exit $rc;
+}
+
+=item * MKBRANCH
+
+Actually a special case of checkout.
+
+-nco cannot reasonably be served in a new branch under BranchOff. One reverts
+to the default behaviour.
+
+=cut
+
+sub mkbranch {
+  for (@ARGV[1..$#ARGV]) {
+    $_ = readlink if -l && defined readlink;
+  }
+  $ct = ClearCase::Argv->new({autochomp=>1});
+  $ct->ipc(1) unless $ct->ctcmd(1);
+  my @agg = grep /^-(?:dir|rec|all|avo)/, @ARGV;
+  die Msg('E', "mutually exclusive flags: @agg") if @agg > 1;
+  if (@agg) {
+    # Remove the aggregation flag, push the aggregated list of
+    # not-checked-out file elements onto argv, and return.
+    my %opt;
+    GetOptions(\%opt, qw(directory recurse all avobs ok));
+    my @added = AutoNotCheckedOut($agg[0], $opt{ok}, 'f', @ARGV);
+    push(@ARGV, @added);
+  }
+  return 0 if grep /^-nco/, @ARGV[1..$#ARGV];
+  my %opt;
+  GetOptions(\%opt, qw(c=s cfile=s cq cqe nc nwarn version));
+  if (my @o = grep /^-/, @ARGV) {
+    if (!(grep /^--$/, @o)) {
+      warn Msg('E', "Unsupported options: @o");
+      exit(1);
     }
-    my ($ver, $bt) = ();
-    my $sel = $ct->argv('ls', '-d', "$e")->qx;
-    if ($sel =~ /^(.*?) +Rule:.*-mkbranch (.*?)\]?$/) {
-      ($ver, $bt) = ($1, $2);
+  }
+  my @bopts = ();
+  push @bopts, q(-ver) if $opt{version};
+  my @gopts = ();
+  push @gopts, q(cfile), $opt{cfile} if $opt{cfile};
+  push @gopts, q(cq)    if $opt{cq};
+  push @gopts, q(cqe)   if $opt{cqe};
+  push @gopts, q(nwarm) if $opt{nwarm};
+  my @copt = ();
+  push @copt, q(-c), $opt{c} if $opt{c};
+  push @copt, q(-nc)         if $opt{nc};
+  my @args = ();
+  if (MSWIN) {
+    for (@ARGV[1..$#ARGV]) {
+      push @args, glob($_);
     }
-    if (checkcs($ct, $e) and $bt) {
-      my $main = ($ct->argv('lsvtree', $e)->qx)[0];
-      $main =~ s%^[^@]*\@\@[\\/](.*)$%$1%;
-      my $vob = $ct->argv('des', '-s', "vob:$e")->qx;
-      my $re = pbrtype(\%pbrt, $ct, "$bt\@$vob") ?
-	qr([\\/]${main}[\\/]$bt[\\/]\d+$) : qr([\\/]$bt[\\/]\d+$);
-      if ($ver =~ m%$re%) {
-	$ct->argv('co', @gopts, @copt, $e);
-	$rc |= $ct->system;
-      } else {
-	my @mkbcopt = @copt? @copt : qw(-nc);
-	my $r = $ct->argv('mkbranch', @mkbcopt,
-			  '-ver', "/${main}/0", $bt, $e)->system;
-	if ($r) {
-	  $rc = 1;
-	} else {
-	  if ($ver !~ m%\@\@[\\/]${main}[\\/]0$%) {
-	    $rc |= $ct->argv('merge', '-to', $e, $ver)->stdout(0)->system;
-	    unlink glob("$e.contrib*");
-	  }
-	}
-      }
-    } else {
-      $rc |= $ct->argv('co', @gopts, @copt, $e)->system;
-    }
+  } else {
+    @args = @ARGV[1..$#ARGV];
+  }
+  my $rc = 0;
+  my %pbrt = ();
+  my $bt = shift @args;
+  foreach my $e (@args) {
+    $rc |= mkbco($e, $bt, \%pbrt);
   }
   exit $rc;
 }
