@@ -149,13 +149,13 @@ sub pbrtype {
   }
   return $pbrt->{$bt};
 }
-sub parsevtree($$) {
-  my ($ele, $obs) = @_;
+sub parsevtree($$$) {
+  my ($ele, $obs, $sel) = @_;
   $ct->argv('lsvtree');
   my @opt = qw(-merge -all);
   push @opt, '-obs' if $obs;
   $ct->opts(@opt);
-  my @vt = grep m%[\\/]([1-9]\d*|CHECKEDOUT)( .*)?$%, $ct->args($ele)->qx;
+  my @vt = grep m%$sel|[\\/]([1-9]\d*|CHECKEDOUT)( .*)?$%, $ct->args($ele)->qx;
   map { s%\\%/%g } @vt;
   my %gen = ();
   my @stack = ();
@@ -253,7 +253,7 @@ sub lsgenealogy {
 	}
 	$ele =~ s%\\%/%g;
 	$ver =~ s%\\%/%g;
-	my %gen = parsevtree($ele, $opt{obsolete});
+	my %gen = parsevtree($ele, $opt{obsolete}, $ver);
 	setdepths($ver, 0, \%gen);
 	my %seen = ();
 	printparents($ver, \%gen, \%seen, 0);
@@ -414,9 +414,10 @@ sub diff {
     $ele =~ s%\\%/%g;
     $ver =~ s%\\%/%g;
     my $bra = $1 if $ver =~ m%^(.*?)/(?:\d+|CHECKEDOUT)$%;
-    my %gen = parsevtree($ele, 1);
+    my %gen = parsevtree($ele, 1, $ver);
     my $p = $gen{$ver}{'parents'};
     my ($brp) = grep { m%^$bra/\d+$% } @{$p};
+    $ver = $ele if $ver =~ m%/CHECKEDOUT$%;
     $diff->args($brp? $brp : $p->[0], $ver)->system;
   }
   exit $?;
@@ -425,8 +426,9 @@ sub diff {
 =head1 COPYRIGHT AND LICENSE
 
 Copyright (c) 2007 IONA Technologies PLC (until v0.05),
-2008 Marc Girod (marc.girod@gmail.com) for later versions. All rights
-reserved.  This Perl program is free software; you may redistribute it
+2008-2009 Marc Girod (marc.girod@gmail.com) for later versions.
+All rights reserved.
+This Perl program is free software; you may redistribute it
 and/or modify it under the same terms as Perl itself.
 
 =head1 SEE ALSO
