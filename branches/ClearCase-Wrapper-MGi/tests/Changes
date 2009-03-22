@@ -40,4 +40,4 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- lsgen: indentation of incestual parent
 	- diff: -predecessor from the genealogy
 	- diff: special case for checkedout version
-	- lsgen/diff: fix when selected banch/0
+	- lsgen/diff: fix when selected branch/0
