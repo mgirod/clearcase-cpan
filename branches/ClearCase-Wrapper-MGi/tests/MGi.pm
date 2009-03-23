@@ -14,11 +14,9 @@ use vars qw($ct);
   local $^W = 0;
   no strict 'vars';
 
-  $checkout = '';
   my $z = $ARGV[0] || '';
   $lsgenealogy =
     "$z [-short] [-all] [-obsolete] [-depth gen-depth] pname ...";
-  $diff = '';
 }
 
 #############################################################################
@@ -184,34 +182,34 @@ sub parsevtree($$$) {
   }
   return %gen;
 }
-sub mkbco {
-  my ($e, $bt, $pbrt) = @_;
+sub mkbco($$$$$$) {
+  my ($e, $bt, $pbrt, $bopt, $gopt, $copt) = @_;
   my $typ = $ct->argv(qw(des -fmt %m), $e)->qx;
   if ($typ !~ /(branch|version)$/) {
     warn Msg('W', "Neither a version nor a branch: $e");
     next;
   }
   my $ver;
-  if ($e =~ m%^(.*?)\@\@(.*)$%) {
+  if ($e =~ m%^(.*?)\@\@.*$%) {
+    $ver = $e;
     $e = $1;
-    $ver = "$e\@\@$2";
-    $ver .= '/LATEST' if $ct->argv(qw(des -fmt %m), $ver)->qx eq 'branch';
+    $ver .= '/LATEST' if $typ eq 'branch';
   }
   my $sel = $ct->argv('ls', '-d', "$e")->qx;
   if ($sel =~ /^(.*?) +Rule:.*-mkbranch (.*?)\]?$/) {
     ($ver, $bt) = ($ver? $ver : $1, $bt? $bt : $2);
   }
-  if (checkcs($ct, $e) and $bt) {
+  if ($bt and checkcs($ct, $e)) {
     my $main = ($ct->argv('lsvtree', $e)->qx)[0];
     $main =~ s%^[^@]*\@\@[\\/](.*)$%$1%;
     my $vob = $ct->argv('des', '-s', "vob:$e")->qx;
-    my $re = pbrtype($pbrt, $ct, "$bt\@$vob") ?
+    my $re = pbrtype($pbrt, "$bt\@$vob") ?
       qr([\\/]${main}[\\/]$bt[\\/]\d+$) : qr([\\/]$bt[\\/]\d+$);
     if ($ver =~ m%$re%) {
-      $ct->argv('co', @gopts, @copt, $e);
-      return $ct->system;
+      push @$gopt, @$copt, $e;
+      return $ct->argv('co', @$gopt)->system;
     } else {
-      my @mkbcopt = @copt? @copt : qw(-nc);
+      my @mkbcopt = @$copt? @$copt : qw(-nc);
       my $r = $ct->argv('mkbranch', @mkbcopt,
 			'-ver', "/${main}/0", $bt, $e)->system;
       if ($r) {
@@ -225,8 +223,8 @@ sub mkbco {
       }
     }
   } else {
-    push @gopts, @bopts, @copts;
-    return $ct->argv('co', @gopts, $e)->system;
+    push @$gopt, @$bopt, @$copt, $e; # Ensure non empty array
+    return $ct->argv('co', @$gopt)->system;
   }
 }
 
@@ -390,7 +388,7 @@ sub checkout {
   my $rc = 0;
   my %pbrt = ();
   foreach my $e (@args) {
-    $rc |= mkbco($e, undef, \%pbrt);
+    $rc |= mkbco($e, undef, \%pbrt, \@bopts, \@gotps, \@copt);
   }
   exit $rc;
 }
@@ -451,7 +449,7 @@ sub mkbranch {
   my %pbrt = ();
   my $bt = shift @args;
   foreach my $e (@args) {
-    $rc |= mkbco($e, $bt, \%pbrt);
+    $rc |= mkbco($e, $bt, \%pbrt, \@bopts, \@gotps, \@copt);
   }
   exit $rc;
 }
