@@ -17,8 +17,6 @@ The code on this site is currently only found in a _tests_ branch.
     * missing support for graphical {{{lsgen}}} (based on Tk)
     * missing support for {{{annotate}}} (based on pruning the -all output)
   * No major [http://code.google.com/p/clearcase-cpan/issues/list known bugs] now, but:
-    * {{{mkbranch}}} functionality could be reconsidered (with a type different from the one mentioned with {{{-mkbranch}}} in the config spec)
-    * I could remove an empty branch on {{{unco}}}, instead of letting this task to a wrapper
     * the {{{-all}}} flag seems not to work in {{{lsgen}}}
     * {{{setdepth}}} recursion could be shortened (performance) when a depth is given, e.g. supporting {{{diff -pred}}} but there is an ambiguity with 'depth': currently, it is the number of levels _displayed_ (intuitive, so probably to be kept).
     * {{{co}}} forces in practice a {{{-nc}}} in the absence of user option. This is wrong on unix, where interactive comments in ipc mode would work. It is in practice acceptable on Windows/cygwin, but probably not done at the right level: should be generalized.
