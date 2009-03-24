@@ -24,6 +24,7 @@ use vars qw($ct);
 #############################################################################
 *co             = *checkout;
 *lsgen		= *lsgenealogy;
+*unco           = *uncheckout;
 
 1;
 
@@ -186,18 +187,27 @@ sub mkbco($$$$$$) {
   my ($e, $bt, $pbrt, $bopt, $gopt, $copt) = @_;
   my $typ = $ct->argv(qw(des -fmt %m), $e)->qx;
   if ($typ !~ /(branch|version)$/) {
-    warn Msg('W', "Neither a version nor a branch: $e");
-    next;
+    warn Msg('W', "Not a vob object: $e");
+    return;
   }
   my $ver;
   if ($e =~ m%^(.*?)\@\@.*$%) {
     $ver = $e;
     $e = $1;
+    $ver =~ s%[\\/]$%%;
     $ver .= '/LATEST' if $typ eq 'branch';
   }
-  my $sel = $ct->argv('ls', '-d', "$e")->qx;
-  if ($sel =~ /^(.*?) +Rule:.*-mkbranch (.*?)\]?$/) {
-    ($ver, $bt) = ($ver? $ver : $1, $bt? $bt : $2);
+  if (@$bopt) {
+    $$bopt[1] =~ s%[\\/]$%%;
+    $ver = $e . "\@\@$$bopt[1]/LATEST";
+  }
+  if (!$ver or !$bt) {
+    my $sel = $ct->argv('ls', '-d', $e)->qx;
+    if ($bt) {
+      $ver = $1 if $sel =~ /^(.*?) +Rule/;
+    } elsif ($sel =~ /^(.*?) +Rule:.*-mkbranch (.*?)\]?$/) {
+      ($ver, $bt) = ($ver? $ver : $1, $2);
+    }
   }
   if ($bt and checkcs($ct, $e)) {
     my $main = ($ct->argv('lsvtree', $e)->qx)[0];
@@ -240,7 +250,7 @@ David Boyce) for more details.
 
 =head1 CLEARTOOL EXTENSIONS
 
-=over 4
+=over 5
 
 =item * LSGENEALOGY
 
@@ -255,22 +265,28 @@ advocated branching strategy.
 
 =over 4
 
-=item 1. B<-all> flag
+=item B<-all> flag
 
 Show 'uninteresting' versions, otherwise skipped:
-  - bearing no label
-  - not at a chain boundary.
 
-=item 2. B<-obsolete> flag
+=over 2
+
+=item - bearing no label
+
+=item - not at a chain boundary.
+
+=back
+
+=item B<-obsolete> flag
 
 Add obsoleted branches to the search.
 
-=item 3. B<-short> flag
+=item B<-short> flag
 
 Skip displaying labels and 'labelled' versions and do not report
 alternative paths or siblings.
 
-=item 4. B<-depth> flag
+=item B<-depth> flag
 
 Specify a maximum depth at which to stop displaying the genealogy of
 the element.
@@ -312,7 +328,7 @@ sub lsgenealogy {
 Supports the BranchOff feature, which you can set up via an attribute
 in the config spec.  The rationale and the design are documented in:
 
- http://www.cmcrossroads.com/cgi-bin/cmwiki/view/CM/BranchOffMain0
+ http://www.cmwiki.com/BranchOffMain0
 
 Instead of branching off the selected version, the strategy is to
 branch off the root of the version tree, copy-merging there from the
@@ -323,10 +339,15 @@ branch, and to cascade branches indefinitely.  The logical version tree
 is restituted by navigating the merge arrows, to find all the direct or
 indirect contributors.
 
--ver/sion option: ignored under a BranchOff config spec, but the version
-specified in the pname is obeyed, as a branch may always be spawn.
+=over 1
 
--bra/nch option: modified under the BranchOff strategy.
+=item B<-ver/sion> flag
+
+Ignored under a I<BranchOff> config spec,
+but the version specified in the pname is anyway obeyed,
+as a branch may always be spawn.
+
+=back
 
 =cut
 
@@ -397,8 +418,15 @@ sub checkout {
 
 Actually a special case of checkout.
 
--nco cannot reasonably be served in a new branch under BranchOff. One reverts
-to the default behaviour.
+=over 1
+
+=item B<-nco> flag
+
+Special case of reverting to the default behaviour,
+as this cannot reasonably be served in a new branch under BranchOff
+(no version to which to attach the I<Merge> hyperlink).
+
+=back
 
 =cut
 
@@ -464,8 +492,6 @@ In case there are multiple parents, consider the one on the same branch as
 Preserve the (Wrapper default) assumption of a B<-pred> flag, is only one
 argument is given.
 
-=back
-
 =cut
 
 sub diff {
@@ -502,6 +528,42 @@ sub diff {
     $diff->args($brp? $brp : $p->[0], $ver)->system;
   }
   exit $?;
+}
+
+=item * UNCHECKOUT
+
+This wrapper implements a common trigger, to remove the parent branch
+if it has no checkouts, no sub-branches, and no remaining versions,
+if the version uncheckedout was number 0.
+
+=back
+
+=cut
+
+sub uncheckout {
+  my %opt;
+  GetOptions(\%opt, qw(ok)) if grep /^-(dif|ok)/, @ARGV;
+  for (@ARGV[1..$#ARGV]) { $_ = readlink if -l && defined readlink }
+  ClearCase::Argv->ipc(1) unless ClearCase::Argv->ctcmd(1);
+  my $unco = ClearCase::Argv->new(@ARGV);
+  $unco->parse(qw(keep rm cact cwork));
+  $unco->optset('IGNORE');
+  $unco->parseIGNORE(qw(c|cfile=s cqe|nc));
+  $unco->args(sort {$b cmp $a} AutoCheckedOut($opt{ok}, $unco->args));
+  $ct = ClearCase::Argv->new({autochomp=>1});
+  my @b0 = grep { m%[\\/]CHECKEDOUT$% }
+    $ct->argv(qw(ls -s -d), $unco->args)->qx;
+  my $rc = $unco->system;
+  map { s%^(.*)[\\/]CHECKEDOUT$%$1% } @b0;
+  my @rm = ();
+  for my $d (@b0) {
+    opendir BR, $d or next;
+    my @f = grep !/\.\.?/, readdir BR;
+    closedir BR;
+    push @rm, $d if (scalar @f == 2) and $f[0] eq '0' and $f[1] eq 'LATEST';
+  }
+  $ct->argv(qw(rmbranch -f), @rm)->system if @rm;
+  exit $rc;
 }
 
 =head1 COPYRIGHT AND LICENSE

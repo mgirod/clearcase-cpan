@@ -42,3 +42,4 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- diff: special case for checkedout version
 	- lsgen/diff: fix when selected branch/0
 	- mkbranch
+	- unco, with rmbranch if leaving only branch/0
