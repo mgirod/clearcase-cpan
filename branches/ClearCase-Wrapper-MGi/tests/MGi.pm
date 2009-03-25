@@ -197,10 +197,6 @@ sub mkbco($$$$$$) {
     $ver =~ s%[\\/]$%%;
     $ver .= '/LATEST' if $typ eq 'branch';
   }
-  if (@$bopt) {
-    $$bopt[1] =~ s%[\\/]$%%;
-    $ver = $e . "\@\@$$bopt[1]/LATEST";
-  }
   if (!$ver or !$bt) {
     my $sel = $ct->argv('ls', '-d', $e)->qx;
     if ($bt) {
@@ -368,6 +364,7 @@ sub checkout {
     my @added = AutoNotCheckedOut($agg[0], $opt{ok}, 'f', @ARGV);
     push(@ARGV, @added);
   }
+  return 0 if grep /^-bra/, @ARGV[1..$#ARGV];
   my %opt;
   GetOptions(\%opt, qw(reserved unreserved nmaster out=s ndata ptime
 		       nwarn c=s cfile=s cq cqe nc version branch=s
@@ -380,7 +377,6 @@ sub checkout {
   }
   my @bopts = ();
   push @bopts, q(-ver) if $opt{version};
-  push @bopts, q(-bra), $opt{branch} if $opt{branch};
   my @gopts = ();
   push @gopts, q(-res) if $opt{reserved};
   push @gopts, q(-unr) if $opt{unreserved};
