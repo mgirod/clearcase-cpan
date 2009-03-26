@@ -311,3 +311,6 @@ Revision history for Perl extension ClearCase::Argv.
 	- cygwin: convert the backslashes of vob tags as well (I/O)
 	- ipc: quote all input arguments containing special characters
 	- removed function prototypes (code style consistency)
+
+1.45 Thu Mar 26 19:58:41 GMTST 2009
+	- mkattr: added a regression test case, and quoting of string values

@@ -1,6 +1,6 @@
 package ClearCase::Argv;
 
-$VERSION = '1.44';
+$VERSION = '1.45';
 
 use Argv 1.23;
 
@@ -575,7 +575,7 @@ sub _ipc_cmd {
 
     # Send the command to cleartool.
     my $cmd = join(' ', map {
-        m%\s|[\[\]\*]% && !(m%^'.+'$% || m%^".+"$%) ? qq("$_") : $_
+        m%\s|[\[\]\*\"]% && !(m%'$%) ? qq('$_') : $_
     } @cmd);
     chomp $cmd;
     my $down = $self->{IPC}->{DOWN};
