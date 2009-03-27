@@ -316,3 +316,4 @@ Revision history for Perl extension ClearCase::Argv.
 	- mkattr: added a regression test case, and quoting of string values
 	- quoting of quotes revisited, especially under cygwin
 	- support for /view under cygwin
+	- hacked r/setview test case around a real unsolved problem
