@@ -342,12 +342,17 @@ sub unixpath {
         no strict 'subs';
 	for my $line (@_) {
 	    my $nl = chomp $line;
-	    $line =~ s/\r$//;
+	    $line =~ s%\r$%%;
+	    $line =~ s%'%\\'%g;
 	    my @bit = Text::ParseWords::parse_line('\s+', 'delimiters', $line);
 	    map {
 	        s%\\%/%g if m%(?:^(?:\..*|"|[A-Za-z]:|\w*)|\@)\\%;
-		$_ = "/cygdrive/" . lc($1) . $2 if m%\A([A-Za-z]):(.*)\Z%;
-	    } grep{$_ and /\S/} @bit;
+		if (m%\A([A-Za-z]):(.*)\Z%) {
+		  $_ = "/cygdrive/" . lc($1) . $2;
+		} else {
+		  s%^//view%/view%;
+		}
+	    } grep{ s%\\'%'%g or ($_ and m%\S%) } @bit;
 	    $line = join '', grep {$_} @bit;
 	    $line .= "\n" if $nl;
 	}
@@ -559,7 +564,7 @@ sub _cvt_input_cw {
 	    if (-r $_) {
 	        $_ = "${cygpfx}$_";
 	    } else {
-	        s%^/%\\%; # case of vob tags
+		s%^/view%//view% or s%^/%\\%; # case of vob tags
 	    }
 	}
     } @{$self->{AV_ARGS}};
@@ -575,7 +580,7 @@ sub _ipc_cmd {
 
     # Send the command to cleartool.
     my $cmd = join(' ', map {
-        m%\s|[\[\]\*\"]% && !(m%'$%) ? qq('$_') : $_
+        m%\s|[\[\]*"']% ? (m%'% ? (m%"% ? $_ : qq("$_")) : qq('$_')) : $_
     } @cmd);
     chomp $cmd;
     my $down = $self->{IPC}->{DOWN};
