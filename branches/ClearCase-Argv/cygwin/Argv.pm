@@ -346,13 +346,14 @@ sub unixpath {
 	    $line =~ s%'%\\'%g;
 	    my @bit = Text::ParseWords::parse_line('\s+', 'delimiters', $line);
 	    map {
+	        s%\\'%'%g;
 	        s%\\%/%g if m%(?:^(?:\..*|"|[A-Za-z]:|\w*)|\@)\\%;
 		if (m%\A([A-Za-z]):(.*)\Z%) {
 		  $_ = "/cygdrive/" . lc($1) . $2;
 		} else {
 		  s%^//view%/view%;
 		}
-	    } grep{ s%\\'%'%g or ($_ and m%\S%) } @bit;
+	    } grep { $_ and m%\S% } @bit;
 	    $line = join '', grep {$_} @bit;
 	    $line .= "\n" if $nl;
 	}
