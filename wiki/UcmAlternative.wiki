@@ -2,7 +2,7 @@
 
 = Introduction =
 
-[http://www.cmwiki.com/DontUseUcm UCM is bad. It fills however a need. Can we have our cake and eat it?
+[http://www.cmwiki.com/DontUseUcm UCM is bad]. It fills however a need. Can we have our cake and eat it?
 
 = Details =
 
