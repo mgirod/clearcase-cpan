@@ -8,7 +8,7 @@
 
 Problems with UCM:
   * Inflexible: components, p- and admin- vobs
-  * GUI and opacity
+  * GUI and opacity: anti-SCM
   * Weight and poor performance
   * [http://www.cmwiki.com/UcmObsolete Anti-ClearCase]
 
