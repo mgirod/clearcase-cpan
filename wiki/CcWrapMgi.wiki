@@ -4,6 +4,7 @@
 
 This wrapper is distributed via CPAN, and was documented [http://search.cpan.org/perldoc?ClearCase::Wrapper::MGi there]
 ([http://www.cmwiki.com/IncrementalTypesImp sketched in the cm wiki]).
+We'll however gradually [UcmAlternative develop these] here.
 It builds upon !ClearCase::Wrapper and thus upon [ClearCaseArgv ClearCase::Argv].
 It aims at supporting various novel usage patterns of (base) !ClearCase.
 
