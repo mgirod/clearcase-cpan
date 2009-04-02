@@ -12,10 +12,14 @@ The fix proposed in [http://code.google.com/p/clearcase-cpan/source/detail?r=247
 Some usage patterns must be identified and discouraged.
 One example is the following, unfortunately matching the command line:
 {{{
-ct->argv(qw(des -fmt "%[owner]p\n" vob:.))->system
+$ct->argv(qw(des -fmt "%[owner]p\n" vob:.))->system
 }}}
 
 The problem is to delegate the parsing to the {{{qw}}} function, which is not part of !ClearCase::Argv. In old and new versions of !ClearCase::Argv, the {{{"%[owner]p\n"}}} token is itself quoted in single quotes, with unwanted results.
+These results are of course desirable if the situation is the following:
+{{{
+$ct->argv(qw(mkattr -nc FOO "foo"))->system
+}}}
 
 This wouldn't happen in the intermediate versions, but the weakness of this idiom shows up if one adds a space inside the format, since {{{qw}}} will use it for its parsing.
 
