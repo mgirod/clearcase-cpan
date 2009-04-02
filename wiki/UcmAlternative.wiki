@@ -1,0 +1,17 @@
+#summary The ClearCase::Wrapper::MGi module has the ambition to develop as an alternative to UCM.
+
+= Introduction =
+
+UCM is bad. It fills however a need. Can we have our cake and eat it?
+
+= Details =
+
+Problems with UCM:
+  * Inflexible: components, p- and admin- vobs
+  * GUI and opacity
+  * Weight and poor performance
+  * Anti-!ClearCase
+
+The pros, the needed functionality
+  * Baselines, activities, change sets: higher level vision
+  * Incremental labeling
