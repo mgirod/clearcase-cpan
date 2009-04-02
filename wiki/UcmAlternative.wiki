@@ -10,7 +10,7 @@ Problems with UCM:
   * Inflexible: components, p- and admin- vobs
   * GUI and opacity
   * Weight and poor performance
-  * [http://www.cmwiki.com/UcmObsolete Anti-!ClearCase]
+  * [http://www.cmwiki.com/UcmObsolete Anti-ClearCase]
 
 The pros, the needed functionality
   * Baselines, activities, change sets: higher level vision
