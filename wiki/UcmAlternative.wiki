@@ -15,3 +15,9 @@ Problems with UCM:
 The pros, the needed functionality
   * Baselines, activities, change sets: higher level vision
   * Incremental labeling
+
+The proposed solution:
+  * Implicit branching: the rule, no exception
+  * Publish in-place: promote
+  * Fully roll-back able, and ready to roll-forward again
+  * Stability, and avoidance
