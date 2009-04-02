@@ -18,6 +18,6 @@ The pros, the needed functionality
 
 The proposed solution:
   * Implicit branching: the rule, no exception
-  * Publish in-place: promote
+  * [http://www.cmwiki.com/NoMergeDelivery Publish in-place]: promote
   * Fully roll-back able, and ready to roll-forward again
   * Stability, and avoidance
