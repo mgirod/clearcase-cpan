@@ -1,11 +1,14 @@
 package ClearCase::Wrapper::MGi;
 
-$VERSION = '0.09';
+$VERSION = '0.10';
 
 use AutoLoader 'AUTOLOAD';
 use ClearCase::Wrapper;
 use strict;
 use vars qw($ct);
+use constant EQHL => 'EqInc';
+use constant PRHL => 'PrevInc';
+use constant DIAT => 'DelInc';
 
 #############################################################################
 # Usage Message Extensions
@@ -233,6 +236,27 @@ sub mkbco($$$$$$) {
     return $ct->argv('co', @$gopt)->system;
   }
 }
+sub ensuretypes(@) {
+  my @vob = shift;
+  my %cmt = (EQHL  => q("Equivalent increment"),
+	     PRHL  => q("Previous increment in a type chain"),
+	     DIAT  => q("Deleted in increment"));
+  my $silent = $ct->clone;
+  $silent->stdout(0);
+  for my $t (EQHL, PRHL) {
+    for my $v (@vob) {
+      my $t2 = "$t\@$v";
+      if ($silent->argv(qw(des -s), "hltype:$t2")->system) {
+	$ct->argv(qw(mkhltype -c), $cmt{$t}, $t2)->system and die;
+      }
+    }
+  }
+  for my $v (@vob) {
+    if ($silent->argv(qw(des -s), "attype:DIAT\@$v")->system) {
+      $ct->argv(qw(mkattype -c), $cmt{'DIAT'}, "DIAT\@$v")->system and die;
+    }
+  }
+}
 
 =head1 NAME
 
@@ -246,22 +270,24 @@ David Boyce) for more details.
 
 =head1 CLEARTOOL EXTENSIONS
 
-=over 5
+=over 6
 
 =item * LSGENEALOGY
 
 New command. B<LsGenealogy> is an alternative way to display the
 version tree of an element. It will treat merge arrows on a par level
 with parenthood on a branch, and will navigate backwards from the
-version currently selected, to find what contributors led to the
-version currently selected.
+version currently selected, to find what contributors took part in its
+state.
 This is thought as being particularly adapted to displaying the
-bush-like structure caracteristic of version trees produced under the
+bush-like structure characteristic of version trees produced under the
 advocated branching strategy.
+
+Flags:
 
 =over 4
 
-=item B<-all> flag
+=item B<-all>
 
 Show 'uninteresting' versions, otherwise skipped:
 
@@ -273,16 +299,16 @@ Show 'uninteresting' versions, otherwise skipped:
 
 =back
 
-=item B<-obsolete> flag
+=item B<-obsolete>
 
 Add obsoleted branches to the search.
 
-=item B<-short> flag
+=item B<-short>
 
 Skip displaying labels and 'labelled' versions and do not report
 alternative paths or siblings.
 
-=item B<-depth> flag
+=item B<-depth>
 
 Specify a maximum depth at which to stop displaying the genealogy of
 the element.
@@ -335,9 +361,11 @@ branch, and to cascade branches indefinitely.  The logical version tree
 is restituted by navigating the merge arrows, to find all the direct or
 indirect contributors.
 
+Flag:
+
 =over 1
 
-=item B<-ver/sion> flag
+=item B<-ver/sion>
 
 Ignored under a I<BranchOff> config spec,
 but the version specified in the pname is anyway obeyed,
@@ -405,7 +433,7 @@ sub checkout {
   my $rc = 0;
   my %pbrt = ();
   foreach my $e (@args) {
-    $rc |= mkbco($e, undef, \%pbrt, \@bopts, \@gotps, \@copt);
+    $rc |= mkbco($e, undef, \%pbrt, \@bopts, \@gopts, \@copt);
   }
   exit $rc;
 }
@@ -414,9 +442,11 @@ sub checkout {
 
 Actually a special case of checkout.
 
+Flag:
+
 =over 1
 
-=item B<-nco> flag
+=item B<-nco>
 
 Special case of reverting to the default behaviour,
 as this cannot reasonably be served in a new branch under BranchOff
@@ -528,11 +558,9 @@ sub diff {
 
 =item * UNCHECKOUT
 
-This wrapper implements a common trigger, to remove the parent branch
-if it has no checkouts, no sub-branches, and no remaining versions,
-if the version uncheckedout was number 0.
-
-=back
+The wrapper implements the functionality commonly provided by a trigger,
+to remove the parent branch if it has no checkouts, no sub-branches, and
+no remaining versions, while unchecking out version number 0.
 
 =cut
 
@@ -562,6 +590,155 @@ sub uncheckout {
   exit $rc;
 }
 
+=item * MKLBTYPE
+
+Extension: families of types, with a chain of fixed types, linked in a
+succession, and one floating type, convenient for use in config specs.
+One application is incremental types, applied only to modified versions,
+allowing however to simulate full baselines.
+This is implemented as part of UCM, for fixed types, and I<magic> config
+specs. The wrapper offers thus a similar functionality on base ClearCase.
+
+The current baseline is embodied with floating labels, which are moved
+over successive versions. This floating type is however not mandatory.
+It is created with the B<-fam/ily> flag. Families with no such floating
+type are just chains, and can still be used with the B<-inc/rement> flag.
+
+Types forming a family are related with hyperlinks of two types:
+
+=over 2
+
+=item B<EqInc>
+
+=item B<PrevInc>
+
+=back
+
+One attribute:
+
+=over 1
+
+=item B<DelInc>
+
+=back
+
+Flags:
+
+=over 4
+
+=item B<-fam/ily>
+
+Create two label types, linked with an B<EqInc> hyperlink.
+The first, given as argument, will be considered as an alias for successive
+increments of the second. It is the I<family> type.
+The name of the initial incremental type is this of the I<family> type, with
+a suffix of I<_1.00>.
+
+=item B<-inc/rement>
+
+Create a new increment of an existing label type family, given as argument.
+This new type will take the place of the previous increment, as the
+destination of the B<EqInc> hyperlink on the I<family> type.
+It will have a B<PrevInc> hyperlink pointing to the previous increment in
+the family.
+
+=item B<arc/hive>
+
+Rename the current type to an I<archive> value (name as prefix, and a
+numeral suffix. Initial value: I<-001>), create a new type, and make the
+archived one its predecessor, with a B<PrevInc> hyperlink.
+
+=item B<-glo/bal>
+
+Global types (in an Admin vob or not) are incompatible with the family
+property.
+
+=back
+
+=cut
+
+sub mklbtype {
+  my $inc = grep /^-(fam|inc|arc)/, @ARGV;
+  my $rep = grep /^-rep/, @ARGV;
+  return if !$inc and grep /^-(ord|glo)/, @ARGV;
+  die Msg('E', 'Incompatible options: incremental types cannot be global')
+    if $inc and grep /^-glo%/, @ARGV;
+  ClearCase::Argv->ipc(1);
+  $ct = ClearCase::Argv->new({autochomp=>1});
+  my $silent = $ct->clone;
+  $silent->stdout(0);
+  if (!$inc and my ($ahl) = grep /^->/,
+      $ct->desc([qw(-s -ahl AdminVOB vob:.)])->qx) {
+    if (my $avob = (split /\s+/, $ahl)[1]) {
+      my $ntype = ClearCase::Argv->new(@ARGV);
+      $ntype->parse(qw(replace|global|ordinary vpelement|vpbranch|vpversion
+		       pbranch|shared gt|ge|lt|le|enum|default|vtype=s cqe|nc
+		       c|cfile=s));
+      my @args = $ntype->args;
+      for (@args) {
+	next if /\@/;
+	$_ = "$_\@$avob";
+	warn Msg('W', "making global type $_ ...");
+      }
+      $ntype->args(@args);
+      $ntype->opts('-global', $ntype->opts);
+      $ntype->exec;
+    }
+  } elsif ($inc) {
+    die Msg('E', "Not implemented yet: -replace and incremental\n") if $rep;
+    my $ntype = ClearCase::Argv->new(grep { !/^-(inc|fam|arc)/ } @ARGV);
+    $ntype->parse(qw(replace|global|ordinary vpelement|vpbranch|vpversion
+		     pbranch|shared gt|ge|lt|le|enum|default|vtype=s cqe|nc
+		     c|cfile=s));
+    my @args = $ntype->args;
+    my @a = @args;
+    my @vobs = grep { s/.*\@(.*)$/$1/ } @a;
+    push @vob, $ct->argv(qw(des -s vob:.))->qx if grep !/@/, @args;
+    ensuretypes(@vob);
+    my %opt;
+    GetOptions(\%opt, qw(family increment));
+    @a = @args;
+    if ($opt{family}) {
+      map { if (/^(.*)(@@.*)?$/) { $_ = "${1}_1.00" . ($2? $2:'') } } @a;
+      $ntype->args(@args, @a);
+      $ntype->system;
+      map {
+	my $inc = 'lbtype:';
+	if (/^(.*)(@@.*)$/) {
+	  $inc .= "${1}_1.00$2";
+	} else {
+	  $inc .= "${_}_1.00";
+	}
+	$silent->argv('mkhlink', EQHL, "lbtype:$_", $inc)->system;
+      } @args;
+    } else {			# increment
+      for my $t (@args) {
+	my ($pair) = grep s/^\s*(.*) -> lbtype:(.*)\@.*$/$1,$2/,
+	  $ct->argv(qw(des -l -ahl), EQHL, "lbtype:$t")->qx;
+	my ($hlk, $prev) = split ',', $pair if $pair;
+	next unless $prev;
+	if ($prev =~ /^(.*)_(\d+)(?:\.(\d+))?$/) {
+	  my ($base, $maj, $min) = ($1, $2, $3);
+	  my $new = "${base}_" . (defined($min)? $maj . '.' . ++$min : ++$maj);
+	  $new .= $1 if $t =~ /^.*(@.*)$/;
+	  $ntype->args($new)->system;
+	  $silent->argv('rmhlink', $hlk)->system;
+	  $silent->argv(qw(mkhlink -nc), EQHL,
+			"lbtype:$t", "lbtype:$new")->system;
+	  $silent->argv(qw(mkhlink -nc), PRHL,
+			"lbtype:$new", "lbtype:$prev")->system;
+	} else {
+	  warn "Previous increment non suitable in $t: $prev\n";
+	  next;
+	}
+      }
+    }
+    exit 0;
+  }
+}
+
+=back
+
 =head1 COPYRIGHT AND LICENSE
 
 Copyright (c) 2007 IONA Technologies PLC (until v0.05),
@@ -572,6 +749,6 @@ and/or modify it under the same terms as Perl itself.
 
 =head1 SEE ALSO
 
-perl(1), ClearCase::Wrapper, ClearCase::Wrapper::DSB
+perl(1), ClearCase::Wrapper, ClearCase::Wrapper::DSB, ClearCase::Argv
 
 =cut

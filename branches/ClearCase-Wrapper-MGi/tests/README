@@ -7,7 +7,7 @@ This is an overlay module for ClearCase::Wrapper. See the POD for that
 module. It is built following the example of ClearCase::Wrapper::DSB.
 The extensions contained here are meant to support a consistent
 branching policy, advocated in:
- http://www.cmcrossroads.com/cgi-bin/cmwiki/view/CM/BranchYesMergeNo
+ http://www.cmwiki.com/BranchYesMergeNo
 Beyond this module, changes were also made to ClearCase::SyncTree,
 which closely relate to the same purpose.
 My intentions are to make this module orthogonal to the DSB ones, so

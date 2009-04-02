@@ -43,3 +43,7 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- lsgen/diff: fix when selected branch/0
 	- mkbranch
 	- unco, with rmbranch if leaving only branch/0
+
+0.10 Thu Apr  2 20:06:31 GMTDT 2009
+	- co: fixed typo--restored standard flags support
+	- mklbtype -fam and -inc: initial support
