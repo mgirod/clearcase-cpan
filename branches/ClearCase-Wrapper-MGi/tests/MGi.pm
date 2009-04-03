@@ -685,55 +685,95 @@ sub mklbtype {
       $ntype->exec;
     }
   } elsif ($inc) {
-    die Msg('E', "Not implemented yet: -replace and incremental\n") if $rep;
-    my $ntype = ClearCase::Argv->new(grep { !/^-(inc|fam|arc)/ } @ARGV);
+    my $ntype = ClearCase::Argv->new(grep { !/^-(inc|fam|arc|rep)/ } @ARGV);
+    my %opt;
+    GetOptions(\%opt, qw(family increment));
     $ntype->parse(qw(replace|global|ordinary vpelement|vpbranch|vpversion
 		     pbranch|shared gt|ge|lt|le|enum|default|vtype=s cqe|nc
 		     c|cfile=s));
     my @args = $ntype->args;
-    my @a = @args;
-    my @vobs = grep { s/.*\@(.*)$/$1/ } @a;
-    push @vob, $ct->argv(qw(des -s vob:.))->qx if grep !/@/, @args;
-    ensuretypes(@vob);
-    my %opt;
-    GetOptions(\%opt, qw(family increment));
-    @a = @args;
-    if ($opt{family}) {
-      map { if (/^(.*)(@@.*)?$/) { $_ = "${1}_1.00" . ($2? $2:'') } } @a;
-      $ntype->args(@args, @a);
-      $ntype->system;
-      map {
-	my $inc = 'lbtype:';
-	if (/^(.*)(@@.*)$/) {
-	  $inc .= "${1}_1.00$2";
-	} else {
-	  $inc .= "${_}_1.00";
+    if ($rep) {
+      @args = grep { $_ = $ct->argv(qw(des -s), "lbtype:$_")->qx } @args;
+      exit 1 unless @args;
+      if ($opt{family}) {
+	my @a = ();
+	foreach my $t (@args) {
+	  if ($ct->argv(qw(des -s -ahl), EQHL, "lbtype:$t")->stderr(0)->qx) {
+	    warn Msg('E', "$t is already a family type\n");
+	  } else {
+	    push @a, $t;
+	  }
 	}
-	$silent->argv('mkhlink', EQHL, "lbtype:$_", $inc)->system;
-      } @args;
-    } else {			# increment
-      for my $t (@args) {
-	my ($pair) = grep s/^\s*(.*) -> lbtype:(.*)\@.*$/$1,$2/,
-	  $ct->argv(qw(des -l -ahl), EQHL, "lbtype:$t")->qx;
-	my ($hlk, $prev) = split ',', $pair if $pair;
-	next unless $prev;
-	if ($prev =~ /^(.*)_(\d+)(?:\.(\d+))?$/) {
-	  my ($base, $maj, $min) = ($1, $2, $3);
-	  my $new = "${base}_" . (defined($min)? $maj . '.' . ++$min : ++$maj);
-	  $new .= $1 if $t =~ /^.*(@.*)$/;
-	  $ntype->args($new)->system;
-	  $silent->argv('rmhlink', $hlk)->system;
-	  $silent->argv(qw(mkhlink -nc), EQHL,
-			"lbtype:$t", "lbtype:$new")->system;
-	  $silent->argv(qw(mkhlink -nc), PRHL,
-			"lbtype:$new", "lbtype:$prev")->system;
-	} else {
-	  warn "Previous increment non suitable in $t: $prev\n";
-	  next;
+	exit 1 unless @a;
+	map {if (/^(.*)(@@.*)?$/) { $_ = "${1}_1.00" . ($2? $2:'') } } @a;
+	$ntype->args(@a);
+	$ntype->system;
+	map {
+	  my $inc = 'lbtype:';
+	  if (/^(.*)(@@.*)$/) { $inc .= "${1}_1.00$2"; }
+	  else                { $inc .= "${_}_1.00";   }
+	  $silent->argv('mkhlink', EQHL, "lbtype:$_", $inc)->system;
+	} @args;
+      } else {	              # increment
+	die Msg('E', "Incompatible flags: replace and incemental");
+      }
+    } else {
+      my @a = @args;
+      my @vobs = grep { s/.*\@(.*)$/$1/ } @a;
+      push @vob, $ct->argv(qw(des -s vob:.))->qx if grep !/@/, @args;
+      ensuretypes(@vob);
+      @a = @args;
+      if ($opt{family}) {
+	map { if (/^(.*)(@@.*)?$/) { $_ = "${1}_1.00" . ($2? $2:'') } } @a;
+	$ntype->args(@args, @a);
+	$ntype->system;
+	map {
+	  my $inc = 'lbtype:';
+	  if (/^(.*)(@@.*)$/) { $inc .= "${1}_1.00$2"; }
+	  else                { $inc .= "${_}_1.00";   }
+	  $silent->argv('mkhlink', EQHL, "lbtype:$_", $inc)->system;
+	} @args;
+      } else {			# increment
+	for my $t (@args) {
+	  my ($pair) = grep s/^\s*(.*) -> lbtype:(.*)\@.*$/$1,$2/,
+	    $ct->argv(qw(des -l -ahl), EQHL, "lbtype:$t")->qx;
+	  my ($hlk, $prev) = split ',', $pair if $pair;
+	  next unless $prev;
+	  if ($prev =~ /^(.*)_(\d+)(?:\.(\d+))?$/) {
+	    my ($base, $maj, $min) = ($1, $2, $3);
+	    my $new = "${base}_" .
+	      (defined($min)? $maj . '.' . ++$min : ++$maj);
+	    $new .= $1 if $t =~ /^.*(@.*)$/;
+	    $ntype->args($new)->system;
+	    $silent->argv('rmhlink', $hlk)->system;
+	    $silent->argv(qw(mkhlink -nc), EQHL,
+			  "lbtype:$t", "lbtype:$new")->system;
+	    $silent->argv(qw(mkhlink -nc), PRHL,
+			  "lbtype:$new", "lbtype:$prev")->system;
+	  } else {
+	    warn "Previous increment non suitable in $t: $prev\n";
+	    next;
+	  }
 	}
       }
     }
     exit 0;
+  } else { # non inc
+    if ($rep) {
+      my $ntype = ClearCase::Argv->new(@ARGV);
+      $ntype->parse(qw(replace|global|ordinary vpelement|vpbranch|vpversion
+		       pbranch|shared gt|ge|lt|le|enum|default|vtype=s cqe|nc
+		       c|cfile=s));
+      my @args = $ntype->args;
+      map { $_ = "lbtype:$_" } @args;
+      my @a = $ct->argv(qw(des -s), @args)->stderr(0)->qx;
+      if (@a) {
+	map { $_ = "lbtype:$_" } @a;
+	my @link = grep s/^\s*(.*) -> .*$/$1/,
+	  $ct->argv(qw(des -l -ahl), join(',',EQHL,PRHL), @a)->qx;
+	$ct->argv('rmhlink', @link)->system;
+      }
+    }
   }
 }
 
