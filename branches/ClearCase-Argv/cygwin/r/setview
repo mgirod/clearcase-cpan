@@ -32,7 +32,6 @@ if ($view2) {
     my $obj2 = ClearCase::Argv->new({autochomp=>1});
     $view1 = $obj1->argv(qw(pwv -s))->qx;
     my $cwd = $obj1->argv('pwd')->qx;
-    chdir('/');
     $obj2->argv('setview', $view2)->stderr(0)->system;
     $view2 = $obj2->argv(qw(pwv -s))->qx;
     print "Current views in two ipc objects: 1: $view1; 2: $view2\n";

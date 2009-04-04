@@ -184,12 +184,10 @@ sub system {
     } else {
         if ($cmd[0] eq 'setview') {
 	    if ($cmd[1] eq '-exec') {
-	        my @c = @cmd;
-		unshift @c, @ct;
-		return system(@c);
+		return $self->stderr($efd)->SUPER::system;
 	    }
 	    $self->ipc(0);
-	    return $self->ipc($cmd[1]);
+	    return $self->ipc($cmd[1], $efd);
 	}
         $rc = $self->_ipc_cmd(undef, $ofd, $efd, @cmd);
     }
@@ -278,15 +276,12 @@ sub qx {
     } else {
         if ($cmd[0] eq 'setview') {
 	    if ($cmd[1] eq '-exec') {
-	        my @c = @cmd;
-		$c[2] = q(') . $c[2] . q(');
-		unshift @c, @ct;
-		my $ret = qx(@c);
+		my $ret = $self->stderr($efd)->SUPER::qx;
 		chomp($ret) if $self->autochomp;
 		return wantarray? split(/\n/, $ret) : $ret;
 	    }
             $self->ipc(0);
-            return $self->ipc($cmd[1]);
+            return $self->ipc($cmd[1], $efd);
         }
 	my @data = ();
 	$rc = $self->_ipc_cmd(\@data, $ofd, $efd, @cmd);
@@ -509,6 +504,7 @@ sub ipc {
     my $self = shift;	# this might be an instance or a classname
     no strict 'refs';	# because $self may be a symbolic hash ref
     my $level = shift;
+    my $stderr = shift;
     if (defined($level) && !$level) {
 	return 0 unless exists($self->{IPC});
 	my $down = $self->{IPC}->{DOWN};
@@ -542,12 +538,22 @@ sub ipc {
 
     # Dies on failure.
     my($down, $back);
-    my @cmd = ($level =~ /^\d+$/) ? (@ct, '-status')
-        : (@ct, qw(setview -exec), q(cleartool -status), $level);
+    my $view = ($level =~ /^\d+$/) ? '' : $level;
+    my @cmd = !$view ? (@ct, '-status')
+      : (@ct, qw(setview -exec), q(cleartool -status), $view);
     my $pid = IPC::Open3::open3($down, $back, undef, @cmd);
 
     # Set the "line discipline" to convert CRLF to \n.
     binmode $back, ':crlf';
+
+    if ($view) {
+      print $down "des -fmt '\\n' .\n";
+      my $out = ($stderr == 2) ? *STDERR : *STDOUT;
+      while ($_ = <$back>) {
+	last if /^Command 1 returned status/;
+	print $out $_ if $stderr;
+      }
+    }
 
     $self->{IPC}->{DOWN} = $down;
     $self->{IPC}->{BACK} = $back;
