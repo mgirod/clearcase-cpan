@@ -20,4 +20,4 @@ The proposed solution:
   * Implicit branching: the rule, no exception
   * [http://www.cmwiki.com/NoMergeDelivery Publish in-place]: promote
   * Fully roll-back able, and ready to roll-forward again
-  * Stability, and avoidance
+  * Stability, and avoidance of duplication
