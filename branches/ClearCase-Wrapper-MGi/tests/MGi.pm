@@ -2,10 +2,8 @@ package ClearCase::Wrapper::MGi;
 
 $VERSION = '0.10';
 
-use vars qw($ct);
-use constant EQHL => 'EqInc';
-use constant PRHL => 'PrevInc';
-use constant DIAT => 'DelInc';
+use vars qw($ct $eqhl $prhl $diat);
+($eqhl, $prhl, $diat) = qw(EqInc PrevInc DelInc);
 
 sub compareincs($$) {
   my ($t1, $t2) = @_;
@@ -249,12 +247,13 @@ sub mkbco($$$$$$) {
 }
 sub ensuretypes(@) {
   my @vob = shift;
-  my %cmt = (EQHL  => q("Equivalent increment"),
-	     PRHL  => q("Previous increment in a type chain"),
-	     DIAT  => q("Deleted in increment"));
+  my %cmt = ($eqhl => q(Equivalent increment),
+	     $prhl => q(Previous increment in a type chain),
+	     $diat => q(Deleted in increment));
   my $silent = $ct->clone;
   $silent->stdout(0);
-  for my $t (EQHL, PRHL) {
+  $silent->stderr(0);
+  for my $t ($eqhl, $prhl) {
     for my $v (@vob) {
       my $t2 = "$t\@$v";
       if ($silent->argv(qw(des -s), "hltype:$t2")->system) {
@@ -263,8 +262,8 @@ sub ensuretypes(@) {
     }
   }
   for my $v (@vob) {
-    if ($silent->argv(qw(des -s), "attype:DIAT\@$v")->system) {
-      $ct->argv(qw(mkattype -c), $cmt{'DIAT'}, "DIAT\@$v")->system and die;
+    if ($silent->argv(qw(des -s), "attype:$diat\@$v")->system) {
+      $ct->argv(qw(mkattype -c), $cmt{$diat}, "$diat\@$v")->system and die;
     }
   }
 }
@@ -289,7 +288,7 @@ sub nextinc($) {
 sub findnext($) { # on input, the type exists
   my $c = shift;
   my @int = grep { s/^<- lbtype:(.*)$/$1/ }
-    $ct->argv(qw(des -s -ahl), PRHL, "lbtype:$c")->qx;
+    $ct->argv(qw(des -s -ahl), $prhl, "lbtype:$c")->qx;
   if (@int) {
     my @i = ();
     for (@int) { push @i, findnext($_); }
@@ -748,7 +747,7 @@ sub mklbtype {
       if ($opt{family}) {
 	my @a = ();
 	foreach my $t (@args) {
-	  if ($ct->argv(qw(des -s -ahl), EQHL, "lbtype:$t")->stderr(0)->qx) {
+	  if ($ct->argv(qw(des -s -ahl), $eqhl, "lbtype:$t")->stderr(0)->qx) {
 	    warn Msg('E', "$t is already a family type\n");
 	  } else {
 	    push @a, $t;
@@ -767,7 +766,7 @@ sub mklbtype {
 	map {
 	  if (defined($pair{$_})) {
 	    my $inc = "lbtype:$pair{$_}";
-	    $silent->argv('mkhlink', EQHL, "lbtype:$_", $inc)->system;
+	    $silent->argv('mkhlink', $eqhl, "lbtype:$_", $inc)->system;
 	  }
 	} keys %pair;
       } else {	              # increment
@@ -795,13 +794,13 @@ sub mklbtype {
 	map {
 	  if (defined($pair{$_})) {
 	    my $inc = "lbtype:$pair{$_}";
-	    $silent->argv('mkhlink', EQHL, "lbtype:$_", $inc)->system;
+	    $silent->argv('mkhlink', $eqhl, "lbtype:$_", $inc)->system;
 	  }
 	} keys %pair;
       } else {			# increment
 	for my $t (@args) {
 	  my ($pair) = grep s/^\s*(.*) -> lbtype:(.*)\@.*$/$1,$2/,
-	    $ct->argv(qw(des -l -ahl), EQHL, "lbtype:$t")->qx;
+	    $ct->argv(qw(des -l -ahl), $eqhl, "lbtype:$t")->qx;
 	  my ($hlk, $prev) = split ',', $pair if $pair;
 	  next unless $prev;
 	  if ($prev =~ /^(.*)_(\d+)(?:\.(\d+))?$/) {
@@ -811,9 +810,9 @@ sub mklbtype {
 	    $new .= $1 if $t =~ /^.*(@.*)$/;
 	    $ntype->args($new)->system;
 	    $silent->argv('rmhlink', $hlk)->system;
-	    $silent->argv(qw(mkhlink -nc), EQHL,
+	    $silent->argv(qw(mkhlink -nc), $eqhl,
 			  "lbtype:$t", "lbtype:$new")->system;
-	    $silent->argv(qw(mkhlink -nc), PRHL,
+	    $silent->argv(qw(mkhlink -nc), $prhl,
 			  "lbtype:$new", "lbtype:$prev")->system;
 	  } else {
 	    warn "Previous increment non suitable in $t: $prev\n";
@@ -835,7 +834,7 @@ sub mklbtype {
       if (@a) {
 	map { $_ = "lbtype:$_" } @a;
 	my @link = grep s/^\s*(.*) -> .*$/$1/,
-	  $ct->argv(qw(des -l -ahl), join(',',EQHL,PRHL), @a)->qx;
+	  $ct->argv(qw(des -l -ahl), "$eqhl,$prhl", @a)->qx;
 	$ct->argv('rmhlink', @link)->system;
       }
     }
