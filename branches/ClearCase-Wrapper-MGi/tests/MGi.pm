@@ -2,13 +2,24 @@ package ClearCase::Wrapper::MGi;
 
 $VERSION = '0.10';
 
-use AutoLoader 'AUTOLOAD';
-use ClearCase::Wrapper;
-use strict;
 use vars qw($ct);
 use constant EQHL => 'EqInc';
 use constant PRHL => 'PrevInc';
 use constant DIAT => 'DelInc';
+
+sub compareincs($$) {
+  my ($t1, $t2) = @_;
+  my ($p1, $M1, $m1, $s1) = pfxmajminsfx($t1);
+  my ($p2, $M2, $m2, $s2) = pfxmajminsfx($t2);
+  if (!(defined($p1) and defined($p2) and ($p1 eq $p2) and ($s1 eq $s2))) {
+    warn Msg('W', "$t1 and $t2 not comparable\n");
+    return 1;
+  }
+  return (($M1 <=> $M2) or (defined($m1) and defined($m2) and $m1 <=> $m2));
+}
+use AutoLoader 'AUTOLOAD';
+use ClearCase::Wrapper;
+use strict;
 
 #############################################################################
 # Usage Message Extensions
@@ -254,6 +265,45 @@ sub ensuretypes(@) {
   for my $v (@vob) {
     if ($silent->argv(qw(des -s), "attype:DIAT\@$v")->system) {
       $ct->argv(qw(mkattype -c), $cmt{'DIAT'}, "DIAT\@$v")->system and die;
+    }
+  }
+}
+sub pfxmajminsfx($) {
+  my $t = shift;
+  if ($t =~ /^(\w+[-_])(\d+)(?:\.(\d+))?(\@.*)?$/) {
+    my $min = ($3 or '');
+    my $sfx = ($4 or '');
+    return ($1, $2, $min, $sfx);
+  } else {
+    warn Msg(
+      'W', "$t doesn't match the pattern expected for an incremental type\n");
+  }
+}
+sub nextinc($) {
+  my $inc = shift;
+  my ($pfx, $maj, $min, $sfx) = pfxmajminsfx($inc);
+  return '' unless $pfx and $maj;
+  my $count = defined($min)? $maj . q(.) . ++$min : ++$maj;
+  return $pfx . $count . $sfx;
+}
+sub findnext($) { # on input, the type exists
+  my $c = shift;
+  my @int = grep { s/^<- lbtype:(.*)$/$1/ }
+    $ct->argv(qw(des -s -ahl), PRHL, "lbtype:$c")->qx;
+  if (@int) {
+    my @i = ();
+    for (@int) { push @i, findnext($_); }
+    return @i;
+  } else {
+    return ($c);
+  }
+}
+sub findfreeinc($) { # on input, the values may or may not exist
+  my $nxt = shift;
+  while (my ($k, $v) = each %{$nxt}) {
+    if ($ct->argv(qw(des -s), "lbtype:$v")->stderr(0)->qx) { #exists
+      my @cand = sort compareincs findnext($v);
+      $$nxt{$k} = nextinc($cand[$#cand]);
     }
   }
 }
@@ -705,34 +755,49 @@ sub mklbtype {
 	  }
 	}
 	exit 1 unless @a;
-	map {if (/^(.*)(@@.*)?$/) { $_ = "${1}_1.00" . ($2? $2:'') } } @a;
-	$ntype->args(@a);
+	my %pair = ();
+	foreach (@a) {
+	  if (/^(.*)(@@.*)?$/) {
+	    $pair{$_} = "${1}_1.00" . ($2? $2:'');
+	  }
+	}
+	findfreeinc(\%pair);
+	$ntype->args(values %pair);
 	$ntype->system;
 	map {
-	  my $inc = 'lbtype:';
-	  if (/^(.*)(@@.*)$/) { $inc .= "${1}_1.00$2"; }
-	  else                { $inc .= "${_}_1.00";   }
-	  $silent->argv('mkhlink', EQHL, "lbtype:$_", $inc)->system;
-	} @args;
+	  if (defined($pair{$_})) {
+	    my $inc = "lbtype:$pair{$_}";
+	    $silent->argv('mkhlink', EQHL, "lbtype:$_", $inc)->system;
+	  }
+	} keys %pair;
       } else {	              # increment
-	die Msg('E', "Incompatible flags: replace and incemental");
+	die Msg('E', "Incompatible flags: replace and incremental");
       }
     } else {
       my @a = @args;
       my @vobs = grep { s/.*\@(.*)$/$1/ } @a;
-      push @vob, $ct->argv(qw(des -s vob:.))->qx if grep !/@/, @args;
+      push @vob, $ct->argv(qw(des -s vob:.))->stderr(0)->qx
+	if grep !/@/, @args;
+      die  Msg('E', qq(Unable to determine VOB for pathname ".".\n))
+	unless @vob;
       ensuretypes(@vob);
       @a = @args;
       if ($opt{family}) {
-	map { if (/^(.*)(@@.*)?$/) { $_ = "${1}_1.00" . ($2? $2:'') } } @a;
-	$ntype->args(@args, @a);
+	my %pair = ();
+	foreach (@a) {
+	  if (/^(.*)(@@.*)?$/) {
+	    $pair{$_} = "${1}_1.00" . ($2? $2:'');
+	  }
+	}
+	findfreeinc(\%pair);
+	$ntype->args(@args, values %pair);
 	$ntype->system;
 	map {
-	  my $inc = 'lbtype:';
-	  if (/^(.*)(@@.*)$/) { $inc .= "${1}_1.00$2"; }
-	  else                { $inc .= "${_}_1.00";   }
-	  $silent->argv('mkhlink', EQHL, "lbtype:$_", $inc)->system;
-	} @args;
+	  if (defined($pair{$_})) {
+	    my $inc = "lbtype:$pair{$_}";
+	    $silent->argv('mkhlink', EQHL, "lbtype:$_", $inc)->system;
+	  }
+	} keys %pair;
       } else {			# increment
 	for my $t (@args) {
 	  my ($pair) = grep s/^\s*(.*) -> lbtype:(.*)\@.*$/$1,$2/,
