@@ -16,8 +16,8 @@ my ($errfh, $tmperr) = tempfile();
 open(SAVEOUT, ">&STDOUT");
 open(SAVEERR, ">&STDERR");
 # Test 1
-*STDOUT = $outfh;
-*STDERR = $errfh;
+open(STDOUT, ">$tmpout");
+open(STDERR, ">$tmperr");
 my $rc = $ct->argv(@cmd)->system;
 close(STDOUT);
 close(STDERR);
@@ -60,9 +60,7 @@ ok ($err, 'qx: stdout ignored, stderr ok.');
 # Test 5
 @lastout = $ct->argv(@cmd)->stderr(0)->qx;
 ok (@lastout eq @expout, 'qx: stderr ignored, stdout ok.');
-TODO: {
-  eval { require ClearCase::CtCmd };
-  local $TODO = "redirection not supported in fork model" if $@;
+eval { require ClearCase::CtCmd };
 # Test 6 -- same thing for ctcmd mode, or what emulates it
 $ct->ctcmd(2); #Gives a warning if CtCmd not installed
 open(STDOUT, ">$tmpout");
@@ -109,6 +107,6 @@ ok ($err, 'qx: stdout ignored, stderr ok.');
 # Test 10
 @lastout = $ct->argv(@cmd)->stderr(0)->qx;
 ok (@lastout eq @expout, 'qx: stderr ignored, stdout ok.');
-}
+
 unlink $tmpout, $tmperr;
 print STDERR "\n", ClearCase::Argv->summary;   # print out the stats we kept
