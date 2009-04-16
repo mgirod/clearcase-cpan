@@ -1,0 +1,10 @@
+#summary ClearCase as the Antithesis to Traditional CM
+
+= Background =
+
+Unix had been developed at AT&T labs, in relation and opposition to academia, at Berkeley and elsewhere.
+Two companies had developed to make profit by using it as the operating system of the workstations they developed: Sun and Apollo. These were times of bold innovation, which led to divergence.
+Apollo/Domain, in spite or because its originality, became too different.
+Apollo was bought by HP.
+
+= Fear of Repeating Errors =
