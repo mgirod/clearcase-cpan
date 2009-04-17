@@ -7,4 +7,12 @@ Two companies had developed to make profit by using it as the operating system o
 Apollo/Domain, in spite or because its originality, became too different.
 Apollo was bought by HP.
 
+This was the chance of the team who had been developing DSEE, the Domain Software Engineering Environment. They ported it on _standard_ Unix (in practice, Solaris and HP-UX), and created the company Atria.
+
+= Bold Originality =
+
+!ClearCase was a breakthrough. Its distinctive feature was a virtual file system, and its application, Workspace Management, a conceptual novelty. Management was made available where and when it was needed, at the developer's and during the development, before stable versions where achieved. In fact, the artifacts most needing management where not _versions_ at all (in the narrow sense of traditional CM: source items under version _control_); they were derived objects: the products of builds, the most volatile and most valuable artifacts, the one eventually to be delivered.
+
+The main tools were _dynamic views_ and _clearmake_.
+
 = Fear of Repeating Errors =
