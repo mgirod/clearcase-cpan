@@ -2,23 +2,26 @@
 
 = Introduction =
 
-In the current version, commands prompting for a comment hang on Windows (and !CygWin),
-but work on unix (not tested in ctcmd mode)
+In the current version, commands prompting the user work in a few cases on unix, but fail most of the time, resulting in hanging behaviour.
 
-There are two distinct problems in !ClearCase which interfere with the code:
-  * a bug with {{{setview}}} under {{{cleartool -status}}}
-  * a problem in Windows to catch prompts and provide user input from perl (Note that !CtCmd exhibits the hanging behaviour as well)
-The status is to satisfy oneself, waiting for IBM replies.
+This is not very important for scripts, but is a major pain in wrappers.
+
+Several distinct problems interfere with the code:
+  * a !ClearCase bug with {{{setview}}} under {{{cleartool -status}}}
+  * differences in behaviour between unix and Windows (Note that they affect !CtCmd as well)
 
 = Details =
 
-  * The problem interferes with the work-around for the [http://www-128.ibm.com/developerworks/support/rational/rfe/execute?use_case=searchChangeRequests&PROD_ID=0&COMP_ID=0&RESP_ID=0&CREATED_BY=314 bug] (RFE 423, acknowledged as defect RATLC01064211, but closed as a user error, and now reopened, I was told) in {{{cleartool -status}}}
-  * There is a workaround for unix, which as it is, fails on Windows
-  * Interactive comments are not essential for writing scripts
-  * It is important for writing wrappers
-
-One can detect the 'setview' request, and indeed start a second process with:
-
-{{{cleartool setview -exec "cleartool -status" foo}}}
-
-(foo being the view).
+  * The work-around s in place for the [http://www-128.ibm.com/developerworks/support/rational/rfe/execute?use_case=searchChangeRequests&PROD_ID=0&COMP_ID=0&RESP_ID=0&CREATED_BY=314 bug] (RFE 423, acknowledged as defect RATLC01064211, then closed as a user error, maybe reopened, but in an unclear state anyway) in {{{cleartool -status}}}
+  * The work-around works on unix for certain prompts, but as far as I know, always fails on Windows
+  'setview' requests are detected, and serviced via a second process started with (_foo_ being the view):
+  {{{
+  cleartool setview -exec "cleartool -status" foo
+  }}}
+  * The regexp for user prompts is too restrictive, and doesn't support e.g.:
+  {{{
+  Checkout comments for "Changes":
+  Save private copy of "Changes"?  [yes] 
+  }}}
+  * In the latter example, the user input is limited to one line, whereas the code expects a single dot as for multiline comments.
+  * In any case, there is something which looks like a flushing problem (although setting the pipes to autoflush doesn't solve it): some prompt from cleartool are not readable until the background process is killed (for lack of an other way). This was experienced on unix, but may apply to Windows as well.
