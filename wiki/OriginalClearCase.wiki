@@ -22,4 +22,4 @@ Dynamic views and clearmake are just options, seldom in favour, and put in roles
 
 !ClearCase has in fact joined back the mainstream of plain old CM, following paths pioneered by other tools.
 We may guess that this was the result of an internal struggle at Rational, in favour of market driven products, and against pioneering innovation.
-Probably did the fate of Apollo have its weight in this sad strategic decision.
+The fate of Apollo had maybe its share in this sad strategic decision.
