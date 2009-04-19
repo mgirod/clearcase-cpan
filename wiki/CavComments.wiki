@@ -24,4 +24,4 @@ Several distinct problems interfere with the code:
   Save private copy of "Changes"?  [yes] 
   }}}
   * In the latter example, the user input is limited to one line, whereas the code expects a single dot as for multiline comments.
-  * In any case, there is something which looks like a flushing problem (although setting the pipes to autoflush doesn't solve it): some prompt from cleartool are not readable until the background process is killed (for lack of an other way). This was experienced on unix, but may apply to Windows as well.
+  * In any case, there is something which looks like a flushing problem (although setting the pipes to autoflush doesn't solve it): some prompts from cleartool are not readable until the background process is killed (for lack of an other way). This was experienced on unix, but may apply to Windows as well.
