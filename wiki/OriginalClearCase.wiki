@@ -21,5 +21,5 @@ With UCM, we must admit that a 180 degree turn took place.
 Dynamic views and clearmake are just options, seldom in favour, and put in roles in which they cannot express their power. Almost forgotten oddities.
 
 !ClearCase has in fact joined back the mainstream of plain old CM, following paths pioneered by other tools.
-We may guess that this was the result of an internal struggle at Rational, in favour of market driven products, and against pioneering innovation.
+We may guess that this was the result of an internal struggle at Rational, in favour of market (i.e. Windows, mostly) driven products, and against pioneering innovation.
 The fate of Apollo had maybe its share in this sad strategic decision.
