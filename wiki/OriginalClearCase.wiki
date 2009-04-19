@@ -17,7 +17,7 @@ The main tools were _dynamic views_ and _clearmake_.
 
 = Fear of Repeating Errors =
 
-With UCM, we must admit that a 180 degree turn has taken place.
+With UCM, we must admit that a 180 degree turn took place.
 Dynamic views and clearmake are just options, seldom in favour, and put in roles in which they cannot express their power. Almost forgotten oddities.
 
 !ClearCase has in fact joined back the mainstream of plain old CM, following paths pioneered by other tools.
