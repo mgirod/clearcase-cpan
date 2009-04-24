@@ -4,7 +4,7 @@
 
 Unix had been developed at AT&T labs, in relation and opposition to academia, at Berkeley and elsewhere.
 Two companies had developed to make profit by using it as the operating system of the workstations they developed: Sun and Apollo. These were times of bold innovation, which led to divergence.
-Apollo/Domain, in spite or because its originality, became too different.
+Apollo/Domain, in spite or because of its originality, became too different.
 Apollo was bought by HP.
 
 This was the opportunity of a life-time for the team who had been developing DSEE, the Domain Software Engineering Environment. They ported it on _standard_ Unix (in practice, Solaris and HP-UX), and created the company Atria.
