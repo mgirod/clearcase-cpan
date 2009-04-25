@@ -45,24 +45,11 @@ KNOWN BUGS AND MISSING FEATURES
   - No tests provided.
   - The view attribute is not searched from included config spec
     fragments.
-  - The treatment of -ver and -bra options is problematic:
-    - their effect on one argument overrides any -mkbranch behaviour,
-      whether off root or not (respected)
-    - the problem is with multiple options, and their order, in the
-      default cleartool behaviour:
-      - a -ver option is self-sufficient so that a later -bra option
-	only applies to following arguments if any;
-      - a -bra option followed with a -ver one are considered mutually
-	exclusive;
-      - only one single -ver or -bra option (of each) can be given.
-    - the wrapper does not try to consider the order of the options,
-      and thus return to the default behaviour if any is given.
 
 Many more functions need to be modified in order to support the
 'BranchOff: root' functionality:
   - describe -fmt "%Pn": should return a merge contributor, unless a
     direct parent is found on the same branch
-  - diff -pred: should as well be extended
   - ls: should mention '-off /{root}' if 'BranchOff: root' is set
   - lsgen: should support a -graphical option
   - synctree: should be added as an operation, with a -from syntax.

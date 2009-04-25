@@ -2,6 +2,8 @@ package ClearCase::Wrapper::MGi;
 
 $VERSION = '0.10';
 
+use warnings;
+use strict;
 use vars qw($ct $eqhl $prhl $diat);
 ($eqhl, $prhl, $diat) = qw(EqInc PrevInc DelInc);
 
@@ -17,7 +19,6 @@ sub compareincs($$) {
 }
 use AutoLoader 'AUTOLOAD';
 use ClearCase::Wrapper;
-use strict;
 
 #############################################################################
 # Usage Message Extensions
@@ -29,6 +30,7 @@ use strict;
   my $z = $ARGV[0] || '';
   $lsgenealogy =
     "$z [-short] [-all] [-obsolete] [-depth gen-depth] pname ...";
+  $mklbtype = "\n* [-family] [-increment] [-archive] pname ...";
 }
 
 #############################################################################
@@ -43,7 +45,7 @@ use strict;
 __END__
 
 ## Internal service routines, undocumented.
-sub sosbranch($$) { # same or sub- branch
+sub sosbranch($$) {		# same or sub- branch
   my ($cur, $prd) = @_;
   $cur =~ s:/([0-9]+|CHECKEDOUT)$:/:;
   $prd =~ s:/([0-9]+|CHECKEDOUT)$:/:;
@@ -86,16 +88,16 @@ sub printparents {
     }
   }
   if ($opt{all}
-      or $l
-      or (scalar(@p) != 1)
-      or (scalar(@s) != 1)
-      or !sosbranch($id, $s[0])
-      or !sosbranch($p[0], $id)) {
+	or $l
+	  or (scalar(@p) != 1)
+	    or (scalar(@s) != 1)
+	      or !sosbranch($id, $s[0])
+		or !sosbranch($p[0], $id)) {
     if ($opt{short}) {
       if ((scalar(@p) != 1)
-	  or (scalar(@s) != 1)
-	  or !sosbranch($id, $s[0])
-	  or !sosbranch($p[0], $id)) {
+	    or (scalar(@s) != 1)
+	      or !sosbranch($id, $s[0])
+		or !sosbranch($p[0], $id)) {
 	printf("%${ind}s${id}\n", '');
 	$$gen{$id}{printed}++;
 	${ind}++;
@@ -285,19 +287,21 @@ sub nextinc($) {
   my $count = defined($min)? $maj . q(.) . ++$min : ++$maj;
   return $pfx . $count . $sfx;
 }
-sub findnext($) { # on input, the type exists
+sub findnext($) {		# on input, the type exists
   my $c = shift;
   my @int = grep { s/^<- lbtype:(.*)$/$1/ }
     $ct->argv(qw(des -s -ahl), $prhl, "lbtype:$c")->qx;
   if (@int) {
     my @i = ();
-    for (@int) { push @i, findnext($_); }
+    for (@int) {
+      push @i, findnext($_);
+    }
     return @i;
   } else {
     return ($c);
   }
 }
-sub findfreeinc($) { # on input, the values may or may not exist
+sub findfreeinc($) {	   # on input, the values may or may not exist
   my $nxt = shift;
   while (my ($k, $v) = each %{$nxt}) {
     if ($ct->argv(qw(des -s), "lbtype:$v")->stderr(0)->qx) { #exists
@@ -305,6 +309,34 @@ sub findfreeinc($) { # on input, the values may or may not exist
       $$nxt{$k} = nextinc($cand[$#cand]);
     }
   }
+}
+sub sltunlocklt($$) {
+  my ($lt, $vob, %lck) = @_;
+  my @opt = $ct->argv(qw(lslock -fmt %c), "lbtype:$lt\@$vob")->stderr(0)->qx;
+  return unless @opt;
+  !$ct->argv('unlock', "lbtype:$lt\@$vob")->stderr(0)->system
+    or (defined(&funlocklt) and funlocklt($lt, $vob))
+    or die Msg('E', "Could not unlock lbtype:$lt\@$vob");
+  if ($opt[0] =~ /^Locked for all users.$/) {
+    $lck{all}++;
+  } elsif ($opt[0] =~ /^Locked for all users \(obsolete\).$/) {
+    $lck{obs}++;
+  } elsif ($opt[0] =~ /^Locked except for users: (.*)$/) {
+    $lck{exc} = join ',', split / /, $1;
+  }
+  return %lck;
+}
+sub sltlocklt($$%) {
+  my ($lt, $vob, %lck) = @_;
+  my @cmd = qw(lock);
+  if ($lck{obs}) {
+    push @cmd, '-obs';
+  } elsif ($lck{exc}) {
+    push @cmd, $lck{exc};
+  }
+  !$ct->argv(@cmd, "lbtype:$lt\@$vob")->stderr(0)->system
+    or (defined(&flocklt) and flocklt($lt, $vob, $lck{exc}))
+    or die Msg('E', "Could not relock lbtype:$lt\@$vob");
 }
 
 =head1 NAME
@@ -319,7 +351,7 @@ David Boyce) for more details.
 
 =head1 CLEARTOOL EXTENSIONS
 
-=over 6
+=over 7
 
 =item * LSGENEALOGY
 
@@ -570,7 +602,9 @@ argument is given.
 =cut
 
 sub diff {
-  for (@ARGV[1..$#ARGV]) { $_ = readlink if -l && defined readlink }
+  for (@ARGV[1..$#ARGV]) {
+    $_ = readlink if -l && defined readlink;
+  }
   push(@ARGV, qw(-dir)) if @ARGV == 1;
   my $diff = ClearCase::Argv->new(@ARGV);
   $diff->autochomp(1);
@@ -616,7 +650,9 @@ no remaining versions, while unchecking out version number 0.
 sub uncheckout {
   my %opt;
   GetOptions(\%opt, qw(ok)) if grep /^-(dif|ok)/, @ARGV;
-  for (@ARGV[1..$#ARGV]) { $_ = readlink if -l && defined readlink }
+  for (@ARGV[1..$#ARGV]) {
+    $_ = readlink if -l && defined readlink;
+  }
   ClearCase::Argv->ipc(1) unless ClearCase::Argv->ctcmd(1);
   my $unco = ClearCase::Argv->new(@ARGV);
   $unco->parse(qw(keep rm cact cwork));
@@ -707,43 +743,45 @@ property.
 =cut
 
 sub mklbtype {
-  my $inc = grep /^-(fam|inc|arc)/, @ARGV;
-  my $rep = grep /^-rep/, @ARGV;
-  return if !$inc and grep /^-(ord|glo)/, @ARGV;
+  my (%opt, $rep);
+  GetOptions(\%opt, qw(family increment archive));
+  GetOptions('replace' => \$rep);
+  return if !%opt and grep /^-(ord|glo)/, @ARGV;
+  die Msg('E', 'Incompatible options: family increment archive')
+    if keys %opt > 1;
   die Msg('E', 'Incompatible options: incremental types cannot be global')
-    if $inc and grep /^-glo%/, @ARGV;
+    if %opt and grep /^-glo/, @ARGV;
   ClearCase::Argv->ipc(1);
   $ct = ClearCase::Argv->new({autochomp=>1});
+  my $ntype = ClearCase::Argv->new(@ARGV);
+  $ntype->parse(qw(global|ordinary vpelement|vpbranch|vpversion
+		pbranch|shared gt|ge|lt|le|enum|default|vtype=s cqe|nc
+		c|cfile=s));
+  my @args = $ntype->args;
   my $silent = $ct->clone;
   $silent->stdout(0);
-  if (!$inc and my ($ahl) = grep /^->/,
+  if (!%opt and my ($ahl) = grep /^->/,
       $ct->desc([qw(-s -ahl AdminVOB vob:.)])->qx) {
     if (my $avob = (split /\s+/, $ahl)[1]) {
-      my $ntype = ClearCase::Argv->new(@ARGV);
-      $ntype->parse(qw(replace|global|ordinary vpelement|vpbranch|vpversion
-		       pbranch|shared gt|ge|lt|le|enum|default|vtype=s cqe|nc
-		       c|cfile=s));
-      my @args = $ntype->args;
       for (@args) {
 	next if /\@/;
 	$_ = "$_\@$avob";
 	warn Msg('W', "making global type $_ ...");
       }
       $ntype->args(@args);
-      $ntype->opts('-global', $ntype->opts);
+      my @opts = ('-global', $ntype->opts);
+      push @opts, '-replace' if $rep;
+      $ntype->opts(@opts);
       $ntype->exec;
     }
-  } elsif ($inc) {
-    my $ntype = ClearCase::Argv->new(grep { !/^-(inc|fam|arc|rep)/ } @ARGV);
-    my %opt;
-    GetOptions(\%opt, qw(family increment));
-    $ntype->parse(qw(replace|global|ordinary vpelement|vpbranch|vpversion
-		     pbranch|shared gt|ge|lt|le|enum|default|vtype=s cqe|nc
-		     c|cfile=s));
-    my @args = $ntype->args;
+  } elsif (%opt) {
+    map { s/^lbtype:(.*)$/$1/ } @args;
     if ($rep) {
-      @args = grep { $_ = $ct->argv(qw(des -s), "lbtype:$_")->qx } @args;
-      exit 1 unless @args;
+      @args = grep { $_ = $ct->argv(qw(des -s), "lbtype:$_")->stderr(0)->qx }
+	@args;
+#      exit 1 unless @args;
+      # Note: workaround for a problem with ClearCase::Argv::qx and stderr!
+      die Msg('E', 'Label type(s) not found') unless @args;
       if ($opt{family}) {
 	my @a = ();
 	foreach my $t (@args) {
@@ -769,7 +807,7 @@ sub mklbtype {
 	    $silent->argv('mkhlink', $eqhl, "lbtype:$_", $inc)->system;
 	  }
 	} keys %pair;
-      } else {	              # increment
+      } else {			# increment
 	die Msg('E', "Incompatible flags: replace and incremental");
       }
     } else {
@@ -797,13 +835,15 @@ sub mklbtype {
 	    $silent->argv('mkhlink', $eqhl, "lbtype:$_", $inc)->system;
 	  }
 	} keys %pair;
-      } else {			# increment
+      } elsif($opt{increment}) {			# increment
 	for my $t (@args) {
-	  my ($pair) = grep s/^\s*(.*) -> lbtype:(.*)\@.*$/$1,$2/,
-	    $ct->argv(qw(des -l -ahl), $eqhl, "lbtype:$t")->qx;
-	  my ($hlk, $prev) = split ',', $pair if $pair;
+	  $ct->argv(qw(des -s), "lbtype:$t")->stdout(0)->system;
+	  my ($pair) = grep s/^\s*(.*) -> lbtype:(.*)\@(.*)$/$1,$2,$3/,
+	    $ct->argv(qw(des -l -ahl), $eqhl, "lbtype:$t")->stderr(0)->qx;
+	  my ($hlk, $prev, $vob) = split ',', $pair if $pair;
 	  next unless $prev;
 	  if ($prev =~ /^(.*)_(\d+)(?:\.(\d+))?$/) {
+	    my %plock = sltunlocklt($prev, $vob) if $prev;
 	    my ($base, $maj, $min) = ($1, $2, $3);
 	    my $new = "${base}_" .
 	      (defined($min)? $maj . '.' . ++$min : ++$maj);
@@ -814,22 +854,21 @@ sub mklbtype {
 			  "lbtype:$t", "lbtype:$new")->system;
 	    $silent->argv(qw(mkhlink -nc), $prhl,
 			  "lbtype:$new", "lbtype:$prev")->system;
+	    sltlocklt($prev, $vob, %plock) if $prev and %plock;
 	  } else {
 	    warn "Previous increment non suitable in $t: $prev\n";
 	    next;
 	  }
 	}
+      } else {
+	die Msg('E', 'Not implemented yet');
       }
     }
     exit 0;
-  } else { # non inc
+  } else {			# non inc
     if ($rep) {
-      my $ntype = ClearCase::Argv->new(@ARGV);
-      $ntype->parse(qw(replace|global|ordinary vpelement|vpbranch|vpversion
-		       pbranch|shared gt|ge|lt|le|enum|default|vtype=s cqe|nc
-		       c|cfile=s));
-      my @args = $ntype->args;
-      map { $_ = "lbtype:$_" } @args;
+      $ntype->opts('-replace', $ntype->opts);
+      map { $_ = "lbtype:$_" unless /^lbtype:/ } @args;
       my @a = $ct->argv(qw(des -s), @args)->stderr(0)->qx;
       if (@a) {
 	map { $_ = "lbtype:$_" } @a;
@@ -839,6 +878,67 @@ sub mklbtype {
       }
     }
   }
+}
+
+=item * LOCK
+
+New B<-allow> and B<-deny> flags. These work like I<-nuser> but operate
+incrementally on an existing I<-nuser> list rather than completely
+replacing it. When B<-allow> or B<-deny> are used, I<-replace> is
+implied.
+
+When B<-iflocked> is used, no lock will be created where one didn't
+previously exist; the I<-nusers> list will only be modified for
+existing locks.
+
+In case of a family type, lock also the equivalent incremental type.
+
+=cut
+
+sub lock {
+  my (%opt, $nusers);
+  GetOptions(\%opt, qw(allow=s deny=s iflocked));
+  GetOptions('nusers=s' => \$nusers);
+  ClearCase::Argv->ipc(1);
+  my $lock = ClearCase::Argv->new(@ARGV);
+  $lock->parse(qw(c|cfile=s cquery|cqeach pname=s obsolete replace));
+  die Msg('E', "cannot specify -nusers along with -allow or -deny")
+    if %opt and $nusers;
+  die Msg('E', "cannot use -allow or -deny with multiple objects")
+    if %opt and $lock->args > 1;
+  my $lslock = ClearCase::Argv->lslock([qw(-fmt %c)], $lock->args);
+  my($currlock) = $lslock->autofail(1)->qx;
+  if ($currlock && $currlock =~ m%^Locked except for users:\s+(.*)%) {
+    my %nusers = map {$_ => 1} split /\s+/, $1;
+    if ($nusers) {
+      %nusers = ();
+      map { $nusers{$_} = 1 } split /,/, $nusers;
+    } else {
+      if ($opt{allow}) {
+	map { $nusers{$_} = 1 } split /,/, $opt{allow};
+      } elsif ($opt{deny}) {
+	map { delete $nusers{$_} } split /,/, $opt{deny};
+      } else {
+	%nusers = ();
+      }
+    }
+    $lock->opts($lock->opts, '-nusers', join(',', sort keys %nusers))
+      if %nusers;
+  } elsif (($nusers or $opt{allow}) and ($currlock or $opt{iflocked})) {
+    $lock->opts($lock->opts, '-nusers', ($nusers or $opt{allow}));
+  }
+  $lock->opts($lock->opts, '-replace')
+    if ($opt{allow} or $opt{deny}) and $currlock and !$lock->flag('replace');
+  my @args = $lock->args;
+  $ct = ClearCase::Argv->new({autochomp=>1});
+  foreach my $t (@args) {
+    if ($ct->argv(qw(des -fmt), '%m\n', $t)->stderr(0)->qx eq 'label type') {
+      my @et = grep s/^-> (.*)$/$1/, $ct->argv(qw(des -s -ahl), $eqhl, $t)->qx;
+      push @args, $et[0] if @et;
+    }
+  }
+  my $rc = $lock->args(@args)->system;
+  exit $rc;
 }
 
 =back
