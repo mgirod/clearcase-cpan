@@ -312,10 +312,10 @@ Revision history for Perl extension ClearCase::Argv.
 	- ipc: quote all input arguments containing special characters
 	- removed function prototypes (code style consistency)
 
-1.45 Fri Apr 24 18:44:41 BST 2009
+1.45 Sat Apr 25 15:56:41 BST 2009
 	- mkattr: added a regression test case, and quoting of string values
 	- quoting of quotes revisited, especially under cygwin
 	- support for /view under cygwin
 	- unix/ipc/setview: managed the standard error
 	- r/stdouterr: fork was ok and ipc wrong--fixed the test cases, added 2
-
+	- fixed both ipc and ctcmd to get the stdouterr tests pass

@@ -241,11 +241,18 @@ sub qx {
 	    ($rc, $data, $errors) = $ctc->exec(@cmd);
 	}
 	$data ||= '';
+         if ($data) {
+             if (!$ofd) {
+                 $data = '';
+             } elsif ($ofd == 2) {
+                 print STDERR $data;
+             }
+         }
 	if ($errors) {
 	    if ($efd == 1) {
-		$data .= $errors;
+	        $data .= $errors;
 	    } elsif ($efd == 2) {
-		print STDERR $errors;
+	        print STDERR $errors;
 	    }
 	}
 	print STDERR "+ (\$? == $?)\n" if $dbg > 1;
@@ -636,8 +643,8 @@ sub _ipc_cmd {
 	print '+ <=', $_ if $_ && $dbg >= 2;
 	next if $next;
 	$self->unixpath($_) if CYGWIN;
-	if ($stdout or $err) {
-	    if ($disposition) {
+	if ($stdout or ($err and $stderr)) {
+	    if ($disposition and (($err and ($stderr == 1)) or ($stdout == 1))) {
 	        push(@$disposition, $_);
 	    } else {
 	        print $out $_;

@@ -15,7 +15,7 @@ file is an accompanying overview and chronology.
 
 =head1 SUMMARY OF FEATURES
 
-=over 7
+=over 8
 
 =item * Interoperability/Portability
 
@@ -26,6 +26,21 @@ almost the same. This includes automatically quoting arguments to
 protect them from the C<cmd.exe> shell, automatically converting
 /-separated pathnames to \, etc. These features can keep a lot of hair
 out of your script (and on your head).
+
+=item * Backwards Compatibility
+
+A case was reported in which changes (in 1.44) broke backwards
+compatibility, in the domain of quoting arguments.
+This is unfortunate, and was fixed in the critical cases (mkattr).
+However, the changes were not gratuitous, and fixed actually 
+discrepancies between the behavior in the different modes (and brought
+e.g. support for the use of quotes inside comments. So, they were not
+withdrawn, with the effect that total backwards compatibility was not
+restored.
+Version 1.45 brings again some amount of backwards incompatibilities,
+with fixes to the way std output and error may be redirected or thrown
+away. The benefit in increased functionality and consistency is once
+again considered worth the while.
 
 =item * Optional Co-Process for Speed
 
