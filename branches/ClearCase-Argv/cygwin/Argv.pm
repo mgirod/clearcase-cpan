@@ -644,7 +644,7 @@ sub _ipc_cmd {
 	next if $next;
 	$self->unixpath($_) if CYGWIN;
 	if ($stdout or ($err and $stderr)) {
-	    if ($disposition and (($err and ($stderr == 1)) or ($stdout == 1))) {
+	    if ($disposition and (($err and $stderr == 1) or (!$err and $stdout == 1))) {
 	        push(@$disposition, $_);
 	    } else {
 	        print $out $_;
