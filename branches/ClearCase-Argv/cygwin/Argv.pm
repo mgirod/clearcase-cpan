@@ -620,8 +620,7 @@ sub _ipc_cmd {
 	    } else {
 	        $next = 1;
 	    }
-	}
-	if (m%^Comments for %) {
+	} elsif (m%^Comments for %) {
 	  if ($disposition) {
 	    push(@$disposition, $_);
 	  } else {
@@ -633,8 +632,7 @@ sub _ipc_cmd {
 		print $down "$_\n";
 	        last if m%^\.$%;
 	    }
-	}
-	if (s%^(.*)Command \d+ returned status (\d+)%$1%) {
+	} elsif (s%^(.*)Command \d+ returned status (\d+)%$1%) {
 	    # Shift the status up so it looks like an exit status.
 	    $rc = $2 << 8;
 	    chomp;
