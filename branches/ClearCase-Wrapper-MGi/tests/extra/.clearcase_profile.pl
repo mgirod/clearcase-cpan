@@ -4,7 +4,6 @@ ClearCase::Argv->ipc(2) unless $ARGV[0] eq 'setview';
 
 {
   my $forcelock = '/usr/bin/locklbtype';
-  my $ct = ClearCase::Argv->new({autochomp=>1});
   sub funlocklt($$) {
     my ($lt, $vob) = @_;
     return system($forcelock, '--unlock', '--vob', $vob, '--lbtype', $lt);

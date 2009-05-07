@@ -310,34 +310,6 @@ sub findfreeinc($) {	   # on input, the values may or may not exist
     }
   }
 }
-sub sltunlocklt($$) {
-  my ($lt, $vob, %lck) = @_;
-  my @opt = $ct->argv(qw(lslock -fmt %c), "lbtype:$lt\@$vob")->stderr(0)->qx;
-  return unless @opt;
-  !$ct->argv('unlock', "lbtype:$lt\@$vob")->stderr(0)->system
-    or (defined(&funlocklt) and funlocklt($lt, $vob))
-    or die Msg('E', "Could not unlock lbtype:$lt\@$vob");
-  if ($opt[0] =~ /^Locked for all users.$/) {
-    $lck{all}++;
-  } elsif ($opt[0] =~ /^Locked for all users \(obsolete\).$/) {
-    $lck{obs}++;
-  } elsif ($opt[0] =~ /^Locked except for users: (.*)$/) {
-    $lck{exc} = join ',', split / /, $1;
-  }
-  return %lck;
-}
-sub sltlocklt($$%) {
-  my ($lt, $vob, %lck) = @_;
-  my @cmd = qw(lock);
-  if ($lck{obs}) {
-    push @cmd, '-obs';
-  } elsif ($lck{exc}) {
-    push @cmd, $lck{exc};
-  }
-  !$ct->argv(@cmd, "lbtype:$lt\@$vob")->stderr(0)->system
-    or (defined(&flocklt) and flocklt($lt, $vob, $lck{exc}))
-    or die Msg('E', "Could not relock lbtype:$lt\@$vob");
-}
 
 =head1 NAME
 
@@ -351,7 +323,7 @@ David Boyce) for more details.
 
 =head1 CLEARTOOL EXTENSIONS
 
-=over 7
+=over 8
 
 =item * LSGENEALOGY
 
@@ -777,11 +749,8 @@ sub mklbtype {
   } elsif (%opt) {
     map { s/^lbtype:(.*)$/$1/ } @args;
     if ($rep) {
-      @args = grep { $_ = $ct->argv(qw(des -s), "lbtype:$_")->stderr(0)->qx }
-	@args;
-#      exit 1 unless @args;
-      # Note: workaround for a problem with ClearCase::Argv::qx and stderr!
-      die Msg('E', 'Label type(s) not found') unless @args;
+      @args = grep { $_ = $ct->argv(qw(des -s), "lbtype:$_")->qx } @args;
+      exit 1 unless @args;
       if ($opt{family}) {
 	my @a = ();
 	foreach my $t (@args) {
@@ -843,7 +812,6 @@ sub mklbtype {
 	  my ($hlk, $prev, $vob) = split ',', $pair if $pair;
 	  next unless $prev;
 	  if ($prev =~ /^(.*)_(\d+)(?:\.(\d+))?$/) {
-	    my %plock = sltunlocklt($prev, $vob) if $prev;
 	    my ($base, $maj, $min) = ($1, $2, $3);
 	    my $new = "${base}_" .
 	      (defined($min)? $maj . '.' . ++$min : ++$maj);
@@ -854,7 +822,6 @@ sub mklbtype {
 			  "lbtype:$t", "lbtype:$new")->system;
 	    $silent->argv(qw(mkhlink -nc), $prhl,
 			  "lbtype:$new", "lbtype:$prev")->system;
-	    sltlocklt($prev, $vob, %plock) if $prev and %plock;
 	  } else {
 	    warn "Previous increment non suitable in $t: $prev\n";
 	    next;
@@ -924,20 +891,101 @@ sub lock {
     }
     $lock->opts($lock->opts, '-nusers', join(',', sort keys %nusers))
       if %nusers;
-  } elsif (($nusers or $opt{allow}) and ($currlock or $opt{iflocked})) {
+  } elsif (($nusers or $opt{allow}) and (!$currlock or $opt{iflocked})) {
     $lock->opts($lock->opts, '-nusers', ($nusers or $opt{allow}));
   }
   $lock->opts($lock->opts, '-replace')
     if ($opt{allow} or $opt{deny}) and $currlock and !$lock->flag('replace');
   my @args = $lock->args;
   $ct = ClearCase::Argv->new({autochomp=>1});
+  my (@lbt, @oth, %vob);
+  my $locvob = $ct->argv(qw(des -s vob:.))->stderr(0)->qx;
   foreach my $t (@args) {
     if ($ct->argv(qw(des -fmt), '%m\n', $t)->stderr(0)->qx eq 'label type') {
-      my @et = grep s/^-> (.*)$/$1/, $ct->argv(qw(des -s -ahl), $eqhl, $t)->qx;
-      push @args, $et[0] if @et;
+      my @et = grep s/^-> lbtype:(.*)@.*$/$1/,
+	$ct->argv(qw(des -s -ahl), $eqhl, $t)->qx;
+      if (@et) {
+	my ($e, $p) = ($et[0], '');
+	if ($t =~ /lbtype:(.*)@(.*)$/) {
+	  $t = $1; $vob{$t} = $2;
+	} else {
+	  $t =~ s/^lbtype://;
+	  $vob{$t} = $locvob;
+	}
+	my $v = $vob{$t}; $vob{$e} = $v;
+	push @lbt, $t, $e;
+	my @pt = grep s/^-> lbtype:(.*)@.*$/$1/,
+	  $ct->argv(qw(des -s -ahl), $prhl, "lbtype:$e\@$v")->qx;
+	if (@pt) {
+	  $p = $pt[0];
+	  if (!$ct->argv(qw(lslock -s), "lbtype:$p\@$v")->stderr(0)->qx) {
+	    push @lbt, $p;
+	    $vob{$p} = $v;
+	  }
+	}
+      } else {
+	push @oth, $t;
+      }
+    } else {
+      push @oth, $t;
     }
   }
-  my $rc = $lock->args(@args)->system;
+  my $rc = @oth? $lock->args(@oth)->system : 0;
+  for my $lt (@lbt) {
+    my $v = $vob{$lt};
+    $rc |= $lock->args("lbtype:$lt\@$v")->stderr(0)->system
+      and (defined(&flocklt) and flocklt($lt, $v, ($nusers or $opt{allow})))
+      and warn Msg('E', "Could not lock lbtype:$lt\@$v");
+  }
+  exit $rc;
+}
+
+=item * UNLOCK
+
+In case of a family type, unlock also the equivalent incremental type.
+
+=cut
+
+sub unlock() {
+  ClearCase::Argv->ipc(1);
+  my $unlock = ClearCase::Argv->new(@ARGV);
+  $unlock->parse(qw(c|cfile=s cquery|cqeach|nc version=s pname=s));
+  my @args = $unlock->args;
+  $ct = ClearCase::Argv->new({autochomp=>1});
+  my (@lbt, @oth, %vob);
+  my $locvob = $ct->argv(qw(des -s vob:.))->stderr(0)->qx;
+  foreach my $t (@args) {
+    if ($ct->argv(qw(des -fmt), '%m\n', $t)->stderr(0)->qx eq 'label type') {
+      my @et = grep s/^-> lbtype:(.*)@.*$/$1/,
+	$ct->argv(qw(des -s -ahl), $eqhl, $t)->qx;
+      if (@et) {
+	if ($t =~ /lbtype:(.*)@(.*)$/) {
+	  $t = $1; my $v = $2; $vob{$t} = $v; $vob{$et[0]} = $v;
+	} else {
+	  $t =~ s/^lbtype://;
+	  $vob{$t} = $locvob; $vob{$et[0]} = $locvob;
+	}
+	push @lbt, $t, $et[0];
+      } else {
+	push @oth, $t;
+      }
+    } else {
+      push @oth, $t;
+    }
+  }
+  my $rc = @oth? $unlock->args(@oth)->system : 0;
+  for my $lt (@lbt) {
+    my $v = $vob{$lt};
+    if ($ct->argv(qw(lslock -s), "lbtype:$lt\@$v")->qx) {
+      $rc |= $unlock->args("lbtype:$lt\@$v")->stderr(0)->system
+	and (defined(&funlocklt) and funlocklt($lt, $v))
+	and die Msg('E', "Could not unlock lbtype:$lt\@$v");
+    } else {
+      warn Msg('E', 'Object is not locked.');
+      warn Msg('E', "Unable to unlock label type \"$lt\".");
+      $rc = 1;
+    }
+  }
   exit $rc;
 }
 
