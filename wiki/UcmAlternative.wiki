@@ -7,9 +7,9 @@
 = Details =
 
 Problems with UCM:
-  * Inflexible: components, p- and admin- vobs
+  * Inflexible: components, p- and admin- vobs, mastership
   * GUI and opacity: anti-SCM
-  * Weight and poor performance
+  * Weight and poor performance, coupling (access restrictions, synchronization, waiting)
   * [http://www.cmwiki.com/UcmObsolete Obsolete]: anti-!ClearCase
 
 The pros, the needed functionality
