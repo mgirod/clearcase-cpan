@@ -9,7 +9,7 @@ use Getopt::Long;
 use ClearCase::Argv;
 use IPC::System::Simple;
 use autodie qw(:system);
-use vars qw($help $unlock $vob @op @nusers @lbtype);
+use vars qw($help $unlock $vob $rep @op @nusers @lbtype);
 
 my $host = 'myhost.mydomain';
 my $ssh = '/usr/bin/ssh';
@@ -19,8 +19,8 @@ my $ct = ClearCase::Argv->new({autochomp=>1});
 {
   my $bn = 'locklbtype'; #under suid, $0 is smthg like /dev/fd/4
   sub usage() {
-    print "Usage: $bn [[--unlock [| --nusers accounts]] --vob <vob>\n"
-      . "  --lbtype <lbtypes> | [--help]]\n\n"
+    print "Usage: $bn [ --unlock | [--nusers accounts] [--replace]]\n"
+      . "  --vob <vob> --lbtype <lbtypes> | --help\n\n"
       . "    By default, lock; use --unlock explicitely.\n"
       . "    Only one vob is accepted, and it is mandatory.\n"
       . "    Multiple label types are possible, either with separate options"
@@ -53,7 +53,8 @@ sub untaintstring($) {
   return join ' ', @words;
 }
 my $res = GetOptions("help" => \$help, "unlock" => \$unlock, "vob=s" => \$vob,
-		     "nusers=s" => \@nusers, "lbtype=s" => \@lbtype);
+		     "replace" => /$rep, "nusers=s" => \@nusers,
+		     "lbtype=s" => \@lbtype);
 usage if $help or !($res and $vob and @lbtype) or ($unlock and @nusers);
 @lbtype = split(/,/, join(',', @lbtype));
 map { $_ = untaint($_) } @lbtype;
@@ -80,6 +81,7 @@ if ($unlock) {
 } else {
   @op = ('lock', '-c', "'Locked by: $account \($pwnam\)'");
   push(@op, '-nusers', join(',', @nusers)) if @nusers;
+  push @op, '-rep' if $rep;
 }
 my ($owner) = grep s%^.*/(.*)$%$1%,
   $ct->argv(qw(des -fmt "%[owner]p"), "vob:$vob")->qx;

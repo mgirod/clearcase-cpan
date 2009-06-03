@@ -4,6 +4,9 @@ Makefile.PL
 MANIFEST
 README
 test.pl
+extra/.ccprfwin.pl
 extra/.clearcase_profile.pl
+extra/VobPathConv.pm
+extra/VobPathConv.pod
 extra/locklbtype
 extra/locklbtype.pod
