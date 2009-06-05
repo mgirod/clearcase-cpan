@@ -1,6 +1,6 @@
 package ClearCase::Wrapper::MGi;
 
-$VERSION = '0.10';
+$VERSION = '0.11';
 
 use warnings;
 use strict;
@@ -31,6 +31,7 @@ use ClearCase::Wrapper;
   $lsgenealogy =
     "$z [-short] [-all] [-obsolete] [-depth gen-depth] pname ...";
   $mklbtype = "\n* [-family] [-increment] [-archive] pname ...";
+  $mklabel	= "\n* [-up]";
 }
 
 #############################################################################
@@ -323,7 +324,7 @@ David Boyce) for more details.
 
 =head1 CLEARTOOL EXTENSIONS
 
-=over 8
+=over 9
 
 =item * LSGENEALOGY
 
@@ -987,6 +988,57 @@ sub unlock() {
     }
   }
   exit $rc;
+}
+
+=item * MKLABEL
+
+In case of a family type, apply also the equivalent incremental type.
+
+Preserve the support for the B<-up> flag from B<ClearCase::Wrapper::DSB>
+
+=cut
+
+sub mklabel {
+  use warnings;
+  use strict;
+  my %opt;
+  GetOptions(\%opt, qw(up));
+  ClearCase::Argv->ipc(1);
+  my $mkl = ClearCase::Argv->new(@ARGV);
+  $mkl->parse(qw(replace|recurse|ci|cq|nc
+		 version|c|cfile|select|type|name|config=s));
+  my($lbtype, @elems) = $mkl->args;
+  $lbtype =~ s/^lbtype://;
+  $ct = ClearCase::Argv->new({autochomp=>1});
+  my @et = grep s/^-> lbtype:(.*)@.*$/$1/,
+    $ct->argv(qw(des -s -ahl), $eqhl, "lbtype:$lbtype")->qx;
+  return 0 unless $opt{up} or @et;
+  die Msg('E', "-up requires -recurse")
+    if $opt{up} and !grep /^-re?$|^-rec/, @ARGV;
+  if (@et) {
+    $mkl->args($et[0], @elems)->system;
+    $mkl->args($lbtype, @elems)->system;
+  }
+  exit $? unless $opt{up};
+  my $dsc = ClearCase::Argv->new({-autochomp=>1});
+  $mkl->syfail(1)->system;
+  require File::Basename;
+  require File::Spec;
+  File::Spec->VERSION(0.82);
+  my %ancestors;
+  for my $pname (@elems) {
+    my $vobtag = $dsc->desc(['-s'], "vob:$pname")->qx;
+    for (my $dad = File::Basename::dirname(File::Spec->rel2abs($pname));
+	 length($dad) >= length($vobtag);
+	 $dad = File::Basename::dirname($dad)) {
+      $ancestors{$dad}++ unless $dad eq '/cygdrive';
+    }
+  }
+  exit(0) if !%ancestors;
+  $mkl->opts(grep !/^-r(ec)?$/, $mkl->opts);
+  @elems = sort {$b cmp $a} keys %ancestors;
+  $mkl->args($et[0], @elems)->system if @et;
+  $mkl->args($lbtype, @elems)->exec;
 }
 
 =back
