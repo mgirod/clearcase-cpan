@@ -4,7 +4,7 @@
 
 In the current version, commands prompting the user work in a few cases on unix, but fail most of the time, resulting in hanging behaviour.
 
-This is not very important for scripts, but is a major pain in wrappers.
+This is not very important for scripts, but is a pain in wrappers. Fortunately, wrappers may handle the issues before invoking !ClearCase::Argv.
 
 Several distinct problems interfere with the code:
   * a !ClearCase bug with {{{setview}}} under {{{cleartool -status}}}
