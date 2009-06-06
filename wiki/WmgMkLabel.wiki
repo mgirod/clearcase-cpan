@@ -1,0 +1,19 @@
+#summary ClearCase::Wrapper::MGi mklabel
+
+= Introduction =
+
+If the first argument is a floating label type, one shall apply the equivalent fixed label type first, only on versions not already bearing the floating, and then move the floating over those versions.
+
+= Details =
+
+In addition, we retain the _-up_ extension from !ClearCase::Wrapper::DSB, which allows to apply labels upwards, to versions needed to access the arguments.
+
+One problem is what to do in case the first application fails.
+  * if it fails fully, then abort.
+  * What if it fails only partly?
+    * One case is this of recursive labeling, in presence of links. In this case, the error reported is that a element was already labeled. The label is not applied a second time (whether on the same or on an other version), but the rest of the elements is labeled. In this case, we ignore the error and move the floating label as well.
+  * Need to check:
+    * is this only for hard links or also for sym links? In the latter case, the versions are always the same, so the error is spurious...
+    * how does the _-replace_ option affects? Is the second pass successful then, the label being moved from where it was first applied?
+
+An other aspect is that we have to add a _-replace_ option in any case to move the floating label, i.e. for the second pass. This means that we have to make sure that both labels do not end on different versions!
