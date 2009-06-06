@@ -1025,10 +1025,11 @@ sub mklabel {
 	@ret;
     push @opt, '-rep' unless grep /^-rep/, @opt;
     $mkl->args($lbtype, @elems)->opts(@opt)->system and exit 1;
+  } else {
+    $mkl->syfail(1)->system;
   }
   exit $? unless $opt{up};
   my $dsc = ClearCase::Argv->new({-autochomp=>1});
-  $mkl->syfail(1)->system;
   require File::Basename;
   require File::Spec;
   File::Spec->VERSION(0.82);
@@ -1049,7 +1050,8 @@ sub mklabel {
   exit 1 if grep
     !/^cleartool: Error: (Version label.*already|Trouble applying|Unable)/,
       @ret;
-  $mkl->args($lbtype, @elems)->opts(@opt)->exec;
+  $mkl->opts(@opt);
+  $mkl->args($lbtype, @elems)->exec;
 }
 
 =back
