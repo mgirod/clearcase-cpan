@@ -993,8 +993,11 @@ sub unlock() {
 =item * MKLABEL
 
 In case of a family type, apply also the equivalent incremental type.
+The meaning of B<-replace> is affected: it concerns the equivalent fixed
+type, and is implicit for the floating type (the one given as argument).
 
 Preserve the support for the B<-up> flag from B<ClearCase::Wrapper::DSB>
+and lift the restriction to using it only with B<-recurse>.
 
 =cut
 
@@ -1013,11 +1016,15 @@ sub mklabel {
   my @et = grep s/^-> lbtype:(.*)@.*$/$1/,
     $ct->argv(qw(des -s -ahl), $eqhl, "lbtype:$lbtype")->qx;
   return 0 unless $opt{up} or @et;
-  die Msg('E', "-up requires -recurse")
-    if $opt{up} and !grep /^-re?$|^-rec/, @ARGV;
+  my @opt = $mkl->opts();
   if (@et) {
-    $mkl->args($et[0], @elems)->system;
-    $mkl->args($lbtype, @elems)->system;
+    my @ret = $mkl->args($et[0], @elems)->stdout(2)->stderr(1)->qx;
+    map {print STDERR "$_\n"} @ret;
+    exit 1 if grep
+      !/^cleartool: Error: (Version label.*already|Trouble applying|Unable)/,
+	@ret;
+    push @opt, '-rep' unless grep /^-rep/, @opt;
+    $mkl->args($lbtype, @elems)->opts(@opt)->system and exit 1;
   }
   exit $? unless $opt{up};
   my $dsc = ClearCase::Argv->new({-autochomp=>1});
@@ -1037,8 +1044,12 @@ sub mklabel {
   exit(0) if !%ancestors;
   $mkl->opts(grep !/^-r(ec)?$/, $mkl->opts);
   @elems = sort {$b cmp $a} keys %ancestors;
-  $mkl->args($et[0], @elems)->system if @et;
-  $mkl->args($lbtype, @elems)->exec;
+  my @ret = $mkl->args($et[0], @elems)->stdout(2)->stderr(1)->qx if @et;
+  map {print STDERR "$_\n"} @ret;
+  exit 1 if grep
+    !/^cleartool: Error: (Version label.*already|Trouble applying|Unable)/,
+      @ret;
+  $mkl->args($lbtype, @elems)->opts(@opt)->exec;
 }
 
 =back
