@@ -32,3 +32,4 @@ The code on this site is developed in a _dev_ branch.
     * integration of {{{synctree}}} under {{{cleartool}}}, including via the graphical interface.
   * Under work:
     * [CwmLockingIssues lock/unlock], using site specific methods when not owning the equivalent or previous types.
+    * [WmgMkLabel mklabel]
