@@ -1,8 +1,8 @@
-#summary [CcWrapMgi ClearCase::Wrapper::MGi] mklabel
+#summary ClearCase::Wrapper::MGi mklabel
 
 = Introduction =
 
-If the first argument is a floating label type, one shall apply the equivalent fixed label type first, only on versions not already bearing the floating, and then move the floating over those versions.
+Command supported by [CcWrapMgi ClearCase::Wrapper::MGi]: If the first argument is a floating label type, one shall apply the equivalent fixed label type first, only on versions not already bearing the floating, and then move the floating over those versions.
 
 = Details =
 
