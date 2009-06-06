@@ -1,4 +1,4 @@
-#summary ClearCase::Wrapper::MGi mklabel
+#summary [CcWrapMgi ClearCase::Wrapper::MGi] mklabel
 
 = Introduction =
 
