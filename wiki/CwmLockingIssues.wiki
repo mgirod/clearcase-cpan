@@ -46,4 +46,30 @@ The one sketched in the _extra_ sub-directory uses _ssh_ (which
 makes it accessible from cygwin as well).
 
 Both use an indirection via the user {{{~/.clearcase_profile.pl}}}
-file.
+file. We have to consider to levels:
+  * unix
+  * Windows
+In unix, the problem is to run the {{{unlock}}} command as vob owner
+of the vob concerned. Since there may be several such accounts, a pure
+suid based solution would be impractical. {{{sudo}}} would offer 
+simpler solutions by allowing groups of users to access specific 
+commands using one of several accounts.
+If {{{sudo}}} is not available, it becomes cumbersome to maintain
+such a mapping. The solution proposed here involves authorizing one
+dedicated account to access cleartool commands as any vob owner via
+{{{ssh}}}. A single script must thus be suid enabled to this account.
+
+In Windows, we have neither {{{sudo}}} nor {{{suid}}} protections.
+The solution proposed uses once again {{{ssh}}} to access the same
+{{{suid}}} enabled script as previously, on a unix host. It uses a
+{{{perl}}} {{{ssh}}} client, and is thus identical on Windows and on
+{{{cygwin}}}.
+
+The various scripts offered require local configuration, of the
+account and host names. The do also require that the users set up
+pairs of private and public keys. Finally they require that at least
+one unix client runs a properly configure {{{ssh}}} daemon.
+
+A last problem concerns the tag of the vobs in the unix and Windows
+regions. A module is provided to offer the conversion in a generic
+way, requiring no special configuration.
