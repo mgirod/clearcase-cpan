@@ -31,7 +31,7 @@ use ClearCase::Wrapper;
   $lsgenealogy =
     "$z [-short] [-all] [-obsolete] [-depth gen-depth] pname ...";
   $mklbtype = "\n* [-family] [-increment] [-archive] pname ...";
-  $mklabel	= "\n* [-up]";
+  $mklabel	= "\n* [-up] [-force]";
 }
 
 #############################################################################
@@ -934,9 +934,9 @@ sub lock {
   my $rc = @oth? $lock->args(@oth)->system : 0;
   for my $lt (@lbt) {
     my $v = $vob{$lt};
-    $rc |= $lock->args("lbtype:$lt\@$v")->stderr(0)->system
+    $rc |= ($lock->args("lbtype:$lt\@$v")->stderr(0)->system
       and (defined(&flocklt) and flocklt($lt, $v, ($nusers or $opt{allow})))
-      and warn Msg('E', "Could not lock lbtype:$lt\@$v");
+      and warn Msg('E', "Could not lock lbtype:$lt\@$v"));
   }
   exit $rc;
 }
@@ -978,9 +978,9 @@ sub unlock() {
   for my $lt (@lbt) {
     my $v = $vob{$lt};
     if ($ct->argv(qw(lslock -s), "lbtype:$lt\@$v")->qx) {
-      $rc |= $unlock->args("lbtype:$lt\@$v")->stderr(0)->system
+      $rc |= ($unlock->args("lbtype:$lt\@$v")->stderr(0)->system
 	and (defined(&funlocklt) and funlocklt($lt, $v))
-	and die Msg('E', "Could not unlock lbtype:$lt\@$v");
+	and die Msg('E', "Could not unlock lbtype:$lt\@$v"));
     } else {
       warn Msg('E', 'Object is not locked.');
       warn Msg('E', "Unable to unlock label type \"$lt\".");
@@ -999,59 +999,81 @@ type, and is implicit for the floating type (the one given as argument).
 Preserve the support for the B<-up> flag from B<ClearCase::Wrapper::DSB>
 and lift the restriction to using it only with B<-recurse>.
 
+Added a B<-force> option which makes mostly sense in the case of applying
+incremental labels. Without it, applying the floating label type will be
+skipped if there has been errors while (incrementally) applying the
+equivalent fixed one. Forcing the application may make sense if the errors
+come from multiple application e.g. due to links, or in order to retry the
+application after a first failure.
+It may also be used to apply labels upwards even if recursive application
+produced errors.
+
 =cut
 
 sub mklabel {
   use warnings;
   use strict;
   my %opt;
-  GetOptions(\%opt, qw(up));
+  GetOptions(\%opt, qw(up force));
   ClearCase::Argv->ipc(1);
   my $mkl = ClearCase::Argv->new(@ARGV);
   $mkl->parse(qw(replace|recurse|ci|cq|nc
 		 version|c|cfile|select|type|name|config=s));
+  my @opt = $mkl->opts();
+  die Msg('E', 'Incompatible flags: up and config')
+    if $opt{up} and grep /^-con/, @opt;
   my($lbtype, @elems) = $mkl->args;
   $lbtype =~ s/^lbtype://;
   $ct = ClearCase::Argv->new({autochomp=>1});
   my @et = grep s/^-> lbtype:(.*)@.*$/$1/,
     $ct->argv(qw(des -s -ahl), $eqhl, "lbtype:$lbtype")->qx;
   return 0 unless $opt{up} or @et;
-  my @opt = $mkl->opts();
-  if (@et) {
-    my @ret = $mkl->args($et[0], @elems)->stdout(2)->stderr(1)->qx;
-    map {print STDERR "$_\n"} @ret;
-    exit 1 if grep
-      !/^cleartool: Error: (Version label.*already|Trouble applying|Unable)/,
-	@ret;
-    push @opt, '-rep' unless grep /^-rep/, @opt;
-    $mkl->args($lbtype, @elems)->opts(@opt)->system and exit 1;
-  } else {
-    $mkl->syfail(1)->system;
-  }
-  exit $? unless $opt{up};
-  my $dsc = ClearCase::Argv->new({-autochomp=>1});
-  require File::Basename;
-  require File::Spec;
-  File::Spec->VERSION(0.82);
-  my %ancestors;
-  for my $pname (@elems) {
-    my $vobtag = $dsc->desc(['-s'], "vob:$pname")->qx;
-    for (my $dad = File::Basename::dirname(File::Spec->rel2abs($pname));
-	 length($dad) >= length($vobtag);
-	 $dad = File::Basename::dirname($dad)) {
-      $ancestors{$dad}++ unless $dad eq '/cygdrive';
+  my ($ret, @rec) = 0;
+  if (grep /^-r(ec)?$/, @opt) {
+    if (@et) {
+      @rec = $ct->argv(qw(ls -s -r -vob), @elems)->qx;
+    } else {
+      $mkl->syfail(1) unless $opt{force};
+      $ret = $mkl->system;
     }
   }
-  exit(0) if !%ancestors;
-  $mkl->opts(grep !/^-r(ec)?$/, $mkl->opts);
-  @elems = sort {$b cmp $a} keys %ancestors;
-  my @ret = $mkl->args($et[0], @elems)->stdout(2)->stderr(1)->qx if @et;
-  map {print STDERR "$_\n"} @ret;
-  exit 1 if grep
-    !/^cleartool: Error: (Version label.*already|Trouble applying|Unable)/,
-      @ret;
+  $mkl->opts(grep !/^-r(ec)?$/, @opt); # recurse handled already
+  @opt = $mkl->opts;
+  if ($opt{up}) {
+    my $dsc = ClearCase::Argv->new({-autochomp=>1});
+    require File::Basename;
+    require File::Spec;
+    File::Spec->VERSION(0.82);
+    my %ancestors;
+    for my $pname (@elems) {
+      my $vobtag = $dsc->desc(['-s'], "vob:$pname")->qx;
+      for (my $dad = File::Basename::dirname(File::Spec->rel2abs($pname));
+	   length($dad) >= length($vobtag);
+	   $dad = File::Basename::dirname($dad)) {
+	$ancestors{$dad}++ unless $dad eq '/cygdrive';
+      }
+    }
+    if (@et) {
+      push @elems, sort {$b cmp $a} keys %ancestors;
+    } else {
+      $ret |= $mkl->args($lbtype, @elems)->system;
+      exit $ret;
+    }
+  }
+  # Necessarily in the incremental type case
+  push @elems, @rec;
+  my @mod = grep {
+    my $v = $_;
+    $_ = (grep /^$lbtype$/, split/ /,
+	  $ct->argv(qw(des -fmt), '%Nl', $v)->qx)? '' : $v;
+  } @elems;
+  exit $ret unless @mod;
+  $ret = $mkl->args($et[0], @mod)->system if @et;
+  exit $ret if $ret and !$opt{force};
+  push @opt, '-rep' unless grep /^-rep/, @opt;
   $mkl->opts(@opt);
-  $mkl->args($lbtype, @elems)->exec;
+  $ret |= $mkl->args($lbtype, @mod)->system;
+  exit $ret;
 }
 
 =back
