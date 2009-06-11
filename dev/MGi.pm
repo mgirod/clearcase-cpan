@@ -203,7 +203,7 @@ sub mkbco($$$$$$) {
   my $typ = $ct->argv(qw(des -fmt %m), $e)->qx;
   if ($typ !~ /(branch|version)$/) {
     warn Msg('W', "Not a vob object: $e");
-    return;
+    return 1;
   }
   my $ver;
   if ($e =~ m%^(.*?)\@\@.*$%) {
@@ -1044,13 +1044,22 @@ sub mklabel {
     require File::Basename;
     require File::Spec;
     File::Spec->VERSION(0.82);
+    my $vroot;
+    if ($^O eq 'cygwin') {
+      $vroot = '/cygwin/a'; #just for the length
+    } elsif ($^O =~ /MSWin/) {
+      $vroot = 'a:';
+    } else {
+       $vroot = $ct->argv(qw(pwv -root))->qx;
+    }
     my %ancestors;
     for my $pname (@elems) {
       my $vobtag = $dsc->desc(['-s'], "vob:$pname")->qx;
+      my $stop = length("$vroot$vobtag");
       for (my $dad = File::Basename::dirname(File::Spec->rel2abs($pname));
-	   length($dad) >= length($vobtag);
+	   length($dad) >= $stop;
 	   $dad = File::Basename::dirname($dad)) {
-	$ancestors{$dad}++ unless $dad eq '/cygdrive';
+	$ancestors{$dad}++;
       }
     }
     if (@et) {
