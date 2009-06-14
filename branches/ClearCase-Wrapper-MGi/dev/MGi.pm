@@ -861,6 +861,17 @@ existing locks.
 
 In case of a family type, lock also the equivalent incremental type.
 
+There may be an issue if the two types are not owned by the same account.
+You may overcome it by providing a module specification via the environment
+variable B<FORCELOCK>. This module must export both a B<flocklt> and a
+B<funlocklt> (force lock and unlock label type) functions.
+The functions take an B<lbtype> and a B<vob tag> as input (B<flocklt>
+optionally takes a B<replace> flag and an B<nusers> exception list).
+The two functions take the responsibility of printing the standard output
+(but not necessarily the errors), and return an error code: 0 for success,
+other for error.
+See the documentation for examples of implementation.
+
 =cut
 
 sub lock {
@@ -932,11 +943,22 @@ sub lock {
     }
   }
   my $rc = @oth? $lock->args(@oth)->system : 0;
+  my ($fl, $loaded) = $ENV{FORCELOCK};
   for my $lt (@lbt) {
     my $v = $vob{$lt};
-    $rc |= ($lock->args("lbtype:$lt\@$v")->stderr(0)->system
-      and (defined(&flocklt) and flocklt($lt, $v, ($nusers or $opt{allow})))
-      and warn Msg('E', "Could not lock lbtype:$lt\@$v"));
+    if ($lock->args("lbtype:$lt\@$v")->stderr(0)->system) {
+      if ($fl and !$loaded) {
+	my $fn = $fl; $fn =~ s%::%/%g; $fn .= '.pm';
+	require $fn;
+	$fl->import;
+	$loaded = 1;
+      }
+      if (!$fl or flocklt($lt, $v, $lock->flag('replace'),
+			  ($nusers or $opt{allow}))) {
+	warn Msg('E', "Could not lock lbtype:$lt\@$v");
+	$rc = 1;
+      }
+    }
   }
   exit $rc;
 }
@@ -944,6 +966,10 @@ sub lock {
 =item * UNLOCK
 
 In case of a family type, unlock also the equivalent incremental type.
+
+There may be an issue if the two types are not owned by the same account.
+See the B<LOCK> documentation for overcoming it with a B<FORCELOCK>
+environment variable.
 
 =cut
 
@@ -975,12 +1001,22 @@ sub unlock() {
     }
   }
   my $rc = @oth? $unlock->args(@oth)->system : 0;
+  my ($fl, $loaded) = $ENV{FORCELOCK};
   for my $lt (@lbt) {
     my $v = $vob{$lt};
     if ($ct->argv(qw(lslock -s), "lbtype:$lt\@$v")->qx) {
-      $rc |= ($unlock->args("lbtype:$lt\@$v")->stderr(0)->system
-	and (defined(&funlocklt) and funlocklt($lt, $v))
-	and die Msg('E', "Could not unlock lbtype:$lt\@$v"));
+      if ($unlock->args("lbtype:$lt\@$v")->stderr(0)->system) {
+	if ($fl and !$loaded) {
+	  my $fn = $fl; $fn =~ s%::%/%g; $fn .= '.pm';
+	  require $fn;
+	  $fl->import;
+	  $loaded = 1;
+	}
+	if (!$fl or funlocklt($lt, $v)) {
+	  warn Msg('E', "Could not unlock lbtype:$lt\@$v");
+	  $rc = 1;
+	}
+      }
     } else {
       warn Msg('E', 'Object is not locked.');
       warn Msg('E', "Unable to unlock label type \"$lt\".");
