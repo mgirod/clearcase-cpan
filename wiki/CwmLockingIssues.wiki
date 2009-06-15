@@ -46,7 +46,7 @@ The one sketched in the _extra_ sub-directory uses _ssh_ (which
 makes it accessible from cygwin as well).
 
 Both use an indirection, either via the user {{{~/.clearcase_profile.pl}}}
-file, or via a module required more locally, and specified via an environment variable: *FORCELOCK*. We have to consider to levels:
+file, or via a module required more locally, and specified via an environment variable: *FORCELOCK*. We have to consider two levels:
   * unix
   * Windows
 In unix, the problem is to run the {{{unlock}}} command as vob owner
