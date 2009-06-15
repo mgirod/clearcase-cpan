@@ -66,7 +66,7 @@ The solution proposed uses once again {{{ssh}}} to access the same
 {{{cygwin}}}.
 
 The various scripts offered require local configuration, of the
-account and host names. The do also require that the users set up
+account and host names. They do also require that the users set up
 pairs of private and public keys. Finally they require that at least
 one unix client runs a properly configure {{{ssh}}} daemon.
 
