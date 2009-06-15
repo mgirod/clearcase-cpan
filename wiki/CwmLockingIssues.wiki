@@ -36,7 +36,7 @@ the hyperlinks, so that locking the _family_ should in fact lock
 The problem is what to do when all the types are not owned by the 
 same account.
 !ClearCase offers no direct support for _group locking_.
-This was reported as a [http://www.ibm.com/developerworks/support/rational/rfe/execute?use_case=searchChangeRequests&myRFE=1025 request for enhancement (ID: 1025)].
+This was reported as a [http://www.ibm.com/developerworks/support/rational/rfe/execute?use_case=searchChangeRequests&CR_ID=1025 request for enhancement (ID: 1025)].
 
 Waiting for a solution to this problem, we may use various 
 techniques, but all of them have to be set up in the site
