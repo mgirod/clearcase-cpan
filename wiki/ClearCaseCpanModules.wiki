@@ -17,3 +17,4 @@ and using his framework.
   * !ClearCase::Wrapper
   * !ClearCase::Wrapper::DSB
   * [CcWrapMgi ClearCase::Wrapper::MGI]
+  * [JarFile An element type manager for jars]: an idea for later
