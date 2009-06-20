@@ -903,7 +903,8 @@ sub lock {
     }
     $lock->opts($lock->opts, '-nusers', join(',', sort keys %nusers))
       if %nusers;
-  } elsif (($nusers or $opt{allow}) and (!$currlock or $opt{iflocked})) {
+  } elsif (($nusers or $opt{allow}) and
+	     (!$currlock or $opt{iflocked}) or $lock->flag('replace')) {
     $lock->opts($lock->opts, '-nusers', ($nusers or $opt{allow}));
   }
   $lock->opts($lock->opts, '-replace')
