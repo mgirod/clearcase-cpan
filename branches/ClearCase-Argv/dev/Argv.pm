@@ -1,6 +1,6 @@
 package ClearCase::Argv;
 
-$VERSION = '1.45';
+$VERSION = '1.46';
 
 use Argv 1.23;
 
@@ -345,10 +345,11 @@ sub unixpath {
 	for my $line (@_) {
 	    my $nl = chomp $line;
 	    $line =~ s%\r$%%;
-	    $line =~ s%'%\\'%g;
-	    my @bit = Text::ParseWords::parse_line('\s+', 'delimiters', $line);
+	    my @chars = split//,$line;
+	    my $odd = (((grep/'/,@chars) % 2) or ((grep/"/,@chars) % 2));
+	    my @bit = $odd? split/(\s+)/,$line
+	      : Text::ParseWords::parse_line('\s+', 'delimiters', $line);
 	    map {
-	        s%\\'%'%g;
 	        s%\\%/%g if m%(?:^(?:\..*|"|[A-Za-z]:|\w*)|\@)\\%;
 		if (m%\A([A-Za-z]):(.*)\Z%) {
 		  $_ = "/cygdrive/" . lc($1) . $2;
@@ -588,14 +589,14 @@ sub _ipc_cmd {
     my $self = shift;
     my ($disposition, $stdout, $stderr, @cmd) = @_;
 
-    # Handle verbosity.
-    my $dbg = $self->dbglevel;
-    $self->_dbg($dbg, '=>', \*STDERR, @cmd) if $dbg;
-
     # Send the command to cleartool.
     my $cmd = join(' ', map {
         m%\s|[\[\]*"']% ? (m%'% ? (m%"% ? $_ : qq("$_")) : qq('$_')) : $_
     } @cmd);
+    # Handle verbosity.
+    my $dbg = $self->dbglevel;
+    $self->_dbg($dbg, '=>', \*STDERR, $cmd) if $dbg;
+
     chomp $cmd;
     my $down = $self->{IPC}->{DOWN};
     print $down $cmd, "\n";
@@ -606,21 +607,22 @@ sub _ipc_cmd {
 	print $down $input, "\n.\n";
 	delete $self->{IPC}->{COMMENT};
     }
-
+    my $man = ($self->{AV_PROG}->[1] eq 'man'); #Special case: errors ok
+    my $manok; #Some man output already: no complete failure
     # Read back the results and get command status.
     my $rc = 0;
     my $back = $self->{IPC}->{BACK};
     while($_ = <$back>) {
         my ($last, $next, $err);
 	my $out = *STDOUT;
-	if (m%^cleartool: (Error|Warning):%) {
+	if (!$manok and m%^cleartool: (Error|Warning):%) {
 	    if ($stderr) {
 	        $out = *STDERR;
 	        $err = 1;
 	    } else {
 	        $next = 1;
 	    }
-	} elsif (m%^Comments for %) {
+	} elsif (!$man and m%^Comments for %) {
 	  if ($disposition) {
 	    push(@$disposition, $_);
 	  } else {
@@ -637,6 +639,8 @@ sub _ipc_cmd {
 	    $rc = $2 << 8;
 	    chomp;
 	    $_ ? $last = 1 : last;
+	} elsif (!$manok and $man) {
+	    $manok = 1;
 	}
 	print '+ <=', $_ if $_ && $dbg >= 2;
 	next if $next;
