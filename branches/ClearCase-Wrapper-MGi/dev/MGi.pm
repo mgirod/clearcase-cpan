@@ -31,7 +31,7 @@ use ClearCase::Wrapper;
   $lsgenealogy =
     "$z [-short] [-all] [-obsolete] [-depth gen-depth] pname ...";
   $mklbtype = "\n* [-family] [-increment] [-archive] pname ...";
-  $mklabel	= "\n* [-up] [-force]";
+  $mklabel	= "\n* [-up] [-force] [-over type]";
 }
 
 #############################################################################
@@ -1050,13 +1050,19 @@ application after a first failure.
 It may also be used to apply labels upwards even if recursive application
 produced errors.
 
+Extension: B<-over> takes either a label or a branch type. In either case,
+the labels will be applied over the result of a find command run on the
+unique version argument, and looking for versions matching respectively
+B<lbtype(xxx)> or <version(.../xxx/LATEST)> queries, and B<!lbtype(lb)> (with
+I<xxx> the B<-over>, and I<lb> the main label type parameter.
+
 =cut
 
 sub mklabel {
   use warnings;
   use strict;
   my %opt;
-  GetOptions(\%opt, qw(up force));
+  GetOptions(\%opt, qw(up force over=s));
   ClearCase::Argv->ipc(1);
   my $mkl = ClearCase::Argv->new(@ARGV);
   $mkl->parse(qw(replace|recurse|ci|cq|nc
@@ -1064,25 +1070,54 @@ sub mklabel {
   my @opt = $mkl->opts();
   die Msg('E', 'Incompatible flags: up and config')
     if $opt{up} and grep /^-con/, @opt;
+  die Msg('E', 'Incompatible flags: recurse and over')
+    if $opt{over} and grep /^-r(ec|$)/, @opt;
+  die Msg('E', 'Incompatible flags: up and over') if $opt{up} and $opt{over};
   my($lbtype, @elems) = $mkl->args;
+  die Msg('E', "Only one version argument with the over flag: ")
+    if scalar @elems > 1;
   $lbtype =~ s/^lbtype://;
   $ct = ClearCase::Argv->new({autochomp=>1});
+  my $fail = $ct->clone({autofail=>1});
   my @et = grep s/^-> lbtype:(.*)@.*$/$1/,
     $ct->argv(qw(des -s -ahl), $eqhl, "lbtype:$lbtype")->qx;
-  return 0 unless $opt{up} or @et;
+  return 0 unless $opt{up} or $opt{over} or @et;
   die Msg('E',
 	  "Lock on label type \"$lbtype\" prevents operation \"make label\"")
     if $ct->argv(qw(lslock -s),"lbtype:$lbtype")->stderr(0)->qx;
-  my ($ret, @rec) = 0;
-  if (grep /^-r(ec)?$/, @opt) {
+  my ($ret, @rec, @mod) = 0;
+  if (grep /^-r(ec|$)/, @opt) {
     if (@et) {
       @rec = $ct->argv(qw(ls -s -r -vob), @elems)->qx;
     } else {
       $mkl->syfail(1) unless $opt{force};
       $ret = $mkl->system;
     }
+  } elsif ($opt{over}) {
+    my ($t, $ver, $lb) = ($opt{over}, $elems[0]);
+    die Msg('E', 'The -over flag requires a local type argument')
+      if !$t or $t =~ /\@/;
+    my $vob = $fail->argv(qw(des -s), "vob:$ver")->qx;
+    if ($t =~ /lbtype:(.*)$/) {
+      $t = $1; $lb = 1;
+      die unless $ct->argv(qw(des -s), "lbtype:$t\@$vob")->qx;
+    } elsif ($t =~ /brtype:(.*)/) {
+      $t = $1; $lb = 0;
+      die unless $ct->argv(qw(des -s), "brtype:$t\@$vob")->qx;
+    } else {
+      if ($ct->argv(qw(des -s), "lbtype:$t\@$vob")->stderr(0)->qx) {
+	$lb = 1;
+      } elsif ($ct->argv(qw(des -s), "brtype:$t\@$vob")->stderr(0)->qx) {
+	$lb = 0;
+      } else {
+	die Msg('E', 'The argument of the -over flag must be an existing type')
+      }
+    }
+    my $query = $lb? "lbtype($t)" : "version(.../$t/LATEST)";
+    $query .= " \&\&! lbtype($lbtype)";
+    @mod = $ct->argv('find', $ver, '-ver', $query, '-print')->stderr(0)->qx;
   }
-  $mkl->opts(grep !/^-r(ec)?$/, @opt); # recurse handled already
+  $mkl->opts(grep !/^-r(ec|$)/, @opt); # recurse handled already
   @opt = $mkl->opts;
   if ($opt{up}) {
     my $dsc = ClearCase::Argv->new({-autochomp=>1});
@@ -1115,12 +1150,14 @@ sub mklabel {
     }
   }
   # Necessarily in the incremental type case
-  push @elems, @rec;
-  my @mod = grep {
-    my $v = $_;
-    $_ = (grep /^$lbtype$/, split/ /,
-	  $ct->argv(qw(des -fmt), '%Nl', $v)->qx)? '' : $v;
-  } @elems;
+  if (!$opt{over}) {
+    push @elems, @rec;
+    @mod = grep {
+      my $v = $_;
+      $_ = (grep /^$lbtype$/, split/ /,
+	    $ct->argv(qw(des -fmt), '%Nl', $v)->qx)? '' : $v;
+    } @elems;
+  }
   exit $ret unless @mod;
   $ret = $mkl->args($et[0], @mod)->system if @et;
   exit $ret if $ret and !$opt{force};
