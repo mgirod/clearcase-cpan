@@ -320,10 +320,12 @@ Revision history for Perl extension ClearCase::Argv.
 	- fixed both ipc and ctcmd to get the stdouterr tests pass
 	- ALL CHANGES FROM 1.41 THROUGH HERE CONTRIBUTED BY Marc Girod.
 
-1.46 Sat Jun 20 18:41:08 GMTDT 2009
+1.46 Sun Jun 21 13:04:48 GMTDT 2009
 	- cygwin: odd numbers of quotes in the output
 	- debug mode: print the commands as sent to cleartool (after quoting)
-	- ipc mode: fix for errors in the text of man pages
+	- ipc mode: fix for examples of errors in the text of man pages
+	- ipc mode: question marks in the comments
+	- cygwin: support for ci -from outside the vob
 
 BACKWARD COMPATIBILITY NOTES:
 

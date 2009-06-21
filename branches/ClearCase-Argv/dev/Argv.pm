@@ -571,8 +571,7 @@ sub ipc {
     return $self;
 }
 
-sub _cvt_input_cw {
-    my $self = shift;
+sub _cw_map {
     map {
         s%^/cygdrive/([A-Za-z])%$1:%;
 	if (m%^/[^/]%) {
@@ -582,7 +581,15 @@ sub _cvt_input_cw {
 		s%^/view%//view% or s%^/%\\%; # case of vob tags
 	    }
 	}
-    } @{$self->{AV_ARGS}};
+    } @_;
+}
+
+sub _cvt_input_cw {
+    my $self = shift;
+    _cw_map @{$self->{AV_ARGS}};
+    for my $o (values %{$self->{AV_OPTS}}) {
+        _cw_map grep{$_}@{$o};
+    }
 }
 
 sub _ipc_cmd {
