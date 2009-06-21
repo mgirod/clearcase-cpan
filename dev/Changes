@@ -56,3 +56,4 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- mklabel: incremental by default, and for -rec and -up 
 	- mkbranch: error when no brtype
 	- mklabel and mklbtype -inc: check lock on lbtype
+	- mklabel -over
