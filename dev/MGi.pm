@@ -809,7 +809,10 @@ sub mklbtype {
 	} keys %pair;
       } elsif($opt{increment}) {			# increment
 	for my $t (@args) {
-	  $ct->argv(qw(des -s), "lbtype:$t")->stdout(0)->system;
+	  die
+	    Msg('E',
+		"Lock on label type \"$t\" prevents operation \"make lbtype\"")
+	    if $ct->argv(qw(lslock -s),"lbtype:$t")->stderr(0)->qx;
 	  my ($pair) = grep s/^\s*(.*) -> lbtype:(.*)\@(.*)$/$1,$2,$3/,
 	    $ct->argv(qw(des -l -ahl), $eqhl, "lbtype:$t")->stderr(0)->qx;
 	  my ($hlk, $prev, $vob) = split ',', $pair if $pair;
@@ -1067,6 +1070,9 @@ sub mklabel {
   my @et = grep s/^-> lbtype:(.*)@.*$/$1/,
     $ct->argv(qw(des -s -ahl), $eqhl, "lbtype:$lbtype")->qx;
   return 0 unless $opt{up} or @et;
+  die Msg('E',
+	  "Lock on label type \"$lbtype\" prevents operation \"make label\"")
+    if $ct->argv(qw(lslock -s),"lbtype:$lbtype")->stderr(0)->qx;
   my ($ret, @rec) = 0;
   if (grep /^-r(ec)?$/, @opt) {
     if (@et) {
@@ -1085,7 +1091,7 @@ sub mklabel {
     File::Spec->VERSION(0.82);
     my $vroot;
     if ($^O eq 'cygwin') {
-      $vroot = '/cygwin/a'; #just for the length
+      $vroot = '/cygdrive/a'; #just for the length
     } elsif ($^O =~ /MSWin/) {
       $vroot = 'a:';
     } else {

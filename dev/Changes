@@ -55,3 +55,4 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- preliminary handling to force locking from Windows/cygwin
 	- mklabel: incremental by default, and for -rec and -up 
 	- mkbranch: error when no brtype
+	- mklabel and mklbtype -inc: check lock on lbtype
