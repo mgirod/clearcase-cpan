@@ -556,6 +556,8 @@ sub mkbranch {
   my $rc = 0;
   my %pbrt = ();
   my $bt = shift @args;
+  $bt =~ s/^brtype:(.*)$/$1/;
+  die if $ct->argv(qw(des -s), "brtype:$bt")->stdout(0)->system;
   foreach my $e (@args) {
     $rc |= mkbco($e, $bt, \%pbrt, \@bopts, \@gotps, \@copt);
   }
