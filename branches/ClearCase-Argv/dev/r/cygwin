@@ -65,3 +65,4 @@ ok $out eq q(<  if ($ele =~ /\.demo"/i) {),
   'Preserved string with one double quote';
 
 print STDERR "\n", ClearCase::Argv->summary;   # print out the stats we kept
+# only for ClearCase commands! None used so far in this test...
