@@ -303,13 +303,15 @@ sub findnext($) {		# on input, the type exists
   }
 }
 sub findfreeinc($) {	   # on input, the values may or may not exist
-  my $nxt = shift;
+  my ($nxt, %n) = shift;
   while (my ($k, $v) = each %{$nxt}) {
-    if ($ct->argv(qw(des -s), "lbtype:$v")->stderr(0)->qx) { #exists
+    while ($ct->argv(qw(des -s), "lbtype:$v")->stderr(0)->qx) { #exists
       my @cand = sort compareincs findnext($v);
-      $$nxt{$k} = nextinc($cand[$#cand]);
+      $v = nextinc($cand[$#cand]);
     }
+    $n{$k} = $v;
   }
+  while (my ($k, $v) = each %n) { $$nxt{$k} = $v }
 }
 
 =head1 NAME
@@ -751,6 +753,13 @@ sub mklbtype {
     }
   } elsif (%opt) {
     map { s/^lbtype:(.*)$/$1/ } @args;
+    my @a = @args;
+    my @vobs = grep { s/.*\@(.*)$/$1/ } @a;
+    push @vob, $ct->argv(qw(des -s vob:.))->stderr(0)->qx
+      if grep !/@/, @args;
+    die  Msg('E', qq(Unable to determine VOB for pathname ".".\n))
+      unless @vob;
+    ensuretypes(@vob);
     if ($rep) {
       @args = grep { $_ = $ct->argv(qw(des -s), "lbtype:$_")->qx } @args;
       exit 1 unless @args;
@@ -783,13 +792,6 @@ sub mklbtype {
 	die Msg('E', "Incompatible flags: replace and incremental");
       }
     } else {
-      my @a = @args;
-      my @vobs = grep { s/.*\@(.*)$/$1/ } @a;
-      push @vob, $ct->argv(qw(des -s vob:.))->stderr(0)->qx
-	if grep !/@/, @args;
-      die  Msg('E', qq(Unable to determine VOB for pathname ".".\n))
-	unless @vob;
-      ensuretypes(@vob);
       @a = @args;
       if ($opt{family}) {
 	my %pair = ();
@@ -1075,10 +1077,11 @@ sub mklabel {
   die Msg('E', 'Incompatible flags: up and over') if $opt{up} and $opt{over};
   my($lbtype, @elems) = $mkl->args;
   die Msg('E', "Only one version argument with the over flag: ")
-    if scalar @elems > 1;
+    if $opt{over} and scalar @elems > 1;
   $lbtype =~ s/^lbtype://;
   $ct = ClearCase::Argv->new({autochomp=>1});
   my $fail = $ct->clone({autofail=>1});
+  $fail->argv(qw(des -s), @elems)->stdout(0)->system;
   my @et = grep s/^-> lbtype:(.*)@.*$/$1/,
     $ct->argv(qw(des -s -ahl), $eqhl, "lbtype:$lbtype")->qx;
   return 0 unless $opt{up} or $opt{over} or @et;
