@@ -754,19 +754,19 @@ sub mklbtype {
   } elsif (%opt) {
     map { s/^lbtype:(.*)$/$1/ } @args;
     my @a = @args;
-    my @vobs = grep { s/.*\@(.*)$/$1/ } @a;
+    my @vob = grep { s/.*\@(.*)$/$1/ } @a;
     push @vob, $ct->argv(qw(des -s vob:.))->stderr(0)->qx
       if grep !/@/, @args;
     die  Msg('E', qq(Unable to determine VOB for pathname ".".\n))
       unless @vob;
     ensuretypes(@vob);
     if ($rep) {
-      @args = grep { $_ = $ct->argv(qw(des -s), "lbtype:$_")->qx } @args;
+      @args = grep { $ct->argv(qw(des -fmt), '%Xn', "lbtype:$_")->qx } @args;
       exit 1 unless @args;
       if ($opt{family}) {
-	my @a = ();
+	@a = ();
 	foreach my $t (@args) {
-	  if ($ct->argv(qw(des -s -ahl), $eqhl, "lbtype:$t")->stderr(0)->qx) {
+	  if ($ct->argv(qw(des -s -ahl), $eqhl, $t)->stderr(0)->qx) {
 	    warn Msg('E', "$t is already a family type\n");
 	  } else {
 	    push @a, $t;
@@ -775,8 +775,8 @@ sub mklbtype {
 	exit 1 unless @a;
 	my %pair = ();
 	foreach (@a) {
-	  if (/^(.*)(@@.*)?$/) {
-	    $pair{$_} = "${1}_1.00" . ($2? $2:'');
+	  if (/^lbtype:(.*)(@.*)$/) {
+	    $pair{"$1$2"} = "${1}_1.00$2";
 	  }
 	}
 	findfreeinc(\%pair);
@@ -792,11 +792,10 @@ sub mklbtype {
 	die Msg('E', "Incompatible flags: replace and incremental");
       }
     } else {
-      @a = @args;
       if ($opt{family}) {
 	my %pair = ();
-	foreach (@a) {
-	  if (/^(.*)(@@.*)?$/) {
+	foreach (@args) {
+	  if (/^(.*?)(@.*)?$/) {
 	    $pair{$_} = "${1}_1.00" . ($2? $2:'');
 	  }
 	}
@@ -823,7 +822,7 @@ sub mklbtype {
 	    my ($base, $maj, $min) = ($1, $2, $3);
 	    my $new = "${base}_" .
 	      (defined($min)? $maj . '.' . ++$min : ++$maj);
-	    $new .= $1 if $t =~ /^.*(@.*)$/;
+	    map { $_ .= $1 } ($new, $prev) if $t =~ /^.*(@.*)$/;
 	    $ntype->args($new)->system;
 	    $silent->argv('rmhlink', $hlk)->system;
 	    $silent->argv(qw(mkhlink -nc), $eqhl,
@@ -851,6 +850,8 @@ sub mklbtype {
 	  $ct->argv(qw(des -l -ahl), "$eqhl,$prhl", @a)->qx;
 	$ct->argv('rmhlink', @link)->system;
       }
+    } else {
+      $ntype->exec;
     }
   }
 }
