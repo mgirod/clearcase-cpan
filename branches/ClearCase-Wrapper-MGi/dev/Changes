@@ -58,3 +58,4 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- mklabel and mklbtype -inc: check lock on lbtype
 	- mklabel -over
 	- mklbtype: fixes for remote and existing types
+	- mkbco: fix for multiple arguments
