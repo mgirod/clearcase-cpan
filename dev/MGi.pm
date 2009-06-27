@@ -244,8 +244,9 @@ sub mkbco($$$$$$) {
       }
     }
   } else {
-    push @$gopt, @$bopt, @$copt, $e; # Ensure non empty array
-    return $ct->argv('co', @$gopt)->system;
+    my @args;
+    push @args, @$gopt, @$bopt, @$copt, $e; # Ensure non empty array
+    return $ct->argv('co', @args)->system;
   }
 }
 sub ensuretypes(@) {
