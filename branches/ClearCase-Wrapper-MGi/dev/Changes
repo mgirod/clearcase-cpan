@@ -50,10 +50,11 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- lock, and unlock, forcing if necessary
 	- added the extra directory, with scripts to enable group locking
 
-0.11 Sun Jun 21 14:31:24 GMTDT 2009
+0.11 Sat Jun 27 09:15:07 GMTDT 2009
 	- added replace option to lock lbtype:
 	- preliminary handling to force locking from Windows/cygwin
 	- mklabel: incremental by default, and for -rec and -up 
 	- mkbranch: error when no brtype
 	- mklabel and mklbtype -inc: check lock on lbtype
 	- mklabel -over
+	- mklbtype: fixes for remote and existing types

@@ -792,10 +792,10 @@ sub mklbtype {
 	die Msg('E', "Incompatible flags: replace and incremental");
       }
     } else {
-      map { $_ = "lbtype:$_" } @a;
-      die Msg('E', "Some types already exist among @args")
-	unless $silent->argv(qw(des -s), @a)->stderr(0)->system;
       if ($opt{family}) {
+	map { $_ = "lbtype:$_" } @a;
+	die Msg('E', "Some types already exist among @args")
+	  unless $silent->argv(qw(des -s), @a)->stderr(0)->system;
 	my %pair = ();
 	foreach (@args) {
 	  if (/^(.*?)(@.*)?$/) {
