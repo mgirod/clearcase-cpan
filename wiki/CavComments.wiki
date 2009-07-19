@@ -11,7 +11,7 @@ Several distinct problems interfere with the code:
   * differences in behaviour between unix and Windows (Note that they affect !CtCmd as well)
 
 = Details =
-
+  * The MGi wrapper attempts now to preempt the user interactions, and thus to avoid the problem. It does this for now only for comments, and with {{{mklbtype}}}. If this proves to work, it will be extended to the other commands, and to the other interactions.
   * A work-around is in place for the [http://www-128.ibm.com/developerworks/support/rational/rfe/execute?use_case=searchChangeRequests&PROD_ID=0&COMP_ID=0&RESP_ID=0&CREATED_BY=314 bug] (RFE 423, acknowledged as defect RATLC01064211, then closed as a user error, maybe reopened, but in an unclear state anyway) in {{{cleartool -status}}}
   * The work-around works on unix for certain prompts, but as far as I know, always fails on Windows
   'setview' requests are detected, and serviced via a second process started with (_foo_ being the view):
