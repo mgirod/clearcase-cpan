@@ -8,7 +8,7 @@ It offers functions to convert paths from Windows to Unix, using the registry
 to map the tags in associated regions.
 It must be installed in the @INC path as ClearCase::VobPathConv.
 
-The remaining files can be used as examples or a templates. TThey all require
+The remaining files can be used as examples or a templates. They all require
 some customization.
 
 'locklbtype' is a standalone script, intended to be installed suid enabled,
@@ -22,20 +22,32 @@ different host keys do not overwrite each other in the ~/.ssh/known_hosts
 files.
 One may also set the name of the log used to save the identity of the
 unlocking users (for lock events, this is saved in a comment of the locks).
-The paths to ssh and cleartool are likely to be staisfying.
+The paths to ssh and cleartool are likely to be satisfying.
 
-'.clearcase_profile.pl' is an example of a startup file read at every
-invocation of the wrapper. This version is meant to invoke locklbtype via a
-system call, therefore using the suid bit mechanism offered by unix shells.
+In order to use this script, you need to define a pair of functions, for
+locking and unlocking. A first attempt implemented them in a
+'.clearcase_profile.pl' startup file, read at every invocation of the wrapper.
+
+An example .clearcase_profile.pl is left, setting the ipc mode for all commands
+apart for setview (unavailable then, assuming the wrapper itself is used from
+a vob).
+
+This was thought as penalizing functions which do not require locking. It was
+thus moved into a module which you can set via an environment variable, and
+thus to have a performance impact only on the lock/unlock functions.
+It must be installed in the @INC path, under a ClearCase directory.
+It comes in two distinct versions, one for unix, and one for Windows (and
+cygwin):
+
+  FORCELOCK=ClearCase::ForceLockUnix #Unix
+  FORCELOCK=ClearCase::ForceLock     #Windows
+
+The unix version, is meant to invoke locklbtype via a system call, therefore
+using the suid bit mechanism offered by unix shells.
 The only customization is the path to the locklbtype utility.
 
-The 'ForceLock.pm' module fills the same role, but from a Windows environment.
-It is meant to be set via an environment variable:
-
-  FORCELOCK=ClearCase::ForceLock
-
-and thus to have a performance impact only on the lock/unlock functions.
-It must be installed in the @INC path as ClearCase::ForceLock.
+In a Windows environment, the related module fills the same role, but
+invokes the suid script on a unix host, via ssh.
 
 It depends on a long list of modules, which I could successfully install
 on: cygwin 1.7 / perl 5.10 / libgmp-devel 4.3.1-1, libssh2
