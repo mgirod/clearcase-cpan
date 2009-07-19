@@ -314,6 +314,97 @@ sub findfreeinc($) {	   # on input, the values may or may not exist
   }
   while (my ($k, $v) = each %n) { $$nxt{$k} = $v }
 }
+sub preemptcmt { #return the comments apart: e.g. mklbtype needs discrimination
+  my ($cmd, $fn) = @_; #already parsed, 3 groups: cquery|cqeach nc c|cfile=s
+  use warnings;
+  use strict;
+  my @opts = $cmd->opts;
+  my ($ret, @mod, @copt) = 0;
+  my ($cqf, $ncf, $cf) =
+    ($cmd->flag('cquery'), $cmd->flag('nc'), $cmd->flag('c'));
+  if (!$cqf and !$ncf and !$cf) {
+    if (defined $ENV{_CLEARCASE_PROFILE}) { #ClearCase::Argv shift
+      if (open PRF, "<$ENV{_CLEARCASE_PROFILE}") {
+	while (<PRF>) {
+	  if (/^\s*(.*?)\s+(-\w+)/) {
+	    my ($op, $fg) = ($1, $2);
+	    if (($op eq ($cmd->prog())[1]) or ($op eq '*')) {
+	      if ($fg eq '-nc') {
+		$ncf = 1;
+	      } elsif ($fg eq '-cqe') {
+		$cqf = 1;
+		push @opts, '-cqe';
+	      } elsif ($fg eq '-cq') {
+		$cqf = 1;
+		push @opts, '-cq';
+	      }
+	      last;
+	    }
+	  }
+	}
+	close PRF;
+      }
+    }
+    if (!$cqf and !$ncf and !$cf) {
+      if (($cmd->prog())[1] =~
+	    /^(check(in|out)|mk(dir|elem|(at|br|el|hl|lb|tr)type|pool|vob))$/) {
+	$cqf = 1;
+	push @opts, '-cqe';
+      } else {
+	$ncf = 1;
+      }
+    }
+  }
+  if ($ncf or $cf) {
+    if ($ncf) {
+      $cmd->opts(grep !/^-nc/,@opts);
+      $ret = &$fn($cmd, qw(-nc));
+    } else {
+      my $skip = 0;
+      for (@opts) {
+	if ($skip) {
+	  $skip = 0;
+	  push @copt, $_;
+	} else {
+	  if (/^-c/) {
+	    $skip = 1;
+	    push @copt, $_;
+	  } else {
+	    push @mod, $_;
+	  }
+	}
+      }
+      $cmd->opts(@mod);
+      $ret = &$fn($cmd, @copt);
+    }
+  }
+  if ($cqf) {
+    my $cqe = grep /^-cqe/, @opts;
+    $cmd->opts(grep !/^-cq/, @opts);
+    my @arg = $cmd->args;
+    my $go = 1;
+    while ($go) {
+      if ($cqe) {
+	my $arg = shift @arg;
+	$cmd->args($arg);
+	$go = scalar @arg;
+	print qq(Comments for "$arg":\n);
+      } else {
+	$go = 0;
+	print "Comment for all listed objects:\n";
+      }
+      my $cmt = '';
+      while (<STDIN>) {
+	last if /^\.$/;
+	$cmt .= $_;
+      }
+      chomp $cmt;
+      $cmt =~ s/\r?\n/\\n/mg;
+      $ret |= &$fn($cmd, '-c', $cmt);
+    }
+  }
+  exit $ret;
+}
 
 =head1 NAME
 
@@ -452,7 +543,7 @@ sub checkout {
   return 0 if grep /^-bra/, @ARGV[1..$#ARGV];
   my %opt;
   GetOptions(\%opt, qw(reserved unreserved nmaster out=s ndata ptime
-		       nwarn c=s cfile=s cq cqe nc version branch=s
+		       nwarn c=s cfile=s cquery cqeach nc version branch=s
 		       query nquery usehijack));
   if (my @o = grep /^-/, @ARGV) {
     if (!(grep /^--$/, @o)) {
@@ -471,8 +562,8 @@ sub checkout {
   push @gopts, q(-pti) if $opt{ptime};
   push @gopts, q(-nwa) if $opt{nwarn};
   push @gopts, q(-cfi), $opt{cfile}   if $opt{cfile};
-  push @gopts, q(-cq)  if $opt{cq};
-  push @gopts, q(-cqe) if $opt{cqe};
+  push @gopts, q(-cq)  if $opt{cquery};
+  push @gopts, q(-cqe) if $opt{cqeach};
   push @gopts, q(-que) if $opt{query};
   push @gopts, q(-nqu) if $opt{nquery};
   push @gopts, q(-use) if $opt{usehijack};
@@ -531,7 +622,7 @@ sub mkbranch {
   }
   return 0 if grep /^-nco/, @ARGV[1..$#ARGV];
   my %opt;
-  GetOptions(\%opt, qw(c=s cfile=s cq cqe nc nwarn version));
+  GetOptions(\%opt, qw(c|cfile=s cquery|cqeach nc nwarn version));
   if (my @o = grep /^-/, @ARGV) {
     if (!(grep /^--$/, @o)) {
       warn Msg('E', "Unsupported options: @o");
@@ -542,8 +633,8 @@ sub mkbranch {
   push @bopts, q(-ver) if $opt{version};
   my @gopts = ();
   push @gopts, q(cfile), $opt{cfile} if $opt{cfile};
-  push @gopts, q(cq)    if $opt{cq};
-  push @gopts, q(cqe)   if $opt{cqe};
+  push @gopts, q(cq)    if $opt{cquery};
+  push @gopts, q(cqe)   if $opt{cqeach};
   push @gopts, q(nwarm) if $opt{nwarm};
   my @copt = ();
   push @copt, q(-c), $opt{c} if $opt{c};
@@ -635,7 +726,7 @@ sub uncheckout {
   my $unco = ClearCase::Argv->new(@ARGV);
   $unco->parse(qw(keep rm cact cwork));
   $unco->optset('IGNORE');
-  $unco->parseIGNORE(qw(c|cfile=s cqe|nc));
+  $unco->parseIGNORE(qw(c|cfile=s cquery|cqeach nc));
   $unco->args(sort {$b cmp $a} AutoCheckedOut($opt{ok}, $unco->args));
   $ct = ClearCase::Argv->new({autochomp=>1});
   my @b0 = grep { m%[\\/]CHECKEDOUT$% }
@@ -705,7 +796,7 @@ destination of the B<EqInc> hyperlink on the I<family> type.
 It will have a B<PrevInc> hyperlink pointing to the previous increment in
 the family.
 
-=item B<arc/hive>
+=item B<-arc/hive>
 
 Rename the current type to an I<archive> value (name as prefix, and a
 numeral suffix. Initial value: I<-001>), create a new type, and make the
@@ -720,22 +811,23 @@ property.
 
 =cut
 
-sub mklbtype {
-  my (%opt, $rep);
-  GetOptions(\%opt, qw(family increment archive));
+sub _foo($@) {
+  my ($foo, @cmt) = @_;
+  print "foo ", join(' ', @cmt, $foo->opts, $foo->args), "\n";
+  return 0;
+}
+sub foo {
+  my $foo = ClearCase::Argv->new(@ARGV);
+  $foo->parse(qw(cquery|cqeach nc c|cfile=s));
+  my @cmt = preemptcmt($foo, \&_foo);
+}
+sub _mklbtype {
+  my ($ntype, @cmt) = @_;
+  my $rep;
   GetOptions('replace' => \$rep);
-  return if !%opt and grep /^-(ord|glo)/, @ARGV;
-  die Msg('E', 'Incompatible options: family increment archive')
-    if keys %opt > 1;
-  die Msg('E', 'Incompatible options: incremental types cannot be global')
-    if %opt and grep /^-glo/, @ARGV;
-  ClearCase::Argv->ipc(1);
   $ct = ClearCase::Argv->new({autochomp=>1});
-  my $ntype = ClearCase::Argv->new(@ARGV);
-  $ntype->parse(qw(global|ordinary vpelement|vpbranch|vpversion
-		pbranch|shared gt|ge|lt|le|enum|default|vtype=s cqe|nc
-		c|cfile=s));
   my @args = $ntype->args;
+  my %opt = %{$ntype->{fopts}};
   my $silent = $ct->clone;
   $silent->stdout(0);
   if (!%opt and my ($ahl) = grep /^->/,
@@ -747,10 +839,10 @@ sub mklbtype {
 	warn Msg('W', "making global type $_ ...");
       }
       $ntype->args(@args);
-      my @opts = ('-global', $ntype->opts);
+      my @opts = (@cmt, '-global', $ntype->opts);
       push @opts, '-replace' if $rep;
       $ntype->opts(@opts);
-      $ntype->exec;
+      return $ntype->system;
     }
   } elsif (%opt) {
     map { s/^lbtype:(.*)$/$1/ } @args;
@@ -782,6 +874,7 @@ sub mklbtype {
 	}
 	findfreeinc(\%pair);
 	$ntype->args(values %pair);
+	$ntype->opts(@cmt, $ntype->opts);
 	$ntype->system;
 	map {
 	  if (defined($pair{$_})) {
@@ -804,7 +897,12 @@ sub mklbtype {
 	  }
 	}
 	findfreeinc(\%pair);
-	$ntype->args(@args, values %pair);
+	my @opts = $ntype->opts();
+	$ntype->args(values %pair);
+	$ntype->opts(@cmt, @opts);
+	$ntype->system;
+	$ntype->args(@args);
+	$ntype->opts('-nc', @opts);
 	$ntype->system;
 	map {
 	  if (defined($pair{$_})) {
@@ -812,12 +910,12 @@ sub mklbtype {
 	    $silent->argv('mkhlink', $eqhl, "lbtype:$_", $inc)->system;
 	  }
 	} keys %pair;
-      } elsif($opt{increment}) {			# increment
+      } elsif ($opt{increment}) { # increment
 	for my $t (@args) {
 	  die
 	    Msg('E',
 		"Lock on label type \"$t\" prevents operation \"make lbtype\"")
-	    if $ct->argv(qw(lslock -s),"lbtype:$t")->stderr(0)->qx;
+	      if $ct->argv(qw(lslock -s),"lbtype:$t")->stderr(0)->qx;
 	  my ($pair) = grep s/^\s*(.*) -> lbtype:(.*)\@(.*)$/$1,$2,$3/,
 	    $ct->argv(qw(des -l -ahl), $eqhl, "lbtype:$t")->stderr(0)->qx;
 	  my ($hlk, $prev, $vob) = split ',', $pair if $pair;
@@ -827,6 +925,7 @@ sub mklbtype {
 	    my $new = "${base}_" .
 	      (defined($min)? $maj . '.' . ++$min : ++$maj);
 	    map { $_ .= $1 } ($new, $prev) if $t =~ /^.*(@.*)$/;
+	    $ntype->opts(@cmt, $ntype->opts);
 	    $ntype->args($new)->system;
 	    $silent->argv('rmhlink', $hlk)->system;
 	    $silent->argv(qw(mkhlink -nc), $eqhl,
@@ -845,7 +944,7 @@ sub mklbtype {
     exit 0;
   } else {			# non inc
     if ($rep) {
-      $ntype->opts('-replace', $ntype->opts);
+      $ntype->opts(@cmt, '-replace', $ntype->opts);
       map { $_ = "lbtype:$_" unless /^lbtype:/ } @args;
       my @a = $ct->argv(qw(des -s), @args)->stderr(0)->qx;
       if (@a) {
@@ -855,9 +954,26 @@ sub mklbtype {
 	$ct->argv('rmhlink', @link)->system;
       }
     } else {
-      $ntype->exec;
+      $ntype->opts(@cmt, $ntype->opts);
+      return $ntype->system;
     }
   }
+}
+sub mklbtype {
+  my %opt;
+  GetOptions(\%opt, qw(family increment archive));
+  return if !%opt and grep /^-(ord|glo)/, @ARGV;
+  die Msg('E', 'Incompatible options: family increment archive')
+    if keys %opt > 1;
+  die Msg('E', 'Incompatible options: incremental types cannot be global')
+    if %opt and grep /^-glo/, @ARGV;
+  ClearCase::Argv->ipc(1);
+  my $ntype = ClearCase::Argv->new(@ARGV);
+  $ntype->parse(qw(global|ordinary vpelement|vpbranch|vpversion
+		   pbranch|shared gt|ge|lt|le|enum|default|vtype=s
+		   cquery|cqeach nc c|cfile=s));
+  $ntype->{fopts} = \%opt;
+  preemptcmt($ntype, \&_mklbtype);
 }
 
 =item * LOCK
@@ -892,7 +1008,7 @@ sub lock {
   GetOptions('nusers=s' => \$nusers);
   ClearCase::Argv->ipc(1);
   my $lock = ClearCase::Argv->new(@ARGV);
-  $lock->parse(qw(c|cfile=s cquery|cqeach pname=s obsolete replace));
+  $lock->parse(qw(c|cfile=s cquery|cqeach nc pname=s obsolete replace));
   die Msg('E', "cannot specify -nusers along with -allow or -deny")
     if %opt and $nusers;
   die Msg('E', "cannot use -allow or -deny with multiple objects")
@@ -989,7 +1105,7 @@ environment variable.
 sub unlock() {
   ClearCase::Argv->ipc(1);
   my $unlock = ClearCase::Argv->new(@ARGV);
-  $unlock->parse(qw(c|cfile=s cquery|cqeach|nc version=s pname=s));
+  $unlock->parse(qw(c|cfile=s cquery|cqeach nc version=s pname=s));
   my @args = $unlock->args;
   $ct = ClearCase::Argv->new({autochomp=>1});
   my (@lbt, @oth, %vob);
