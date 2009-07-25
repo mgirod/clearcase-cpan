@@ -1,6 +1,6 @@
 package ClearCase::Wrapper::MGi;
 
-$VERSION = '0.11';
+$VERSION = '0.12';
 
 use warnings;
 use strict;
@@ -46,6 +46,12 @@ use ClearCase::Wrapper;
 __END__
 
 ## Internal service routines, undocumented.
+sub samebranch($$) {		# same branch
+  my ($cur, $prd) = @_;
+  $cur =~ s:/([0-9]+|CHECKEDOUT)$:/:;
+  $prd =~ s:/([0-9]+|CHECKEDOUT)$:/:;
+  return ($cur eq $prd);
+}
 sub sosbranch($$) {		# same or sub- branch
   my ($cur, $prd) = @_;
   $cur =~ s:/([0-9]+|CHECKEDOUT)$:/:;
@@ -53,6 +59,7 @@ sub sosbranch($$) {		# same or sub- branch
   return ($cur =~ qr(^$prd));
 }
 sub printparents {
+  no warnings 'recursion';
   my ($id, $gen, $seen, $ind) = @_;
   if ($$seen{$id}++) {
     printf("%${ind}s\[alternative path: ${id}\]\n", '')
@@ -88,19 +95,14 @@ sub printparents {
       print "\]\n";
     }
   }
-  if ($opt{all}
-	or $l
-	  or (scalar(@p) != 1)
-	    or (scalar(@s) != 1)
-	      or !sosbranch($id, $s[0])
-		or !sosbranch($p[0], $id)) {
+  my $yes = ($opt{all} or (scalar(@p) != 1) or (scalar(@s) != 1)
+	       or !samebranch($id, $s[0]) or !sosbranch($p[0], $id));
+  if ($l or $yes) {
     if ($opt{short}) {
-      if ((scalar(@p) != 1)
-	    or (scalar(@s) != 1)
-	      or !sosbranch($id, $s[0])
-		or !sosbranch($p[0], $id)) {
+      if ($yes) {
 	printf("%${ind}s${id}\n", '');
 	$$gen{$id}{printed}++;
+	$$seen{$id} = 0 if $id =~ m%/CHECKEDOUT$%; #print its parent
 	${ind}++;
       }
     } else {
