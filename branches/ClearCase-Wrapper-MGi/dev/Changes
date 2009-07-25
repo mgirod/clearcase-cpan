@@ -60,3 +60,8 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- mklbtype: fixes for remote and existing types
 	- mkbco: fix for multiple arguments
 	- mklbtype: comments processed, and distributed to fixed or floating
+
+0.12 Fri Jul 24 20:39:40 GMTDT 2009
+     	- lsgen: print the parent version from which checked out
+	- lsgen: -all option
+	- lsgen: print parent merged in back (fix... was skipped)
