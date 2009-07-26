@@ -66,3 +66,4 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- lsgen: -all option
 	- lsgen: print parent merged in back (fix... was skipped)
 	- co/mkbranch: use preemptcmt
+	- preemptcmt: support multiline comments

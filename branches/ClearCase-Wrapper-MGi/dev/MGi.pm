@@ -206,6 +206,18 @@ sub _mkbco {
   my $bt = $cmd->{bt};
   my $ver = $cmd->{ver};
   my @opts = $cmd->opts;
+  if ($cmd->flag('nco')) { #mkbranch
+    my @a = ($bt);
+    push @a, $cmd->args;
+    $cmd->args(@a);
+    push @opts, @cmt;
+    $cmd->opts(@opts);
+    return $cmd->system;
+  } elsif ($cmd->flag('branch')) { #co
+    push @opts, @cmt;
+    $cmd->opts(@opts);
+    return $cmd->system;
+  }
   foreach my $e ($cmd->args) {
     my $typ = $ct->argv(qw(des -fmt %m), $e)->qx;
     if ($typ !~ /(branch|version)$/) {
@@ -260,7 +272,7 @@ sub _mkbco {
       $rc |= $ct->argv('co', @args)->system;
     }
   }
-  exit $rc;
+  return $rc;
 }
 sub ensuretypes(@) {
   my @vob = shift;
@@ -328,6 +340,7 @@ sub findfreeinc($) {	   # on input, the values may or may not exist
   while (my ($k, $v) = each %n) { $$nxt{$k} = $v }
 }
 sub preemptcmt { #return the comments apart: e.g. mklbtype needs discrimination
+  use File::Temp qw(tempfile);
   my ($cmd, $fn) = @_; #already parsed, 3 groups: cquery|cqeach nc c|cfile=s
   use warnings;
   use strict;
@@ -371,7 +384,7 @@ sub preemptcmt { #return the comments apart: e.g. mklbtype needs discrimination
   }
   if ($ncf or $cf) {
     if ($ncf) {
-      $cmd->opts(grep !/^-nc/,@opts);
+      $cmd->opts(grep !/^-nc(?:omment)?$/,@opts);
       $ret = &$fn($cmd, qw(-nc));
     } else {
       my $skip = 0;
@@ -391,8 +404,7 @@ sub preemptcmt { #return the comments apart: e.g. mklbtype needs discrimination
       $cmd->opts(@mod);
       $ret = &$fn($cmd, @copt);
     }
-  }
-  if ($cqf) {
+  } elsif ($cqf) {
     my $cqe = grep /^-cqe/, @opts;
     $cmd->opts(grep !/^-cq/, @opts);
     my @arg = $cmd->args;
@@ -413,8 +425,14 @@ sub preemptcmt { #return the comments apart: e.g. mklbtype needs discrimination
 	$cmt .= $_;
       }
       chomp $cmt;
-      $cmt =~ s/\r?\n/\\n/mg;
-      $ret |= &$fn($cmd, '-c', $cmt);
+      if ($cmt =~ /\n/) {
+	my ($fh, $cfile) = tempfile();
+	print $fh $cmt;
+	close $fh;
+	$ret |= &$fn($cmd, '-cfile', $cfile);
+      } else {
+	$ret |= &$fn($cmd, '-c', $cmt);
+      }
     }
   }
   exit $ret;
@@ -550,9 +568,8 @@ sub checkout {
     my @added = AutoNotCheckedOut($agg[0], $opt{ok}, 'f', @ARGV);
     push(@ARGV, @added);
   }
-  return 0 if grep /^-bra/, @ARGV[1..$#ARGV];
+  ClearCase::Argv->ipc(1) unless ClearCase::Argv->ctcmd(); #set by the user
   $ct = ClearCase::Argv->new({autochomp=>1});
-  $ct->ipc(1) unless $ct->ctcmd(); #unless already set by the user
   my $co = ClearCase::Argv->new(@ARGV);
   $co->parse(qw(reserved unreserved nmaster out=s ndata ptime nwarn
 		version branch=s query nquery usehijack
@@ -595,13 +612,12 @@ sub mkbranch {
     my @added = AutoNotCheckedOut($agg[0], $opt{ok}, 'f', @ARGV);
     push(@ARGV, @added);
   }
-  return 0 if grep /^-nco/, @ARGV[1..$#ARGV];
+  ClearCase::Argv->ipc(1) unless ClearCase::Argv->ctcmd();
   $ct = ClearCase::Argv->new({autochomp=>1});
-  $ct->ipc(1) unless $ct->ctcmd(1);
   my $ver;
   GetOptions("version=s" => \$ver);
   my $mkbranch = ClearCase::Argv->new(@ARGV);
-  $mkbranch->parse(qw(nwarn cquery|cqeach nc c|cfile=s));
+  $mkbranch->parse(qw(nwarn nco ptime cquery|cqeach nc c|cfile=s));
   my @args = $mkbranch->args;
   my $bt = shift @args;
   $bt =~ s/^brtype:(.*)$/$1/;
