@@ -48,14 +48,14 @@ __END__
 ## Internal service routines, undocumented.
 sub samebranch($$) {		# same branch
   my ($cur, $prd) = @_;
-  $cur =~ s:/([0-9]+|CHECKEDOUT)$:/:;
-  $prd =~ s:/([0-9]+|CHECKEDOUT)$:/:;
+  $cur =~ s:/[0-9]+$:/:; # Treat CHECKEDOUT as other branch
+  $prd =~ s:/[0-9]+$:/:;
   return ($cur eq $prd);
 }
 sub sosbranch($$) {		# same or sub- branch
   my ($cur, $prd) = @_;
-  $cur =~ s:/([0-9]+|CHECKEDOUT)$:/:;
-  $prd =~ s:/([0-9]+|CHECKEDOUT)$:/:;
+  $cur =~ s:/[0-9]+$:/:;
+  $prd =~ s:/[0-9]+$:/:;
   return ($cur =~ qr(^$prd));
 }
 sub printparents {
@@ -102,7 +102,6 @@ sub printparents {
       if ($yes) {
 	printf("%${ind}s${id}\n", '');
 	$$gen{$id}{printed}++;
-	$$seen{$id} = 0 if $id =~ m%/CHECKEDOUT$%; #print its parent
 	${ind}++;
       }
     } else {
@@ -200,56 +199,68 @@ sub parsevtree($$$) {
   }
   return %gen;
 }
-sub mkbco($$$$$$) {
-  my ($e, $bt, $pbrt, $bopt, $gopt, $copt) = @_;
-  my $typ = $ct->argv(qw(des -fmt %m), $e)->qx;
-  if ($typ !~ /(branch|version)$/) {
-    warn Msg('W', "Not a vob object: $e");
-    return 1;
-  }
-  my $ver;
-  if ($e =~ m%^(.*?)\@\@.*$%) {
-    $ver = $e;
-    $e = $1;
-    $ver =~ s%[\\/]$%%;
-    $ver .= '/LATEST' if $typ eq 'branch';
-  }
-  if (!$ver or !$bt) {
-    my $sel = $ct->argv('ls', '-d', $e)->qx;
-    if ($bt) {
-      $ver = $1 if $sel =~ /^(.*?) +Rule/;
-    } elsif ($sel =~ /^(.*?) +Rule:.*-mkbranch (.*?)\]?$/) {
-      ($ver, $bt) = ($ver? $ver : $1, $2);
+sub _mkbco {
+  my ($cmd, @cmt) = @_;
+  my $rc = 0;
+  my %pbrt = ();
+  my $bt = $cmd->{bt};
+  my $ver = $cmd->{ver};
+  my @opts = $cmd->opts;
+  foreach my $e ($cmd->args) {
+    my $typ = $ct->argv(qw(des -fmt %m), $e)->qx;
+    if ($typ !~ /(branch|version)$/) {
+      warn Msg('W', "Not a vob object: $e");
+      $rc = 1;
+      next;
     }
-  }
-  if ($bt and checkcs($ct, $e)) {
-    my $main = ($ct->argv('lsvtree', $e)->qx)[0];
-    $main =~ s%^[^@]*\@\@[\\/](.*)$%$1%;
-    my $vob = $ct->argv('des', '-s', "vob:$e")->qx;
-    my $re = pbrtype($pbrt, "$bt\@$vob") ?
-      qr([\\/]${main}[\\/]$bt[\\/]\d+$) : qr([\\/]$bt[\\/]\d+$);
-    if ($ver =~ m%$re%) {
-      push @$gopt, @$copt, $e;
-      return $ct->argv('co', @$gopt)->system;
-    } else {
-      my @mkbcopt = @$copt? @$copt : qw(-nc);
-      my $r = $ct->argv('mkbranch', @mkbcopt,
-			'-ver', "/${main}/0", $bt, $e)->system;
-      if ($r) {
-	return 1;
-      } else {
-	if ($ver !~ m%\@\@[\\/]${main}[\\/]0$%) {
-	  my $rc = $ct->argv('merge', '-to', $e, $ver)->stdout(0)->system;
-	  unlink glob("$e.contrib*");
-	  return $rc;
-	}
+    if ($ver) {
+      $ver = "/$ver" unless $ver =~ m%^[\\/]%;
+      $e =~ s%\@\@.*$%%;
+      my $v = $e;
+      $ver = "$v\@\@$ver";
+    } elsif ($e =~ m%^(.*?)\@\@.*$%) {
+      $ver = $e;
+      $e = $1;
+      $ver =~ s%[\\/]$%%;
+      $ver .= '/LATEST' if $typ eq 'branch';
+    }
+    if (!$ver or !$bt) {
+      my $sel = $ct->argv('ls', '-d', $e)->qx;
+      if ($bt) {
+	$ver = $1 if $sel =~ /^(.*?) +Rule/;
+      } elsif ($sel =~ /^(.*?) +Rule:.*-mkbranch (.*?)\]?$/) {
+	($ver, $bt) = ($ver? $ver : $1, $2);
       }
     }
-  } else {
-    my @args;
-    push @args, @$gopt, @$bopt, @$copt, $e; # Ensure non empty array
-    return $ct->argv('co', @args)->system;
+    if ($bt and checkcs($ct, $e)) {
+      my $main = ($ct->argv('lsvtree', $e)->qx)[0];
+      $main =~ s%^[^@]*\@\@[\\/](.*)$%$1%;
+      my $vob = $ct->argv('des', '-s', "vob:$e")->qx;
+      my $re = pbrtype(\%pbrt, "$bt\@$vob") ?
+	qr([\\/]${main}[\\/]$bt[\\/]\d+$) : qr([\\/]$bt[\\/]\d+$);
+      if ($ver =~ m%$re%) {
+	push @opts, @cmt, $e;
+	$rc |= $ct->argv('co', @opts)->system;
+      } else {
+	my @mkbcopt = @cmt? @cmt : qw(-nc);
+	if ($ct->argv('mkbranch', @mkbcopt, '-ver', "/$main/0", $bt, $e)
+	      ->stderr(0)->system) {
+	  $rc = 1;
+	} else {
+	  if ($ver !~ m%\@\@[\\/]${main}[\\/]0$%) {
+	    my $lrc = $ct->argv('merge', '-to', $e, $ver)->stdout(0)->system;
+	    unlink glob("$e.contrib*");
+	    $rc |= $lrc;
+	  }
+	}
+      }
+    } else {
+      my @args;
+      push @args, @opts, @cmt, $e; # Ensure non empty array
+      $rc |= $ct->argv('co', @args)->system;
+    }
   }
+  exit $rc;
 }
 sub ensuretypes(@) {
   my @vob = shift;
@@ -348,8 +359,9 @@ sub preemptcmt { #return the comments apart: e.g. mklbtype needs discrimination
       }
     }
     if (!$cqf and !$ncf and !$cf) {
-      if (($cmd->prog())[1] =~
-	    /^(check(in|out)|mk(dir|elem|(at|br|el|hl|lb|tr)type|pool|vob))$/) {
+      my $re =
+	qr/c[io]|check(in|out)|mk(dir|elem|(at|br|el|hl|lb|tr)type|pool|vob)/;
+      if (($cmd->prog())[1] =~ /^($re)$/) {
 	$cqf = 1;
 	push @opts, '-cqe';
       } else {
@@ -526,11 +538,7 @@ as a branch may always be spawn.
 =cut
 
 sub checkout {
-  for (@ARGV[1..$#ARGV]) {
-    $_ = readlink if -l && defined readlink;
-  }
-  $ct = ClearCase::Argv->new({autochomp=>1});
-  $ct->ipc(1) unless $ct->ctcmd(1);
+  map { $_ = readlink if -l && defined readlink } @ARGV[1..$#ARGV];
   # Duplicate the base Wrapper checkout functionality.
   my @agg = grep /^-(?:dir|rec|all|avo)/, @ARGV;
   die Msg('E', "mutually exclusive flags: @agg") if @agg > 1;
@@ -543,49 +551,18 @@ sub checkout {
     push(@ARGV, @added);
   }
   return 0 if grep /^-bra/, @ARGV[1..$#ARGV];
-  my %opt;
-  GetOptions(\%opt, qw(reserved unreserved nmaster out=s ndata ptime
-		       nwarn c=s cfile=s cquery cqeach nc version branch=s
-		       query nquery usehijack));
-  if (my @o = grep /^-/, @ARGV) {
-    if (!(grep /^--$/, @o)) {
-      warn Msg('E', "Unsupported options: @o");
-      exit(1);
-    }
-  }
-  my @bopts = ();
-  push @bopts, q(-ver) if $opt{version};
-  my @gopts = ();
-  push @gopts, q(-res) if $opt{reserved};
-  push @gopts, q(-unr) if $opt{unreserved};
-  push @gopts, q(-nma) if $opt{nmaster};
-  push @gopts, q(-out), $opt{out}     if $opt{out};
-  push @gopts, q(-nda) if $opt{ndata};
-  push @gopts, q(-pti) if $opt{ptime};
-  push @gopts, q(-nwa) if $opt{nwarn};
-  push @gopts, q(-cfi), $opt{cfile}   if $opt{cfile};
-  push @gopts, q(-cq)  if $opt{cquery};
-  push @gopts, q(-cqe) if $opt{cqeach};
-  push @gopts, q(-que) if $opt{query};
-  push @gopts, q(-nqu) if $opt{nquery};
-  push @gopts, q(-use) if $opt{usehijack};
-  my @copt = ();
-  push @copt, q(-c), $opt{c} if $opt{c};
-  push @copt, q(-nc)         if $opt{nc};
-  my @args = ();
+  $ct = ClearCase::Argv->new({autochomp=>1});
+  $ct->ipc(1) unless $ct->ctcmd(); #unless already set by the user
+  my $co = ClearCase::Argv->new(@ARGV);
+  $co->parse(qw(reserved unreserved nmaster out=s ndata ptime nwarn
+		version branch=s query nquery usehijack
+		cquery|cqeach nc c|cfile=s));
   if (MSWIN) {
-    for (@ARGV[1..$#ARGV]) {
-      push @args, glob($_);
-    }
-  } else {
-    @args = @ARGV[1..$#ARGV];
+    my @args = $co->args;
+    map { $_ = glob($_) } @args;
+    $co->args(@args);
   }
-  my $rc = 0;
-  my %pbrt = ();
-  foreach my $e (@args) {
-    $rc |= mkbco($e, undef, \%pbrt, \@bopts, \@gopts, \@copt);
-  }
-  exit $rc;
+  preemptcmt($co, \&_mkbco);
 }
 
 =item * MKBRANCH
@@ -607,11 +584,7 @@ as this cannot reasonably be served in a new branch under BranchOff
 =cut
 
 sub mkbranch {
-  for (@ARGV[1..$#ARGV]) {
-    $_ = readlink if -l && defined readlink;
-  }
-  $ct = ClearCase::Argv->new({autochomp=>1});
-  $ct->ipc(1) unless $ct->ctcmd(1);
+  map { $_ = readlink if -l && defined readlink } @ARGV[1..$#ARGV];
   my @agg = grep /^-(?:dir|rec|all|avo)/, @ARGV;
   die Msg('E', "mutually exclusive flags: @agg") if @agg > 1;
   if (@agg) {
@@ -623,41 +596,21 @@ sub mkbranch {
     push(@ARGV, @added);
   }
   return 0 if grep /^-nco/, @ARGV[1..$#ARGV];
-  my %opt;
-  GetOptions(\%opt, qw(c|cfile=s cquery|cqeach nc nwarn version));
-  if (my @o = grep /^-/, @ARGV) {
-    if (!(grep /^--$/, @o)) {
-      warn Msg('E', "Unsupported options: @o");
-      exit(1);
-    }
-  }
-  my @bopts = ();
-  push @bopts, q(-ver) if $opt{version};
-  my @gopts = ();
-  push @gopts, q(cfile), $opt{cfile} if $opt{cfile};
-  push @gopts, q(cq)    if $opt{cquery};
-  push @gopts, q(cqe)   if $opt{cqeach};
-  push @gopts, q(nwarm) if $opt{nwarm};
-  my @copt = ();
-  push @copt, q(-c), $opt{c} if $opt{c};
-  push @copt, q(-nc)         if $opt{nc};
-  my @args = ();
-  if (MSWIN) {
-    for (@ARGV[1..$#ARGV]) {
-      push @args, glob($_);
-    }
-  } else {
-    @args = @ARGV[1..$#ARGV];
-  }
-  my $rc = 0;
-  my %pbrt = ();
+  $ct = ClearCase::Argv->new({autochomp=>1});
+  $ct->ipc(1) unless $ct->ctcmd(1);
+  my $ver;
+  GetOptions("version=s" => \$ver);
+  my $mkbranch = ClearCase::Argv->new(@ARGV);
+  $mkbranch->parse(qw(nwarn cquery|cqeach nc c|cfile=s));
+  my @args = $mkbranch->args;
   my $bt = shift @args;
   $bt =~ s/^brtype:(.*)$/$1/;
   die if $ct->argv(qw(des -s), "brtype:$bt")->stdout(0)->system;
-  foreach my $e (@args) {
-    $rc |= mkbco($e, $bt, \%pbrt, \@bopts, \@gotps, \@copt);
-  }
-  exit $rc;
+  map { $_ = glob($_) } @args if MSWIN;
+  $mkbranch->args(@args);
+  $mkbranch->{bt} = $bt;
+  $mkbranch->{ver} = $ver;
+  preemptcmt($mkbranch, \&_mkbco);
 }
 
 =item * DIFF
