@@ -204,7 +204,6 @@ sub _mkbco {
   my $rc = 0;
   my %pbrt = ();
   my $bt = $cmd->{bt};
-  my $ver = $cmd->{ver};
   my @opts = $cmd->opts;
   if ($cmd->flag('nco')) { #mkbranch
     my @a = ($bt);
@@ -219,6 +218,7 @@ sub _mkbco {
     return $cmd->system;
   }
   foreach my $e ($cmd->args) {
+    my $ver = $cmd->{ver};
     my $typ = $ct->argv(qw(des -fmt %m), $e)->qx;
     if ($typ !~ /(branch|version)$/) {
       warn Msg('W', "Not a vob object: $e");
