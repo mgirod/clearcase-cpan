@@ -153,9 +153,9 @@ sub checkcs {
   $v =~ s/^(.*?)\@\@.*$/$1/;
   my $dest = dirname($v);
   my $pwd = getcwd();
-  chdir($dest);
+  $ct->argv('cd', $dest)->system if $pwd;
   my @cs = grep /^\#\#:BranchOff: *root/, $ct->argv('catcs')->qx;
-  chdir($pwd) if $pwd;
+  $ct->argv('cd', $pwd)->system if $pwd;
   return scalar @cs;
 }
 sub pbrtype {
@@ -244,7 +244,7 @@ sub _mkbco {
 	($ver, $bt) = ($ver? $ver : $1, $2);
       }
     }
-    if ($bt and checkcs($ct, $e)) {
+    if ($bt and checkcs($e)) {
       my $main = ($ct->argv('lsvtree', $e)->qx)[0];
       $main =~ s%^[^@]*\@\@[\\/](.*)$%$1%;
       my $vob = $ct->argv('des', '-s', "vob:$e")->qx;
