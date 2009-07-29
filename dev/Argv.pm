@@ -1,6 +1,6 @@
 package ClearCase::Argv;
 
-$VERSION = '1.46';
+$VERSION = '1.47';
 
 use Argv 1.23;
 
@@ -574,8 +574,9 @@ sub ipc {
 sub _cw_map {
     map {
         s%^/cygdrive/([A-Za-z])%$1:%;
-	if (m%^/[^/]%) {
-	    if (!s%^/view%//view% && -r $_) {
+	if (m%^(vob:)?/[^/]%) {
+	    no warnings;
+	    if (!s%^(vob:)?/view%$1//view% && -r $_) {
 	        $_ = "${cygpfx}$_";
 	    } else {
 	        s%^/%\\%; # case of vob tags
