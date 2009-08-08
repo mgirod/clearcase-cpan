@@ -152,10 +152,11 @@ sub checkcs {
   $ct = $ct->clone();
   $v =~ s/^(.*?)\@\@.*$/$1/;
   my $dest = dirname($v);
+  $dest = '' if $dest eq '.';
   my $pwd = getcwd();
-  $ct->argv('cd', $dest)->system if $pwd;
+  $ct->argv('cd', $dest)->system if $dest;
   my @cs = grep /^\#\#:BranchOff: *root/, $ct->argv('catcs')->qx;
-  $ct->argv('cd', $pwd)->system if $pwd;
+  $ct->argv('cd', $pwd)->system if $dest;
   return scalar @cs;
 }
 sub pbrtype {
