@@ -7,7 +7,7 @@ our $VERSION = '0.03';
 require Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT = qw(funlocklt flocklt);
-our @forcelock = qw(sudo -u ccvobesp /opt/rational/clearcase/bin/cleartool);
+our @forcelock = qw(sudo /opt/rational/clearcase/bin/cleartool);
 
 sub funlocklt($$) {
   my ($lt, $vob) = @_;
