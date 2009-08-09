@@ -1015,13 +1015,14 @@ sub lock {
   my $locvob = $ct->argv(qw(des -s vob:.))->stderr(0)->qx;
   foreach my $t (@args) {
     if ($ct->argv(qw(des -fmt), '%m\n', $t)->stderr(0)->qx eq 'label type') {
-      my $t1 = $t;
+      my ($t1,$v) = $t;
       if ($t =~ /lbtype:(.*)@(.*)$/) {
-	$t = $1; $vob{$t} = $2;
+	$t = $1; $v = $2;
       } else {
 	$t =~ s/^lbtype://;
-	$vob{$t} = $locvob;
+	$v = $locvob;
       }
+      $vob{$t} = $v;
       push @lbt, $t;
       my @et = grep s/^-> lbtype:(.*)@.*$/$1/,
 	$ct->argv(qw(des -s -ahl), $eqhl, $t1)->qx;
