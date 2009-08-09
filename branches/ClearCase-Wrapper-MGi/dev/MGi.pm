@@ -1015,18 +1015,20 @@ sub lock {
   my $locvob = $ct->argv(qw(des -s vob:.))->stderr(0)->qx;
   foreach my $t (@args) {
     if ($ct->argv(qw(des -fmt), '%m\n', $t)->stderr(0)->qx eq 'label type') {
+      my $t1 = $t;
+      if ($t =~ /lbtype:(.*)@(.*)$/) {
+	$t = $1; $vob{$t} = $2;
+      } else {
+	$t =~ s/^lbtype://;
+	$vob{$t} = $locvob;
+      }
+      push @lbt, $t;
       my @et = grep s/^-> lbtype:(.*)@.*$/$1/,
-	$ct->argv(qw(des -s -ahl), $eqhl, $t)->qx;
+	$ct->argv(qw(des -s -ahl), $eqhl, $t1)->qx;
       if (@et) {
 	my ($e, $p) = ($et[0], '');
-	if ($t =~ /lbtype:(.*)@(.*)$/) {
-	  $t = $1; $vob{$t} = $2;
-	} else {
-	  $t =~ s/^lbtype://;
-	  $vob{$t} = $locvob;
-	}
-	my $v = $vob{$t}; $vob{$e} = $v;
-	push @lbt, $t, $e;
+	$vob{$e} = $vob{$t};
+	push @lbt, $e;
 	my @pt = grep s/^-> lbtype:(.*)@.*$/$1/,
 	  $ct->argv(qw(des -s -ahl), $prhl, "lbtype:$e\@$v")->qx;
 	if (@pt) {
@@ -1036,8 +1038,6 @@ sub lock {
 	    $vob{$p} = $v;
 	  }
 	}
-      } else {
-	push @oth, $t;
       }
     } else {
       push @oth, $t;
@@ -1084,18 +1084,19 @@ sub unlock() {
   my $locvob = $ct->argv(qw(des -s vob:.))->stderr(0)->qx;
   foreach my $t (@args) {
     if ($ct->argv(qw(des -fmt), '%m\n', $t)->stderr(0)->qx eq 'label type') {
-      my @et = grep s/^-> lbtype:(.*)@.*$/$1/,
-	$ct->argv(qw(des -s -ahl), $eqhl, $t)->qx;
-      if (@et) {
-	if ($t =~ /lbtype:(.*)@(.*)$/) {
-	  $t = $1; my $v = $2; $vob{$t} = $v; $vob{$et[0]} = $v;
-	} else {
-	  $t =~ s/^lbtype://;
-	  $vob{$t} = $locvob; $vob{$et[0]} = $locvob;
-	}
-	push @lbt, $t, $et[0];
+      my $t1 = $t;
+      if ($t =~ /lbtype:(.*)@(.*)$/) {
+	$t = $1; $vob{$t} = $2;
       } else {
-	push @oth, $t;
+	$t =~ s/^lbtype://;
+	$vob{$t} = $locvob;
+      }
+      push @lbt, $t;
+      my @et = grep s/^-> lbtype:(.*)@.*$/$1/,
+	$ct->argv(qw(des -s -ahl), $eqhl, $t1)->qx;
+      if (@et) {
+	push @lbt, $et[0];
+	$vob{$et[0]} = $vob{$t};
       }
     } else {
       push @oth, $t;
