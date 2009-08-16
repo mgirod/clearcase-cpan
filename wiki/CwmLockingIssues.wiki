@@ -14,6 +14,9 @@ these hyperlinks, i.e. affect *two* types.
 This brings a problem if the different types are not owned by the 
 same account.
 
+The current implementation differs slightly from the intention
+described below.
+
 = Details =
 
 We consider here only incremental label types, because archiving
@@ -51,8 +54,8 @@ file, or via a module required more locally, and specified via an environment va
   * Windows
 In unix, the problem is to run the {{{unlock}}} command as vob owner
 of the vob concerned. Since there may be several such accounts, a pure
-suid based solution would be impractical. {{{sudo}}} would offer 
-simpler solutions by allowing groups of users to access specific 
+suid based solution would be impractical. {{{sudo}}} offers a 
+simpler solution by allowing groups of users to access specific 
 commands using one of several accounts.
 If {{{sudo}}} is not available, it becomes cumbersome to maintain
 such a mapping. The solution proposed here involves authorizing one
@@ -73,3 +76,10 @@ one unix client runs a properly configure {{{ssh}}} daemon.
 A last problem concerns the tag of the vobs in the unix and Windows
 regions. A module is provided to offer the conversion in a generic
 way, requiring no special configuration.
+
+It feels difficult to fully decouple the logical
+from the physical locking.
+One way could be via an {{{-unlock}}} option to {{{mklbtype -inc}}}.
+Otherwise, one doesn't know at {{{unlock}}} time what is the purpose
+of this operation, i.e. whether unlocking the current fixed type is
+logical or physical.
