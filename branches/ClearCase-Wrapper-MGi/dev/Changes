@@ -61,9 +61,12 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- mkbco: fix for multiple arguments
 	- mklbtype: comments processed, and distributed to fixed or floating
 
-0.12 Sun Jul 26 15:10:14 GMTDT 2009
+0.12 Sun Aug 16 15:04:39 GMTDT 2009
      	- lsgen: print the parent version from which checked out
 	- lsgen: -all option
 	- lsgen: print parent merged in back (fix... was skipped)
 	- co/mkbranch: use preemptcmt
 	- preemptcmt: support multiline comments
+	- forcelock: sudo based solution (contributed: Tatyana Shpichko)
+	- uncheckout: interactive negociation of -rm/-keep options
+	- hidden intenral function: renaming according to convention

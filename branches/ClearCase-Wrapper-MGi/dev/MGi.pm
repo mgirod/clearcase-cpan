@@ -7,7 +7,7 @@ use strict;
 use vars qw($ct $eqhl $prhl $diat);
 ($eqhl, $prhl, $diat) = qw(EqInc PrevInc DelInc);
 
-sub compareincs($$) {
+sub _Compareincs($$) {
   my ($t1, $t2) = @_;
   my ($p1, $M1, $m1, $s1) = pfxmajminsfx($t1);
   my ($p2, $M2, $m2, $s2) = pfxmajminsfx($t2);
@@ -18,7 +18,6 @@ sub compareincs($$) {
   return (($M1 <=> $M2) or (defined($m1) and defined($m2) and $m1 <=> $m2));
 }
 use AutoLoader 'AUTOLOAD';
-use ClearCase::Wrapper;
 
 #############################################################################
 # Usage Message Extensions
@@ -46,19 +45,19 @@ use ClearCase::Wrapper;
 __END__
 
 ## Internal service routines, undocumented.
-sub samebranch($$) {		# same branch
+sub _Samebranch($$) {		# same branch
   my ($cur, $prd) = @_;
   $cur =~ s:/[0-9]+$:/:; # Treat CHECKEDOUT as other branch
   $prd =~ s:/[0-9]+$:/:;
   return ($cur eq $prd);
 }
-sub sosbranch($$) {		# same or sub- branch
+sub _Sosbranch($$) {		# same or sub- branch
   my ($cur, $prd) = @_;
   $cur =~ s:/[0-9]+$:/:;
   $prd =~ s:/[0-9]+$:/:;
   return ($cur =~ qr(^$prd));
 }
-sub printparents {
+sub _Printparents {
   no warnings 'recursion';
   my ($id, $gen, $seen, $ind) = @_;
   if ($$seen{$id}++) {
@@ -96,7 +95,7 @@ sub printparents {
     }
   }
   my $yes = ($opt{all} or (scalar(@p) != 1) or (scalar(@s) != 1)
-	       or !samebranch($id, $s[0]) or !sosbranch($p[0], $id));
+	       or !_Samebranch($id, $s[0]) or !_Sosbranch($p[0], $id));
   if ($l or $yes) {
     if ($opt{short}) {
       if ($yes) {
@@ -113,22 +112,22 @@ sub printparents {
   return if (defined($opt{depth})) and ($opt{depth} < $ind);
   foreach my $p (@p) {
     if ($$gen{$id}{depth} < $$gen{$p}{depth}) {
-      printparents($p, $gen, $seen, $ind);
+      _Printparents($p, $gen, $seen, $ind);
     } else {
       printf("%${ind}s\[alternative path: ${p}\]\n", '')
 	unless $opt{short};
     }
   }
 }
-sub findpredinstack($$) {
+sub _Findpredinstack($$) {
   my ($g, $stack) = @_;
   while ($$stack[-1]) {
-    return $$stack[-1] if sosbranch($g, $$stack[-1]);
+    return $$stack[-1] if _Sosbranch($g, $$stack[-1]);
     pop @{$stack};
   }
-  return 0; 
+  return 0;
 }
-sub setdepths {
+sub _Setdepths {
   no warnings 'recursion';
   my ($id, $dep, $gen) = @_;
   if (defined($$gen{$id}{depth})) {
@@ -142,10 +141,10 @@ sub setdepths {
   }
   my @p = defined($$gen{$id}{parents}) ? @{ $$gen{$id}{parents} } : ();
   foreach my $p (@p) {
-    setdepths($p, $$gen{$id}{depth} + 1, $gen);
+    _Setdepths($p, $$gen{$id}{depth} + 1, $gen);
   }
 }
-sub checkcs {
+sub _Checkcs {
   use File::Basename;
   use Cwd;
   my ($v) = @_;
@@ -159,7 +158,7 @@ sub checkcs {
   $ct->argv('cd', $pwd)->system if $dest;
   return scalar @cs;
 }
-sub pbrtype {
+sub _Pbrtype {
   my ($pbrt, $bt) = @_;
   if (!defined($pbrt->{$bt})) {
     my $tc = $ct->argv('des', qw(-fmt %[type_constraint]p),
@@ -168,7 +167,7 @@ sub pbrtype {
   }
   return $pbrt->{$bt};
 }
-sub parsevtree($$$) {
+sub _Parsevtree($$$) {
   my ($ele, $obs, $sel) = @_;
   $ct->argv('lsvtree');
   my @opt = qw(-merge -all);
@@ -192,7 +191,7 @@ sub parsevtree($$$) {
       push @{ $gen{$n}{parents} }, $stack[-1];
       next;
     }
-    if (findpredinstack($g, \@stack)) {
+    if (_Findpredinstack($g, \@stack)) {
       push @{ $gen{$g}{parents} }, $stack[-1];
       push @{ $gen{$stack[-1]}{children} }, $g;
     }
@@ -200,7 +199,7 @@ sub parsevtree($$$) {
   }
   return %gen;
 }
-sub _mkbco {
+sub _Mkbco {
   my ($cmd, @cmt) = @_;
   my $rc = 0;
   my %pbrt = ();
@@ -245,11 +244,11 @@ sub _mkbco {
 	($ver, $bt) = ($ver? $ver : $1, $2);
       }
     }
-    if ($bt and checkcs($e)) {
+    if ($bt and _Checkcs($e)) {
       my $main = ($ct->argv('lsvtree', $e)->qx)[0];
       $main =~ s%^[^@]*\@\@[\\/](.*)$%$1%;
       my $vob = $ct->argv('des', '-s', "vob:$e")->qx;
-      my $re = pbrtype(\%pbrt, "$bt\@$vob") ?
+      my $re = _Pbrtype(\%pbrt, "$bt\@$vob") ?
 	qr([\\/]${main}[\\/]$bt[\\/]\d+$) : qr([\\/]$bt[\\/]\d+$);
       if ($ver =~ m%$re%) {
 	push @opts, @cmt, $e;
@@ -275,7 +274,7 @@ sub _mkbco {
   }
   return $rc;
 }
-sub ensuretypes(@) {
+sub _Ensuretypes(@) {
   my @vob = shift;
   my %cmt = ($eqhl => q(Equivalent increment),
 	     $prhl => q(Previous increment in a type chain),
@@ -297,7 +296,7 @@ sub ensuretypes(@) {
     }
   }
 }
-sub pfxmajminsfx($) {
+sub _Pfxmajminsfx($) {
   my $t = shift;
   if ($t =~ /^(\w+[-_])(\d+)(?:\.(\d+))?(\@.*)?$/) {
     my $min = ($3 or '');
@@ -308,39 +307,39 @@ sub pfxmajminsfx($) {
       'W', "$t doesn't match the pattern expected for an incremental type\n");
   }
 }
-sub nextinc($) {
+sub _Nextinc($) {
   my $inc = shift;
-  my ($pfx, $maj, $min, $sfx) = pfxmajminsfx($inc);
+  my ($pfx, $maj, $min, $sfx) = _Pfxmajminsfx($inc);
   return '' unless $pfx and $maj;
   my $count = defined($min)? $maj . q(.) . ++$min : ++$maj;
   return $pfx . $count . $sfx;
 }
-sub findnext($) {		# on input, the type exists
+sub _Findnext($) {		# on input, the type exists
   my $c = shift;
   my @int = grep { s/^<- lbtype:(.*)$/$1/ }
     $ct->argv(qw(des -s -ahl), $prhl, "lbtype:$c")->qx;
   if (@int) {
     my @i = ();
     for (@int) {
-      push @i, findnext($_);
+      push @i, _Findnext($_);
     }
     return @i;
   } else {
     return ($c);
   }
 }
-sub findfreeinc($) {	   # on input, the values may or may not exist
+sub _Findfreeinc($) {	   # on input, the values may or may not exist
   my ($nxt, %n) = shift;
   while (my ($k, $v) = each %{$nxt}) {
     while ($ct->argv(qw(des -s), "lbtype:$v")->stderr(0)->qx) { #exists
-      my @cand = sort compareincs findnext($v);
-      $v = nextinc($cand[$#cand]);
+      my @cand = sort _Compareincs _Findnext($v);
+      $v = _Nextinc($cand[$#cand]);
     }
     $n{$k} = $v;
   }
   while (my ($k, $v) = each %n) { $$nxt{$k} = $v }
 }
-sub preemptcmt { #return the comments apart: e.g. mklbtype needs discrimination
+sub _Preemptcmt { #return the comments apart: e.g. mklbtype needs discrimination
   use File::Temp qw(tempfile);
   my ($cmd, $fn) = @_; #already parsed, 3 groups: cquery|cqeach nc c|cfile=s
   use warnings;
@@ -438,7 +437,52 @@ sub preemptcmt { #return the comments apart: e.g. mklbtype needs discrimination
   }
   exit $ret;
 }
-
+sub _Unco {
+  use warnings;
+  use strict;
+  my $unco = shift;
+  $ct = ClearCase::Argv->new({autochomp=>1});
+  my @b0 = grep { m%[\\/]CHECKEDOUT$% }
+    $ct->argv(qw(ls -s -d), $unco->args)->qx;
+  my $rc = $unco->system;
+  map { s%^(.*)[\\/]CHECKEDOUT$%$1% } @b0;
+  my @rm = ();
+  for my $d (@b0) {
+    opendir BR, $d or next;
+    my @f = grep !/\.\.?/, readdir BR;
+    closedir BR;
+    push @rm, $d if (scalar @f == 2) and $f[0] eq '0' and $f[1] eq 'LATEST';
+  }
+  $ct->argv(qw(rmbranch -f), @rm)->system if @rm;
+  return $rc;
+}
+sub _Yesno {
+  my ($cmd, $fn, $yn, $test, $errmsg) = @_;
+  use warnings;
+  use strict;
+  my $ret = 0;
+  my @opts = $cmd->opts;
+  for my $arg ($cmd->args) {
+    my $res = $test->args($arg)->qx;
+    if (!$res or $res =~ /^cleartool: Error:/) {
+      warn ($res or Msg('E', $errmsg . $arg . "\n"));
+      next;
+    }
+    printf $yn->{format}, $arg;
+    my $ans = <STDIN>; chomp $ans; $ans = lc($ans);
+    $ans = $yn->{default} unless $ans;
+    while ($ans !~ $yn->{valid}) {
+      print $yn->{instruct};
+      $ans = <STDIN>; chomp $ans; $ans = lc($ans);
+      $ans = $yn->{default} unless $ans;
+    }
+    push @opts, $yn->{opt}->{$ans};
+    $cmd->opts(@opts);
+    $cmd->args($arg);
+    $ret |= &$fn($cmd);
+  }
+  exit $ret;
+}
 =head1 NAME
 
 ClearCase::Wrapper::MGi - Marc Girod's contributed cleartool wrapper functions
@@ -518,10 +562,10 @@ sub lsgenealogy {
     }
     $ele =~ s%\\%/%g;
     $ver =~ s%\\%/%g;
-    my %gen = parsevtree($ele, $opt{obsolete}, $ver);
-    setdepths($ver, 0, \%gen);
+    my %gen = _Parsevtree($ele, $opt{obsolete}, $ver);
+    _Setdepths($ver, 0, \%gen);
     my %seen = ();
-    printparents($ver, \%gen, \%seen, 0);
+    _Printparents($ver, \%gen, \%seen, 0);
   }
   exit 0;
 }
@@ -580,7 +624,7 @@ sub checkout {
     map { $_ = glob($_) } @args;
     $co->args(@args);
   }
-  preemptcmt($co, \&_mkbco);
+  _Preemptcmt($co, \&_Mkbco);
 }
 
 =item * MKBRANCH
@@ -627,7 +671,7 @@ sub mkbranch {
   $mkbranch->args(@args);
   $mkbranch->{bt} = $bt;
   $mkbranch->{ver} = $ver;
-  preemptcmt($mkbranch, \&_mkbco);
+  _Preemptcmt($mkbranch, \&_Mkbco);
 }
 
 =item * DIFF
@@ -671,7 +715,7 @@ sub diff {
     $ele =~ s%\\%/%g;
     $ver =~ s%\\%/%g;
     my $bra = $1 if $ver =~ m%^(.*?)/(?:\d+|CHECKEDOUT)$%;
-    my %gen = parsevtree($ele, 1, $ver);
+    my %gen = _Parsevtree($ele, 1, $ver);
     my $p = $gen{$ver}{'parents'};
     my ($brp) = grep { m%^$bra/\d+$% } @{$p};
     $ver = $ele if $ver =~ m%/CHECKEDOUT$%;
@@ -696,24 +740,26 @@ sub uncheckout {
   }
   ClearCase::Argv->ipc(1) unless ClearCase::Argv->ctcmd(1);
   my $unco = ClearCase::Argv->new(@ARGV);
-  $unco->parse(qw(keep rm cact cwork));
+  $unco->parse(qw(keep|rm cact cwork));
   $unco->optset('IGNORE');
   $unco->parseIGNORE(qw(c|cfile=s cquery|cqeach nc));
   $unco->args(sort {$b cmp $a} AutoCheckedOut($opt{ok}, $unco->args));
-  $ct = ClearCase::Argv->new({autochomp=>1});
-  my @b0 = grep { m%[\\/]CHECKEDOUT$% }
-    $ct->argv(qw(ls -s -d), $unco->args)->qx;
-  my $rc = $unco->system;
-  map { s%^(.*)[\\/]CHECKEDOUT$%$1% } @b0;
-  my @rm = ();
-  for my $d (@b0) {
-    opendir BR, $d or next;
-    my @f = grep !/\.\.?/, readdir BR;
-    closedir BR;
-    push @rm, $d if (scalar @f == 2) and $f[0] eq '0' and $f[1] eq 'LATEST';
+  if ($unco->flag('keep')) {
+    _Unco($unco);
+  } else {
+    my %kr = (yes => '-keep', no => '-rm');
+    my %yn = (
+      format   => q(Save private copy of "%s"?  [yes] ),
+      default  => q(yes),
+      valid    => qr/yes|no/,
+      instruct => "Please answer with one of the following: yes, no\n",
+      opt      => \%kr,
+    );
+    my $lsco = ClearCase::Argv->lsco([qw(-cview -s)]);
+    $lsco->stderr(1);
+    my $err = 'Unable to find checked out version for ';
+    _Yesno($unco, \&_Unco, \%yn, $lsco, $err);
   }
-  $ct->argv(qw(rmbranch -f), @rm)->system if @rm;
-  exit $rc;
 }
 
 =item * MKLBTYPE
@@ -783,17 +829,7 @@ property.
 
 =cut
 
-sub _foo($@) {
-  my ($foo, @cmt) = @_;
-  print "foo ", join(' ', @cmt, $foo->opts, $foo->args), "\n";
-  return 0;
-}
-sub foo {
-  my $foo = ClearCase::Argv->new(@ARGV);
-  $foo->parse(qw(cquery|cqeach nc c|cfile=s));
-  my @cmt = preemptcmt($foo, \&_foo);
-}
-sub _mklbtype {
+sub _Mklbtype {
   my ($ntype, @cmt) = @_;
   my $rep;
   GetOptions('replace' => \$rep);
@@ -824,7 +860,7 @@ sub _mklbtype {
       if grep !/@/, @args;
     die  Msg('E', qq(Unable to determine VOB for pathname ".".\n))
       unless @vob;
-    ensuretypes(@vob);
+    _Ensuretypes(@vob);
     if ($rep) {
       @args = grep { $ct->argv(qw(des -fmt), '%Xn', "lbtype:$_")->qx } @args;
       exit 1 unless @args;
@@ -844,7 +880,7 @@ sub _mklbtype {
 	    $pair{"$1$2"} = "${1}_1.00$2";
 	  }
 	}
-	findfreeinc(\%pair);
+	_Findfreeinc(\%pair);
 	$ntype->args(values %pair);
 	$ntype->opts(@cmt, $ntype->opts);
 	$ntype->system;
@@ -868,7 +904,7 @@ sub _mklbtype {
 	    $pair{$_} = "${1}_1.00" . ($2? $2:'');
 	  }
 	}
-	findfreeinc(\%pair);
+	_Findfreeinc(\%pair);
 	my @opts = $ntype->opts();
 	$ntype->args(values %pair);
 	$ntype->opts(@cmt, @opts);
@@ -945,7 +981,7 @@ sub mklbtype {
 		   pbranch|shared gt|ge|lt|le|enum|default|vtype=s
 		   cquery|cqeach nc c|cfile=s));
   $ntype->{fopts} = \%opt;
-  preemptcmt($ntype, \&_mklbtype);
+  _Preemptcmt($ntype, \&_Mklbtype);
 }
 
 =item * LOCK
