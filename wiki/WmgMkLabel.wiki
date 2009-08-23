@@ -21,4 +21,3 @@ In addition, we retain the _-up_ extension from !ClearCase::Wrapper::DSB, which 
   * The _-con_ option should of course be supported.
   * This forces to work on global types. Note that these ones do not necessarily imply using an admin vob: one may use _cptype_ to maintain hyperlinks.
   * One other case is getting the list of versions as a file, or from a pipe, e.g. supporting Audited Objects? Performance may become an issue (running _des -s vob:xxx_ on every argument...)
-  * An issue with the existing _-over_ seems however more urgent.
