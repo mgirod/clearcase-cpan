@@ -8,9 +8,7 @@ Command supported by [CcWrapMgi ClearCase::Wrapper::MGi]: If the first argument 
 
 In addition, we retain the _-up_ extension from !ClearCase::Wrapper::DSB, which allows to apply labels upwards, to versions needed to access the arguments.
 
-One problem is what to do in case the first application fails.
-  * By default, abort.
-  * Note that it may fail only partly
+  * One problem is what to do in case the first application fails: by default, abort. Note that it may fail only partly
     * One case is this of recursive labeling, in presence of links. In this case, the error reported is that a element was already labeled. The label is not applied a second time (whether on the same or on an other version), but the rest of the elements is labeled. In this case, we ignore the error and move the floating label as well.
     * For this case, I added a _-force_ option...
     * Note that the error may happen with hard links, in which case the versions may differ, so that additional information is needed to decide what to do; but it may also happen with symbolic links, and then, the versions are always the same, so the error is spurious...
