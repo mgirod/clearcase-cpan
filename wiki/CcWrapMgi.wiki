@@ -29,5 +29,7 @@ The code on this site is developed in a _dev_ branch.
     * availability of functionality from !ClearCase::Wrapper:DSB, such as inclusion of config spec components
     * integration of {{{synctree}}} under {{{cleartool}}}, including via the graphical interface.
   * Under work:
+    * interactive input: generalize to avoid all hangs
+    * mklbtype -archive
     * [CwmLockingIssues lock/unlock], using site specific methods when not owning the equivalent or previous types.
-    * [WmgMkLabel mklabel]
+    * [WmgMkLabel mklabel] -con
