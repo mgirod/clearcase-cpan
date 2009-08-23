@@ -28,6 +28,7 @@ sub funlocklt($$) {
   $vob = winpath2ux($vob);
   my($out, $err, $ret) = ssh()->cmd(
     "$exec '$flk --unlock --vob $vob --lbtype $lt' $view");
+  print STDERR join("\n", grep(/^cleartool:/, split /\n/, $err), '') if $err;
   print $out if $out;
   return $ret;
 }
@@ -38,6 +39,7 @@ sub flocklt($$;$$) {
   $cmd .= " --replace" if $rep;
   $cmd .= " --nusers $nusers" if $nusers;
   my($out, $err, $ret) = ssh()->cmd("$exec '$cmd --lbtype $lt' $view");
+  print STDERR join("\n", grep(/^cleartool:/, split /\n/, $err), '') if $err;
   print $out if $out;
   return $ret;
 }
