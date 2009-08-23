@@ -11,7 +11,7 @@ Several distinct problems interfere with the code:
   * differences in behaviour between unix and Windows (Note that they affect !CtCmd as well)
 
 = Details =
-  * The MGi wrapper attempts now to preempt the user interactions, and thus to avoid the problem. It does this for now only for comments, and with {{{mklbtype}}}. It will now be extended to the other commands, and to the other interactions (see below: no real fix was found at the ClearCase::Argv level; however, wrappers may handle them all).
+  * The MGi wrapper attempts now to preempt the user interactions, and thus to avoid the problem. It does this for now only for comments, and with {{{mklbtype}}}. It will now be extended to the other commands, and to the other interactions (see below: no real fix was found at the !ClearCase::Argv level; however, wrappers may handle them all).
   * There will however remain for a later phase niceties such saving comments from co to ci, or as a default to later commands ; or maybe a '!' termination instead of '.', in order to break interactive looping and use the same values for the remainder of the arguments.
 
 Otherwise, at the level of infrastructure:
