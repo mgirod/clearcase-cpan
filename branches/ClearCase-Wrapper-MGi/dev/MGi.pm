@@ -1,6 +1,6 @@
 package ClearCase::Wrapper::MGi;
 
-$VERSION = '0.12';
+$VERSION = '0.13';
 
 use warnings;
 use strict;
@@ -483,6 +483,22 @@ sub _Yesno {
   }
   exit $ret;
 }
+sub _FindOver {
+  my ($mod, $base, $query) = @_;
+  my @d = $ct->argv('find', $base, qw(-type d -ver),
+		    $query, '-print')->stderr(0)->qx;
+  my @f = $ct->argv('find', $base, qw(-type f -ver),
+		    $query, '-print')->stderr(0)->qx;
+  my $e = $base;
+  $e =~ s/@.*$//;
+  if (my ($v) = grep /^$e@/, @d, @f) {
+    map { s%^$e/%$v/% } @d, @f;
+  }
+  @d = grep { !/^$base$/ } @d; #already recorded if relevant
+  push @{$mod}, @d, @f;
+  _FindOver($mod, $_, $query) for @d;
+}
+
 =head1 NAME
 
 ClearCase::Wrapper::MGi - Marc Girod's contributed cleartool wrapper functions
@@ -745,7 +761,7 @@ sub uncheckout {
   $unco->parseIGNORE(qw(c|cfile=s cquery|cqeach nc));
   $unco->args(sort {$b cmp $a} AutoCheckedOut($opt{ok}, $unco->args));
   if ($unco->flag('keep')) {
-    _Unco($unco);
+    exit _Unco($unco);
   } else {
     my %kr = (yes => '-keep', no => '-rm');
     my %yn = (
@@ -831,8 +847,7 @@ property.
 
 sub _Mklbtype {
   my ($ntype, @cmt) = @_;
-  my $rep;
-  GetOptions('replace' => \$rep);
+  my $rep = $ntype->{rep};
   $ct = ClearCase::Argv->new({autochomp=>1});
   my @args = $ntype->args;
   my %opt = %{$ntype->{fopts}};
@@ -968,8 +983,9 @@ sub _Mklbtype {
   }
 }
 sub mklbtype {
-  my %opt;
+  my (%opt, $rep);
   GetOptions(\%opt, qw(family increment archive));
+  GetOptions('replace' => \$rep);
   return if !%opt and grep /^-(ord|glo)/, @ARGV;
   die Msg('E', 'Incompatible options: family increment archive')
     if keys %opt > 1;
@@ -981,6 +997,7 @@ sub mklbtype {
 		   pbranch|shared gt|ge|lt|le|enum|default|vtype=s
 		   cquery|cqeach nc c|cfile=s));
   $ntype->{fopts} = \%opt;
+  $ntype->{rep} = $rep;
   _Preemptcmt($ntype, \&_Mklbtype);
 }
 
@@ -1043,8 +1060,13 @@ sub lock {
 	     (!$currlock or $opt{iflocked}) or $lock->flag('replace')) {
     $lock->opts($lock->opts, '-nusers', ($nusers or $opt{allow}));
   }
-  $lock->opts($lock->opts, '-replace')
-    if ($opt{allow} or $opt{deny}) and $currlock and !$lock->flag('replace');
+  if ($currlock and !$lock->flag('replace')) {
+    if ($opt{allow} or $opt{deny}) {
+      $lock->opts($lock->opts, '-replace')
+    } else {
+      die Msg('E', 'Object is already locked.');
+    }
+  }
   my @args = $lock->args;
   $ct = ClearCase::Argv->new({autochomp=>1});
   my (@lbt, @oth, %vob);
@@ -1084,18 +1106,23 @@ sub lock {
   my ($fl, $loaded) = $ENV{FORCELOCK};
   for my $lt (@lbt) {
     my $v = $vob{$lt};
-    if ($lock->args("lbtype:$lt\@$v")->stderr(0)->system) {
+    my @out = $lock->args("lbtype:$lt\@$v")->stderr(1)->qx;
+    if (grep /^cleartool: Error/, @out) {
       if ($fl and !$loaded) {
 	my $fn = $fl; $fn =~ s%::%/%g; $fn .= '.pm';
 	require $fn;
 	$fl->import;
 	$loaded = 1;
       }
-      if (!$fl or flocklt($lt, $v, $lock->flag('replace'),
-			  ($nusers or $opt{allow}))) {
-	warn Msg('E', "Could not lock lbtype:$lt\@$v");
+      if (!$fl) {
+	print @out;
+	$rc = 1;
+      } elsif (flocklt($lt, $v, $lock->flag('replace'),
+		       ($nusers or $opt{allow}))) {
 	$rc = 1;
       }
+    } else {
+      print @out;
     }
   }
   exit $rc;
@@ -1144,17 +1171,22 @@ sub unlock() {
   for my $lt (@lbt) {
     my $v = $vob{$lt};
     if ($ct->argv(qw(lslock -s), "lbtype:$lt\@$v")->qx) {
-      if ($unlock->args("lbtype:$lt\@$v")->stderr(0)->system) {
+      my @out = $unlock->args("lbtype:$lt\@$v")->stderr(1)->qx;
+      if (grep /^cleartool: Error/, @out) {
 	if ($fl and !$loaded) {
 	  my $fn = $fl; $fn =~ s%::%/%g; $fn .= '.pm';
 	  require $fn;
 	  $fl->import;
 	  $loaded = 1;
 	}
-	if (!$fl or funlocklt($lt, $v)) {
-	  warn Msg('E', "Could not unlock lbtype:$lt\@$v");
+	if (!$fl) {
+	  print @out;
+	  $rc = 1;
+	} elsif	(funlocklt($lt, $v)) {
 	  $rc = 1;
 	}
+      } else {
+	print @out;
       }
     } else {
       warn Msg('E', 'Object is not locked.');
@@ -1213,12 +1245,24 @@ sub mklabel {
   $ct = ClearCase::Argv->new({autochomp=>1});
   my $fail = $ct->clone({autofail=>1});
   $fail->argv(qw(des -s), @elems)->stdout(0)->system;
+  my (%vb, @lt);
+  for my $e (@elems) {
+    my $v = $ct->argv(qw(des -s), "vob:$e")->stderr(0)->qx;
+    $vb{$v}++ if $v;
+  }
+  if ($lbtype =~ /@/) {
+    push @lt, $lbtype;
+  } else {
+    push @lt, "$lbtype\@$_" for keys %vb;
+  }
   my @et = grep s/^-> lbtype:(.*)@.*$/$1/,
-    $ct->argv(qw(des -s -ahl), $eqhl, "lbtype:$lbtype")->qx;
+    map { $ct->argv(qw(des -s -ahl), $eqhl, "lbtype:$_")->qx } @lt;
   return 0 unless $opt{up} or $opt{over} or @et;
-  die Msg('E',
-	  "Lock on label type \"$lbtype\" prevents operation \"make label\"")
-    if $ct->argv(qw(lslock -s),"lbtype:$lbtype")->stderr(0)->qx;
+  die Msg('E', "Only one vob supported for family types") if @et > 1;
+  map {
+    die Msg('E', qq(Lock on label type "$_" prevents operation "make label"))
+      if $ct->argv(qw(lslock -s),"lbtype:$_")->stderr(0)->qx
+    } @lt;
   my ($ret, @rec, @mod) = 0;
   if (grep /^-r(ec|$)/, @opt) {
     if (@et) {
@@ -1249,7 +1293,8 @@ sub mklabel {
     }
     my $query = $lb? "lbtype($t)" : "version(.../$t/LATEST)";
     $query .= " \&\&! lbtype($lbtype)";
-    @mod = $ct->argv('find', $ver, '-ver', $query, '-print')->stderr(0)->qx;
+    $ver =~ s/@.*//; # if fully qualified, won't get recorded
+    _FindOver(\@mod, $ver, $query);
   }
   $mkl->opts(grep !/^-r(ec|$)/, @opt); # recurse handled already
   @opt = $mkl->opts;

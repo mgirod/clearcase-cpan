@@ -70,3 +70,9 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- forcelock: sudo based solution (contributed: Tatyana Shpichko)
 	- uncheckout: interactive negociation of -rm/-keep options
 	- hidden intenral function: renaming according to convention
+
+0.13 Sun Aug 23 17:23:09 GMTDT 2009
+        - lock/unlock: preserve original error message in case of failure
+	- unco: exit after running, do not fall back to default behaviour
+	- mklabel: argument in remote vob; and recursive find with -over
+	- mklbtype: fix to Label type not found: "-rep"
