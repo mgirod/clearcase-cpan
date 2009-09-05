@@ -30,7 +30,7 @@ use AutoLoader 'AUTOLOAD';
   $lsgenealogy =
     "$z [-short] [-all] [-obsolete] [-depth gen-depth] pname ...";
   $mklbtype = "\n* [-family] [-increment] [-archive] pname ...";
-  $mklabel	= "\n* [-up] [-force] [-over type]";
+  $mklabel	= "\n* [-up] [-force] [-over type [-all]]";
 }
 
 #############################################################################
@@ -482,21 +482,6 @@ sub _Yesno {
     $ret |= &$fn($cmd);
   }
   exit $ret;
-}
-sub _FindOver {
-  my ($mod, $base, $query) = @_;
-  my @d = $ct->argv('find', $base, qw(-type d -ver),
-		    $query, '-print')->stderr(0)->qx;
-  my @f = $ct->argv('find', $base, qw(-type f -ver),
-		    $query, '-print')->stderr(0)->qx;
-  my $e = $base;
-  $e =~ s/@.*$//;
-  if (my ($v) = grep /^$e@/, @d, @f) {
-    map { s%^$e/%$v/% } @d, @f;
-  }
-  @d = grep { !/^$base$/ } @d; #already recorded if relevant
-  push @{$mod}, @d, @f;
-  _FindOver($mod, $_, $query) for @d;
 }
 
 =head1 NAME
@@ -1220,6 +1205,12 @@ the labels will be applied over the result of a find command run on the
 unique version argument, and looking for versions matching respectively
 B<lbtype(xxx)> or <version(.../xxx/LATEST)> queries, and B<!lbtype(lb)> (with
 I<xxx> the B<-over>, and I<lb> the main label type parameter.
+Internally B<-over> performs a B<find>. This one depends by default on the
+current config spec, with the result that it is not guaranteed to reach all
+the versions specified, at least in the first pass. One may thus use an B<-all>
+option which will be passed to the B<find>.
+The B<-over> option doesn't require an element argument (default: current
+directory). With the B<-all> option, it uses one if given, as a filter.
 
 =cut
 
@@ -1227,12 +1218,14 @@ sub mklabel {
   use warnings;
   use strict;
   my %opt;
-  GetOptions(\%opt, qw(up force over=s));
+  GetOptions(\%opt, qw(up force over=s all));
   ClearCase::Argv->ipc(1);
   my $mkl = ClearCase::Argv->new(@ARGV);
   $mkl->parse(qw(replace|recurse|ci|cq|nc
 		 version|c|cfile|select|type|name|config=s));
   my @opt = $mkl->opts();
+  die Msg('E', 'all is only supported in conjunction with over')
+    if $opt{all} and !$opt{over};
   die Msg('E', 'Incompatible flags: up and config')
     if $opt{up} and grep /^-con/, @opt;
   die Msg('E', 'Incompatible flags: recurse and over')
@@ -1243,8 +1236,6 @@ sub mklabel {
     if $opt{over} and scalar @elems > 1;
   $lbtype =~ s/^lbtype://;
   $ct = ClearCase::Argv->new({autochomp=>1});
-  my $fail = $ct->clone({autofail=>1});
-  $fail->argv(qw(des -s), @elems)->stdout(0)->system;
   my (%vb, @lt);
   for my $e (@elems) {
     my $v = $ct->argv(qw(des -s), "vob:$e")->stderr(0)->qx;
@@ -1258,6 +1249,9 @@ sub mklabel {
   my @et = grep s/^-> lbtype:(.*)@.*$/$1/,
     map { $ct->argv(qw(des -s -ahl), $eqhl, "lbtype:$_")->qx } @lt;
   return 0 unless $opt{up} or $opt{over} or @et;
+  my $fail = $ct->clone({autofail=>1});
+  $fail->argv(qw(des -s), @elems)->stdout(0)->system
+    unless $opt{all} and !@elems; #with eq fixed types, one failure fails all
   die Msg('E', "Only one vob supported for family types") if @et > 1;
   map {
     die Msg('E', qq(Lock on label type "$_" prevents operation "make label"))
@@ -1275,7 +1269,8 @@ sub mklabel {
     my ($t, $ver, $lb) = ($opt{over}, $elems[0]);
     die Msg('E', 'The -over flag requires a local type argument')
       if !$t or $t =~ /\@/;
-    my $vob = $fail->argv(qw(des -s), "vob:$ver")->qx;
+    my $base = $ver || '.';
+    my $vob = $fail->argv(qw(des -s), "vob:$base")->qx;
     if ($t =~ /lbtype:(.*)$/) {
       $t = $1; $lb = 1;
       die unless $ct->argv(qw(des -s), "lbtype:$t\@$vob")->qx;
@@ -1293,8 +1288,13 @@ sub mklabel {
     }
     my $query = $lb? "lbtype($t)" : "version(.../$t/LATEST)";
     $query .= " \&\&! lbtype($lbtype)";
-    $ver =~ s/@.*//; # if fully qualified, won't get recorded
-    _FindOver(\@mod, $ver, $query);
+    $base = '-a' if $opt{all};
+    @mod = $ct->argv('find', $base, '-ver', $query, '-print')->stderr(0)->qx;
+    if ($opt{all} and $ver) {
+      use File::Spec::Functions qw(rel2abs);
+      $ver = rel2abs($ver);
+      @mod = grep /^${ver}(\W|$)/, @mod;
+    }
   }
   $mkl->opts(grep !/^-r(ec|$)/, @opt); # recurse handled already
   @opt = $mkl->opts;
