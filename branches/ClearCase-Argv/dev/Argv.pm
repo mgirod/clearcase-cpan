@@ -125,7 +125,7 @@ sub system {
 	    my @ret = $self->SUPER::qv(@rargs);
 	    $self->unixpath(@ret);
 	    print join("", @ret), "\n" if @ret;
-	    return;
+	    return $?;
 	} else {
 	    return $self->SUPER::system(@rargs);
 	}

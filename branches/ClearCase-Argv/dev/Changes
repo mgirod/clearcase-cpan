@@ -328,8 +328,9 @@ Revision history for Perl extension ClearCase::Argv.
 	- cygwin: support for mounting views under /view
 	- ALL CHANGES FROM 1.41 THROUGH HERE CONTRIBUTED BY Marc Girod.
 
-1.47 Wed Jul 29 18:48:04 GMTDT 2009
+1.47 Tue Sep  8 19:15:05 GMTDT 2009
         - cygwin: convert vob:/path input arguments
+	- cygwin: return an error code for system
 
 BACKWARD COMPATIBILITY NOTES:
 
