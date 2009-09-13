@@ -599,7 +599,7 @@ sub _ipc_cmd {
 
     # Send the command to cleartool.
     my $cmd = join(' ', map {
-        m%\s|[\[\]*"'?]% ? (m%'% ? (m%"% ? $_ : qq("$_")) : qq('$_')) : $_
+        m%^$|\s|[\[\]*"'?]% ? (m%'% ? (m%"% ? $_ : qq("$_")) : qq('$_')) : $_
     } @cmd);
     # Handle verbosity.
     my $dbg = $self->dbglevel;
