@@ -71,8 +71,9 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- uncheckout: interactive negociation of -rm/-keep options
 	- hidden internal function: renaming according to convention
 
-0.13 Sat Sep  5 17:25:25 GMTDT 2009
+0.13 Tue Sep  8 19:32:27 GMTDT 2009
         - lock/unlock: preserve original error message in case of failure
 	- unco: exit after running, do not fall back to default behaviour
 	- mklabel: argument in remote vob; and -all option with -over
 	- mklbtype: fix to Label type not found: "-rep"
+	- ci in user interactions preempting mode
