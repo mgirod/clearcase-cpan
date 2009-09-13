@@ -30,13 +30,15 @@ use AutoLoader 'AUTOLOAD';
   $lsgenealogy =
     "$z [-short] [-all] [-obsolete] [-depth gen-depth] pname ...";
   $mklbtype = "\n* [-family] [-increment] [-archive] pname ...";
-  $mklabel	= "\n* [-up] [-force] [-over type [-all]]";
+  $mklabel = "\n* [-up] [-force] [-over type [-all]]";
+  $checkin = "\n* [-dir|-rec|-all|-avobs] [-ok] [-diff [diff-opts]] [-revert]";
 }
 
 #############################################################################
 # Command Aliases
 #############################################################################
 *co             = *checkout;
+*ci		= *checkin;
 *lsgen		= *lsgenealogy;
 *unco           = *uncheckout;
 
@@ -341,7 +343,7 @@ sub _Findfreeinc($) {	   # on input, the values may or may not exist
 }
 sub _Preemptcmt { #return the comments apart: e.g. mklbtype needs discrimination
   use File::Temp qw(tempfile);
-  my ($cmd, $fn) = @_; #already parsed, 3 groups: cquery|cqeach nc c|cfile=s
+  my ($cmd, $fn, $tst) = @_; #parsed, 3 groups: cquery|cqeach nc c|cfile=s
   use warnings;
   use strict;
   my @opts = $cmd->opts;
@@ -412,11 +414,19 @@ sub _Preemptcmt { #return the comments apart: e.g. mklbtype needs discrimination
     while ($go) {
       if ($cqe) {
 	my $arg = shift @arg;
-	$cmd->args($arg);
 	$go = scalar @arg;
+	if ($tst and !$tst->{test}->args($arg)->qx) {
+	  warn Msg('E', $tst->{error} . $arg . "\n");
+	  next;
+	}
+	$cmd->args($arg);
 	print qq(Comments for "$arg":\n);
       } else {
 	$go = 0;
+	if ($tst and !$tst->{test}->args(@arg)->qx) { #None checked out
+	  warn Msg('E', $tst->{error} . join(', ', @arg) . "\n");
+	  last;
+	}
 	print "Comment for all listed objects:\n";
       }
       my $cmt = '';
@@ -463,10 +473,12 @@ sub _Yesno {
   my $ret = 0;
   my @opts = $cmd->opts;
   for my $arg ($cmd->args) {
-    my $res = $test->args($arg)->qx;
-    if (!$res or $res =~ /^cleartool: Error:/) {
-      warn ($res or Msg('E', $errmsg . $arg . "\n"));
-      next;
+    if ($test) {
+      my $res = $test->args($arg)->qx;
+      if (!$res or $res =~ /^cleartool: Error:/) {
+	warn ($res or Msg('E', $errmsg . $arg . "\n"));
+	next;
+      }
     }
     printf $yn->{format}, $arg;
     my $ans = <STDIN>; chomp $ans; $ans = lc($ans);
@@ -483,6 +495,56 @@ sub _Yesno {
   }
   exit $ret;
 }
+sub _Ci1 { #_Checkin1 gets truncated by AutoSplit
+  use strict;
+  use warnings;
+  my $ci = shift;
+  my @elems = $ci->args;
+  my $opt = $ci->{opthashre};
+  # Unless -diff or -revert in use, we're done.
+  return $ci->system unless $opt->{diff} || $opt->{revert};
+  # Make sure the -pred flag is there as we're going one at a time.
+  my $diff = $ci->clone->prog('diff');
+  $diff->optsDIFF(qw(-pred -serial), $diff->optsDIFF);
+  # Without -diff we only care about return code
+  $diff->stdout(0) unless $opt->{diff};
+  # With -revert, suppress msgs from typemgrs that don't do diffs
+  $diff->stderr(0) if $opt->{revert};
+  # Now process each element, diffing and then either ci-ing or unco-ing.
+  my $rc = 0;
+  for my $elem (@elems) {
+    my $chng = $diff->args($elem)->system('DIFF');
+    if ($opt->{revert} && !$chng) {
+      # If -revert and no changes, unco instead of checkin
+      $rc |= ClearCase::Argv->unco(['-rm'], $elem)->system;
+    } else {
+      $rc |= $ci->args($elem)->system;
+    }
+  }
+  return $rc;
+}
+sub _Checkin {
+  use strict;
+  use warnings;
+  my ($ci, @cmt) = @_;
+  $ci->opts($ci->opts, @cmt);
+  if ($ci->flag('from') and !$ci->flag('keep')) {
+    my %kr = (yes => '-keep', no => '-rm');
+    my %yn = (
+      format   => q(Save private copy of "%s"?  [yes] ),
+      default  => q(yes),
+      valid    => qr/yes|no/,
+      instruct => "Please answer with one of the following: yes, no\n",
+      opt      => \%kr,
+    );
+    my $lsco = ClearCase::Argv->lsco([qw(-cview -s)]);
+    $lsco->stderr(1);
+    my $err = 'Unable to find checked out version for ';
+    _Yesno($ci, \&_Ci1, \%yn, $lsco, $err); #only one arg: may exit
+  } else {
+    return _Ci1($ci);
+  }
+}
 
 =head1 NAME
 
@@ -496,7 +558,7 @@ David Boyce) for more details.
 
 =head1 CLEARTOOL EXTENSIONS
 
-=over 9
+=over 10
 
 =item * LSGENEALOGY
 
@@ -1344,6 +1406,85 @@ sub mklabel {
   $mkl->opts(@opt);
   $ret |= $mkl->args($lbtype, @mod)->system;
   exit $ret;
+}
+
+=item * CI/CHECKIN
+
+Extended to handle the B<-dir/-rec/-all/-avobs> flags. These are fairly
+self-explanatory but for the record B<-dir> checks in all checkouts in
+the current directory, B<-rec> does the same but recursively down from
+the current directory, B<-all> operates on all checkouts in the current
+VOB, and B<-avobs> on all checkouts in any VOB.
+
+Extended to allow B<symbolic links> to be checked in (by operating on
+the target of the link instead).
+
+Extended to implement a B<-diff> flag, which runs a B<I<diff -pred>>
+command before each checkin so the user can review his/her changes
+before typing the comment.
+
+Implements a new B<-revert> flag. This causes identical (unchanged)
+elements to be unchecked-out instead of being checked in.
+
+Since checkin is such a common operation, a special fature is supported
+to save typing: an unadorned I<ci> cmd is C<promoted> to I<ci -dir -me
+-diff -revert>. In other words typing I<ct ci> will step through each
+file checked out by you in the current directory and view,
+automatically undoing the checkout if no changes have been made and
+showing diffs followed by a checkin-comment prompt otherwise.
+
+[ From David Boyce's ClearCase::Wrapper. Adapted to user interactions
+preempting. ]
+
+=cut
+
+sub checkin {
+  use strict;
+  use warnings;
+  # Allows 'ct ci' to be shorthand for 'ct ci -me -diff -revert -dir'.
+  push(@ARGV, qw(-me -diff -revert -dir)) if grep(!/^-pti/, @ARGV) == 1;
+  # -re999 isn't a real flag, it's to disambiguate -rec from -rev. Id. -cr999.
+  my %opt;
+  GetOptions(\%opt, qw(crnum=s cr999=s diff ok revert re999))
+    if grep /^-(crn|dif|ok|rev)/, @ARGV;
+  ClearCase::Argv->ipc(1);
+  # This is a hidden flag to support DB's checkin_post trigger.
+  # It allows the bug number to be supplied as a cmdline option.
+  $ENV{CRNUM} = $opt{crnum} if $opt{crnum};
+  my $ci = ClearCase::Argv->new(@ARGV);
+  # Parse checkin and (potential) diff flags into different optsets.
+  $ci->parse(qw(cquery|cqeach nc c|cfile=s
+		nwarn|cr|ptime|identical|cact|cwork keep|rm from=s));
+  if ($opt{'diff'} || $opt{revert}) {
+    $ci->optset('DIFF');
+    $ci->parseDIFF(qw(serial_format|diff_format|window columns|options=s
+		      graphical|tiny|hstack|vstack|predecessor));
+  }
+  # Now do auto-aggregation on the remaining args.
+  my @elems = AutoCheckedOut($opt{ok}, $ci->args); # may exit
+  # Turn symbolic links into their targets so CC will "do the right thing".
+  for (@elems) {
+    $_ = readlink if -l && defined readlink;
+  }
+  $ci->args(@elems);
+  # Give a warning if the file is open for editing by vim.
+  # (DB knows, there are lots of other editors but it just happens
+  # to be easy to detect vim by its .swp file)
+  for (@elems) {
+    die Msg('E', "$_: appears to be open in vim!") if -f ".$_.swp";
+  }
+  if ($opt{diff} or $opt{revert}) {
+    # In case ~/.clearcase_profile makes ci -nc the default, make sure
+    # we prompt for a comment - unless checking in dirs only.
+    if (!grep(/^-c|^-nc$/, $ci->opts) && grep(-f, @elems)) {
+      $ci->opts('-cqe', $ci->opts);
+      $ci->{AV_LKG}{''}{cquery}=1;
+    }
+  }
+  my %tst = (test  => ClearCase::Argv->lsco([qw(-cview -s)])->stderr(1),
+	     error => 'Unable to find checked out version for ');
+  $ci->{opthashre} = \%opt;
+  _Preemptcmt($ci, \&_Checkin, \%tst);
 }
 
 =back
