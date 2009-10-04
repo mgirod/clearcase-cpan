@@ -576,7 +576,7 @@ sub ipc {
 sub _cw_map {
     use File::Basename;
     map {
-        s%^/cygdrive/([A-Za-z])%$1:%;
+        s%^(vob:)?/cygdrive/([A-Za-z])%$1$2:%;
 	if (m%^(vob:)?/[^/]%) {
 	    no warnings;
 	    if (!s%^(vob:)?/view%$1//view% && -r dirname($_)) {
