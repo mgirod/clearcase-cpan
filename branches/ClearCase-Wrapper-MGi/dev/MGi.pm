@@ -982,12 +982,17 @@ sub _Mklbtype {
 	} keys %pair;
       } elsif ($opt{increment}) { # increment
 	for my $t (@args) {
-	  die
-	    Msg('E',
-		"Lock on label type \"$t\" prevents operation \"make lbtype\"")
-	      if $ct->argv(qw(lslock -s),"lbtype:$t")->stderr(0)->qx;
+	  my $pt = "lbtype:$t";
+	  if (!$ct->argv(qw(des -s), $pt)->stderr(0)->qx) {
+	    warn Msg('E', qq(Label type not found: "$t"));
+	    next;
+	  } elsif ($ct->argv(qw(lslock -s), $pt)->stderr(0)->qx) {
+	    warn Msg('E', qq(Lock on label type "$t" )
+		       . qq(prevents operation "make lbtype"));
+	    next;
+	  }
 	  my ($pair) = grep s/^\s*(.*) -> lbtype:(.*)\@(.*)$/$1,$2,$3/,
-	    $ct->argv(qw(des -l -ahl), $eqhl, "lbtype:$t")->stderr(0)->qx;
+	    $ct->argv(qw(des -l -ahl), $eqhl, $pt)->stderr(0)->qx;
 	  my ($hlk, $prev, $vob) = split ',', $pair if $pair;
 	  next unless $prev;
 	  if ($prev =~ /^(.*)_(\d+)(?:\.(\d+))?$/) {
@@ -1294,12 +1299,13 @@ sub mklabel {
     if $opt{over} and grep /^-r(ec|$)/, @opt;
   die Msg('E', 'Incompatible flags: up and over') if $opt{up} and $opt{over};
   my($lbtype, @elems) = $mkl->args;
-  die Msg('E', "Only one version argument with the over flag: ")
+  die Msg('E', 'Only one version argument with the over flag')
     if $opt{over} and scalar @elems > 1;
+  die Msg('E', 'Label type required') unless $lbtype;
   $lbtype =~ s/^lbtype://;
   $ct = ClearCase::Argv->new({autochomp=>1});
   my (%vb, @lt);
-  for my $e (@elems) {
+  for my $e (@elems or q(.)) {
     my $v = $ct->argv(qw(des -s), "vob:$e")->stderr(0)->qx;
     $vb{$v}++ if $v;
   }
@@ -1308,12 +1314,13 @@ sub mklabel {
   } else {
     push @lt, "$lbtype\@$_" for keys %vb;
   }
+  my @lt1 = @lt;
   my @et = grep s/^-> lbtype:(.*)@.*$/$1/,
-    map { $ct->argv(qw(des -s -ahl), $eqhl, "lbtype:$_")->qx } @lt;
+    map { $ct->argv(qw(des -s -ahl), $eqhl, "lbtype:$_")->qx } @lt1;
   return 0 unless $opt{up} or $opt{over} or @et;
   my $fail = $ct->clone({autofail=>1});
   $fail->argv(qw(des -s), @elems)->stdout(0)->system
-    unless $opt{all} and !@elems; #with eq fixed types, one failure fails all
+    unless $opt{over} and !@elems; #eq fixed => 1 failure fails all
   die Msg('E', "Only one vob supported for family types") if @et > 1;
   map {
     die Msg('E', qq(Lock on label type "$_" prevents operation "make label"))
