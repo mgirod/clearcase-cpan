@@ -341,6 +341,39 @@ sub _Findfreeinc($) {	   # on input, the values may or may not exist
   }
   while (my ($k, $v) = each %n) { $$nxt{$k} = $v }
 }
+sub _PreCi {
+  use strict;
+  use warnings;
+  my ($ci, @arg) = @_;
+  my $lsco = ClearCase::Argv->lsco([qw(-cview -s)])->stderr(1);
+  if (!$lsco->args(@arg)->qx) {
+    warn Msg('E', 'Unable to find checked out version for '
+	       . join(', ', @arg) . "\n");
+    return 0;
+  }
+  my $opt = $ci->{opthashre};
+  return 1 unless $opt->{diff} || $opt->{revert};
+  my $elem = $arg[0]; #Only one because of -cqe
+  # Make sure the -pred flag is there as we're going one at a time.
+  my $diff = $ci->clone->prog('diff');
+  $diff->optsDIFF(qw(-pred -serial), $diff->optsDIFF);
+  # Without -diff we only care about return code
+  $diff->stdout(0) unless $opt->{diff};
+  # With -revert, suppress msgs from typemgrs that don't do diffs
+  $diff->stderr(0) if $opt->{revert};
+  if ($diff->args($elem)->system('DIFF')) {
+    return 1;
+  } else {
+    if ($opt->{revert}) { # unco instead of checkin
+      _Unco(ClearCase::Argv->unco(['-rm'], $elem));
+      return 0;
+    } else { # -diff
+      warn Msg('E', q(By default, won't create version with )
+		 . q(data identical to predecessor.));
+      return 0;
+    }
+  }
+}
 sub _Preemptcmt { #return the comments apart: e.g. mklbtype needs discrimination
   use File::Temp qw(tempfile);
   my ($cmd, $fn, $tst) = @_; #parsed, 3 groups: cquery|cqeach nc c|cfile=s
@@ -415,18 +448,12 @@ sub _Preemptcmt { #return the comments apart: e.g. mklbtype needs discrimination
       if ($cqe) {
 	my $arg = shift @arg;
 	$go = scalar @arg;
-	if ($tst and !$tst->{test}->args($arg)->qx) {
-	  warn Msg('E', $tst->{error} . $arg . "\n");
-	  next;
-	}
+	next if $tst and !&$tst($cmd, $arg);
 	$cmd->args($arg);
 	print qq(Comments for "$arg":\n);
       } else {
 	$go = 0;
-	if ($tst and !$tst->{test}->args(@arg)->qx) { #None checked out
-	  warn Msg('E', $tst->{error} . join(', ', @arg) . "\n");
-	  last;
-	}
+	last if $tst and !&$tst($cmd, @arg); #None checked out
 	print "Comment for all listed objects:\n";
       }
       my $cmt = '';
@@ -495,34 +522,6 @@ sub _Yesno {
   }
   exit $ret;
 }
-sub _Ci1 { #_Checkin1 gets truncated by AutoSplit
-  use strict;
-  use warnings;
-  my $ci = shift;
-  my @elems = $ci->args;
-  my $opt = $ci->{opthashre};
-  # Unless -diff or -revert in use, we're done.
-  return $ci->system unless $opt->{diff} || $opt->{revert};
-  # Make sure the -pred flag is there as we're going one at a time.
-  my $diff = $ci->clone->prog('diff');
-  $diff->optsDIFF(qw(-pred -serial), $diff->optsDIFF);
-  # Without -diff we only care about return code
-  $diff->stdout(0) unless $opt->{diff};
-  # With -revert, suppress msgs from typemgrs that don't do diffs
-  $diff->stderr(0) if $opt->{revert};
-  # Now process each element, diffing and then either ci-ing or unco-ing.
-  my $rc = 0;
-  for my $elem (@elems) {
-    my $chng = $diff->args($elem)->system('DIFF');
-    if ($opt->{revert} && !$chng) {
-      # If -revert and no changes, unco instead of checkin
-      $rc |= ClearCase::Argv->unco(['-rm'], $elem)->system;
-    } else {
-      $rc |= $ci->args($elem)->system;
-    }
-  }
-  return $rc;
-}
 sub _Checkin {
   use strict;
   use warnings;
@@ -540,9 +539,9 @@ sub _Checkin {
     my $lsco = ClearCase::Argv->lsco([qw(-cview -s)]);
     $lsco->stderr(1);
     my $err = 'Unable to find checked out version for ';
-    _Yesno($ci, \&_Ci1, \%yn, $lsco, $err); #only one arg: may exit
+    _Yesno($ci, \&{$ci->system}, \%yn, $lsco, $err); #only one arg: may exit
   } else {
-    return _Ci1($ci);
+    return $ci->system;
   }
 }
 
@@ -1488,10 +1487,8 @@ sub checkin {
       $ci->{AV_LKG}{''}{cquery}=1;
     }
   }
-  my %tst = (test  => ClearCase::Argv->lsco([qw(-cview -s)])->stderr(1),
-	     error => 'Unable to find checked out version for ');
   $ci->{opthashre} = \%opt;
-  _Preemptcmt($ci, \&_Checkin, \%tst);
+  _Preemptcmt($ci, \&_Checkin, \&_PreCi);
 }
 
 =back
