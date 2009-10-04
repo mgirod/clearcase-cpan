@@ -344,6 +344,7 @@ sub unixpath {
         no strict 'subs';
 	for my $line (@_) {
 	    my $nl = chomp $line;
+	    my $bs = $line =~ s/\\$//;
 	    $line =~ s%\r$%%;
 	    my @chars = split//,$line;
 	    my $odd = (((grep/'/,@chars) % 2) || ((grep/"/,@chars) % 2));
@@ -358,6 +359,7 @@ sub unixpath {
 		}
 	    } grep { $_ && m%\S% } @bit;
 	    $line = join '', grep {$_} @bit;
+	    $line .= '\\' if $bs;
 	    $line .= "\n" if $nl;
 	}
     } else {
@@ -572,11 +574,12 @@ sub ipc {
 }
 
 sub _cw_map {
+    use File::Basename;
     map {
         s%^/cygdrive/([A-Za-z])%$1:%;
 	if (m%^(vob:)?/[^/]%) {
 	    no warnings;
-	    if (!s%^(vob:)?/view%$1//view% && -r $_) {
+	    if (!s%^(vob:)?/view%$1//view% && -r dirname($_)) {
 	        $_ = "${cygpfx}$_";
 	    } else {
 	        s%^/%\\%; # case of vob tags
