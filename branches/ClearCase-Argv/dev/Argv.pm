@@ -579,7 +579,7 @@ sub _cw_map {
     for (@_) {
         next if s%^(vob:)?/cygdrive/([A-Za-z])%$1$2:%;
 	next if s%^(vob:)?/view%$1//view%;
-	if (m%^(vob:)?/[^/]%) {
+	if (m%^/[^/]%) {
 	    my $p = dirname $_;
 	    if ($p eq '/') {
 	        s%^/%\\%; # case of vob tags
