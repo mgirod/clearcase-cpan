@@ -576,16 +576,18 @@ sub ipc {
 sub _cw_map {
     use File::Basename;
     no warnings;
-    map {
-        s%^(vob:)?/cygdrive/([A-Za-z])%$1$2:%;
+    for (@_) {
+        next if s%^(vob:)?/cygdrive/([A-Za-z])%$1$2:%;
+	next if s%^(vob:)?/view%$1//view%;
 	if (m%^(vob:)?/[^/]%) {
-	    if (!s%^(vob:)?/view%$1//view% && -r dirname($_)) {
-	        $_ = "${cygpfx}$_";
-	    } else {
+	    my $p = dirname $_;
+	    if ($p eq '/') {
 	        s%^/%\\%; # case of vob tags
+	    } elsif (-r $p) {
+	        $_ = "${cygpfx}$_";
 	    }
 	}
-    } @_;
+    }
 }
 
 sub _cvt_input_cw {
