@@ -518,7 +518,7 @@ sub _Yesno {
     push @opts, $yn->{opt}->{$ans};
     $cmd->opts(@opts);
     $cmd->args($arg);
-    $ret |= &$fn($cmd);
+    $ret |= &{$fn}($cmd);
   }
   exit $ret;
 }
@@ -539,7 +539,8 @@ sub _Checkin {
     my $lsco = ClearCase::Argv->lsco([qw(-cview -s)]);
     $lsco->stderr(1);
     my $err = 'Unable to find checked out version for ';
-    _Yesno($ci, \&{$ci->system}, \%yn, $lsco, $err); #only one arg: may exit
+    my $run = sub { my $ci = shift; $ci->system };
+    _Yesno($ci, $run, \%yn, $lsco, $err); #only one arg: may exit
   } else {
     return $ci->system;
   }
@@ -1304,7 +1305,7 @@ sub mklabel {
   $lbtype =~ s/^lbtype://;
   $ct = ClearCase::Argv->new({autochomp=>1});
   my (%vb, @lt);
-  for my $e (@elems or q(.)) {
+  for my $e (@elems?@elems:qw(.)) {
     my $v = $ct->argv(qw(des -s), "vob:$e")->stderr(0)->qx;
     $vb{$v}++ if $v;
   }
