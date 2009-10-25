@@ -621,6 +621,7 @@ sub _ipc_cmd {
 	delete $self->{IPC}->{COMMENT};
     }
     my $man = ($self->{AV_PROG}->[1] eq 'man'); #Special case: errors ok
+    my $diff = ($self->{AV_PROG}->[1] eq 'diff');
     my $manok; #Some man output already: no complete failure
     # Read back the results and get command status.
     my $rc = 0;
@@ -648,14 +649,14 @@ sub _ipc_cmd {
 	        last if m%^\.$%;
 	    }
 	} elsif (s%^(.*)Command \d+ returned status (\d+)%$1%) {
-	    # Shift the status up so it looks like an exit status.
-	    $rc = $2 << 8;
+	    $rc = $2 unless $rc;
 	    chomp;
 	    $_ ? $last = 1 : last;
 	} elsif (!$manok && $man) {
 	    $manok = 1;
 	}
 	print '+ <=', $_ if $_ && $dbg >= 2;
+	$rc = 1 if $diff and !/^Files are identical/;
 	next if $next;
 	$self->unixpath($_) if CYGWIN;
 	if ($stdout || ($err && $stderr)) {
