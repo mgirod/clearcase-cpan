@@ -77,3 +77,6 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- mklabel: argument in remote vob; and -all option with -over
 	- mklbtype: fix to Label type not found: "-rep"; error report
 	- ci in user interactions preempting mode
+
+0.14 Mon Oct 26 18:42:46 GMTST 2009
+        - co: die if no element

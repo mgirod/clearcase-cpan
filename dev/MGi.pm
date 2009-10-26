@@ -1,6 +1,6 @@
 package ClearCase::Wrapper::MGi;
 
-$VERSION = '0.13';
+$VERSION = '0.14';
 
 use warnings;
 use strict;
@@ -219,6 +219,7 @@ sub _Mkbco {
     $cmd->opts(@opts);
     return $cmd->system;
   }
+  die Msg('E', 'Element pathname required.') unless $cmd->args;
   foreach my $e ($cmd->args) {
     my $ver = $cmd->{ver};
     my $typ = $ct->argv(qw(des -fmt %m), $e)->qx;
