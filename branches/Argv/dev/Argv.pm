@@ -1,6 +1,6 @@
 package Argv;
 
-$VERSION = '1.24';
+$VERSION = '1.25';
 @ISA = qw(Exporter);
 
 use constant MSWIN => $^O =~ /MSWin32|Windows_NT/i ? 1 : 0;
@@ -574,6 +574,7 @@ sub quote {
 	    $_ = qq(\\"$1\\") if MSWIN;
 	    next;
 	} elsif (m%^".*"$%s) {
+	    $_ = qq(\\"$_\\") if MSWIN;
 	    next;
 	}
 	# Skip if contains no special chars.
