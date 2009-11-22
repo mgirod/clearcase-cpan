@@ -504,7 +504,7 @@ sub _Yesno {
     if ($test) {
       my $res = $test->args($arg)->qx;
       if (!$res or $res =~ /^cleartool: Error:/) {
-	warn ($res or Msg('E', $errmsg . $arg . "\n"));
+	warn ($res or Msg('E', $errmsg . '"' . $arg . "\".\n"));
 	next;
       }
     }
@@ -516,10 +516,14 @@ sub _Yesno {
       $ans = <STDIN>; chomp $ans; $ans = lc($ans);
       $ans = $yn->{default} unless $ans;
     }
-    push @opts, $yn->{opt}->{$ans};
-    $cmd->opts(@opts);
-    $cmd->args($arg);
-    $ret |= &{$fn}($cmd);
+    if ($yn->{opt}->{$ans}) {
+      push @opts, $yn->{opt}->{$ans};
+      $cmd->opts(@opts);
+      $cmd->args($arg);
+      $ret |= &{$fn}($cmd);
+    } else {
+      $ret = 1;
+    }
   }
   exit $ret;
 }
@@ -1491,6 +1495,40 @@ sub checkin {
   }
   $ci->{opthashre} = \%opt;
   _Preemptcmt($ci, \&_Checkin, \&_PreCi);
+}
+
+=item * RMBRANCH
+
+No semantic change. This implementation is only needed to handle the
+optional interactive dialog in the context of the ipc mode of the
+underlying I<ClearCase::Argv>, to work around a bug in I<cleartool status>.
+
+=cut
+
+sub rmbranch {
+  use strict;
+  use warnings;
+  ClearCase::Argv->ipc(1);
+  my $rmbranch = ClearCase::Argv->new(@ARGV);
+  $rmbranch->parse(qw(cquery|cqeach nc c|cfile=s force));
+  if ($rmbranch->flag('force')) {
+    exit $rmbranch->system;
+  } else {
+    my %forceorabort = (yes => '-force');
+    my %yn = (
+      format   =>
+	q(Remove branch, all its sub-branches and sub-versions? [no] ),
+      default  => q(no),
+      valid    => qr/yes|no/,
+      instruct => "Please answer with one of the following: yes, no\n",
+      opt      => \%forceorabort,
+    );
+    my $exists = ClearCase::Argv->des([qw(-s)]);
+    $exists->stderr(1);
+    my $err = q(Pathname not found: );
+    my $run = sub { my $rmbranch = shift; $rmbranch->system };
+    _Yesno($rmbranch, $run, \%yn, $exists, $err);
+  }
 }
 
 =back
