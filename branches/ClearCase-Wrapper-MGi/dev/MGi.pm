@@ -563,7 +563,7 @@ David Boyce) for more details.
 
 =head1 CLEARTOOL EXTENSIONS
 
-=over 10
+=over 11
 
 =item * LSGENEALOGY
 
@@ -957,6 +957,36 @@ sub _Mklbtype {
 	    $silent->argv('mkhlink', $eqhl, "lbtype:$_", $inc)->system;
 	  }
 	} keys %pair;
+      } elsif ($opt{archive}) {
+	my $rc = 0;
+	foreach my $t (@args) {
+	  my ($pfx, $vob) = $t =~ /^lbtype:(.*)(@.*)$/;
+	  my ($prev) = grep s/^-> lbtype:(.*)@.*/$1/,
+	    $ct->argv(qw(des -s -ahl), $prhl, $t)->stderr(0)->qx;
+	  my $arc;
+	  if ($prev) {
+	    if (my ($pfx, $nr) = $prev =~ /^(.*-)(\d+)$/) {
+	      $arc = $pfx . $nr++;
+	    } else {
+	      $arc = $prev . '-001';
+	    }
+	  } else {
+	    $arc = $pfx . '-001';
+	  }
+	  ($pfx, my $nr) = $arc =~ /^(.*-)(\d+)$/;
+	  while ($ct->argv(qw(des -s), "lbtype:${arc}$vob")->stderr(0)->qx) {
+	    $arc = $pfx . $nr++;
+	  }
+	  if ($ct->argv('rename', $t, $arc)->system) {
+	    $rc = 1;
+	    next;
+	  }
+	  $ntype->args($t);
+	  $ntype->opts(@cmt, $ntype->opts);
+	  $ntype->system;
+	  $silent->argv('mkhlink', $prhl, $t, "lbtype:${arc}$vob")->system;
+	}
+	exit $rc;
       } else {			# increment
 	die Msg('E', "Incompatible flags: replace and incremental");
       }
@@ -1017,12 +1047,10 @@ sub _Mklbtype {
 	    next;
 	  }
 	}
-      } else {
-	die Msg('E', 'Not implemented yet');
       }
     }
     exit 0;
-  } else {			# non inc
+  } else {			# non inc/arc/fam
     if ($rep) {
       $ntype->opts(@cmt, '-replace', $ntype->opts);
       map { $_ = "lbtype:$_" unless /^lbtype:/ } @args;
@@ -1032,6 +1060,12 @@ sub _Mklbtype {
 	my @link = grep s/^\s*(.*) -> .*$/$1/,
 	  $ct->argv(qw(des -l -ahl), "$eqhl,$prhl", @a)->qx;
 	$ct->argv('rmhlink', @link)->system;
+      } else {
+	foreach (@args) {
+	  s/^lbtype://;
+	  warn Msg('E', qq(Label type not found: "$_".));
+	}
+	exit 1;
       }
     } else {
       $ntype->opts(@cmt, $ntype->opts);
@@ -1039,7 +1073,17 @@ sub _Mklbtype {
     }
   }
 }
+ sub _ExLbType {
+   use strict;
+   use warnings;
+   my ($mkt, $arg) = @_;
+   $arg = 'lbtype:' . $arg unless $arg =~ /^lbtype:/;
+   # Maybe need to check that non locked?
+   return ClearCase::Argv->des('-s', $arg)->stdout(0)->system? 0 : 1;
+ }
 sub mklbtype {
+  use strict;
+  use warnings;
   my (%opt, $rep);
   GetOptions(\%opt, qw(family increment archive));
   GetOptions('replace' => \$rep);
@@ -1054,8 +1098,9 @@ sub mklbtype {
 		   pbranch|shared gt|ge|lt|le|enum|default|vtype=s
 		   cquery|cqeach nc c|cfile=s));
   $ntype->{fopts} = \%opt;
-  $ntype->{rep} = $rep;
-  _Preemptcmt($ntype, \&_Mklbtype);
+  $ntype->{rep} = $opt{archive}? 1 : $rep;
+  my $tst = \&_ExLbType if $ntype->{rep};
+  _Preemptcmt($ntype, \&_Mklbtype, $tst);
 }
 
 =item * LOCK
@@ -1438,7 +1483,7 @@ before typing the comment.
 Implements a new B<-revert> flag. This causes identical (unchanged)
 elements to be unchecked-out instead of being checked in.
 
-Since checkin is such a common operation, a special fature is supported
+Since checkin is such a common operation, a special feature is supported
 to save typing: an unadorned I<ci> cmd is C<promoted> to I<ci -dir -me
 -diff -revert>. In other words typing I<ct ci> will step through each
 file checked out by you in the current directory and view,

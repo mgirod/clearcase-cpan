@@ -78,6 +78,7 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- mklbtype: fix to Label type not found: "-rep"; error report
 	- ci in user interactions preempting mode
 
-0.14 Sun Nov 22 16:02:20 GMT 2009
+0.14 Sun Nov 22 20:03:34 GMTST 2009
         - co: die if no element
 	- rmbranch: handle the interactive case of missing -f flag
+	- mklbtype -arc
