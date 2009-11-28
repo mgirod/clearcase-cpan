@@ -563,7 +563,7 @@ David Boyce) for more details.
 
 =head1 CLEARTOOL EXTENSIONS
 
-=over 11
+=over 12
 
 =item * LSGENEALOGY
 
@@ -897,190 +897,198 @@ property.
 
 =cut
 
-sub _Mklbtype {
-  my ($ntype, @cmt) = @_;
-  my $rep = $ntype->{rep};
-  $ct = ClearCase::Argv->new({autochomp=>1});
-  my @args = $ntype->args;
-  my %opt = %{$ntype->{fopts}};
-  my $silent = $ct->clone;
-  $silent->stdout(0);
-  if (!%opt and my ($ahl) = grep /^->/,
-      $ct->desc([qw(-s -ahl AdminVOB vob:.)])->qx) {
-    if (my $avob = (split /\s+/, $ahl)[1]) {
-      for (@args) {
-	next if /\@/;
-	$_ = "$_\@$avob";
-	warn Msg('W', "making global type $_ ...");
+sub _GenMkTypeSub {
+  use strict;
+  use warnings;
+  my ($type, $Name, $name) = @_;
+  return sub {
+    my ($ntype, @cmt) = @_;
+    my $rep = $ntype->{rep};
+    $ct = ClearCase::Argv->new({autochomp=>1});
+    my @args = $ntype->args;
+    my %opt = %{$ntype->{fopts}};
+    my $silent = $ct->clone;
+    $silent->stdout(0);
+    if (!%opt and my ($ahl) = grep /^->/,
+	$ct->desc([qw(-s -ahl AdminVOB vob:.)])->qx) {
+      if (my $avob = (split /\s+/, $ahl)[1]) {
+	for (@args) {
+	  next if /\@/;
+	  $_ = "$_\@$avob";
+	  warn Msg('W', "making global type $_ ...");
+	}
+	$ntype->args(@args);
+	my @opts = (@cmt, '-global', $ntype->opts);
+	push @opts, '-replace' if $rep;
+	$ntype->opts(@opts);
+	return $ntype->system;
       }
-      $ntype->args(@args);
-      my @opts = (@cmt, '-global', $ntype->opts);
-      push @opts, '-replace' if $rep;
-      $ntype->opts(@opts);
-      return $ntype->system;
-    }
-  } elsif (%opt) {
-    map { s/^lbtype:(.*)$/$1/ } @args;
-    my @a = @args;
-    my @vob = grep { s/.*\@(.*)$/$1/ } @a;
-    push @vob, $ct->argv(qw(des -s vob:.))->stderr(0)->qx
-      if grep !/@/, @args;
-    die  Msg('E', qq(Unable to determine VOB for pathname ".".\n))
-      unless @vob;
-    _Ensuretypes(@vob);
-    if ($rep) {
-      @args = grep { $ct->argv(qw(des -fmt), '%Xn', "lbtype:$_")->qx } @args;
-      exit 1 unless @args;
-      if ($opt{family}) {
-	@a = ();
-	foreach my $t (@args) {
-	  if ($ct->argv(qw(des -s -ahl), $eqhl, $t)->stderr(0)->qx) {
-	    warn Msg('E', "$t is already a family type\n");
-	  } else {
-	    push @a, $t;
-	  }
-	}
-	exit 1 unless @a;
-	my %pair = ();
-	foreach (@a) {
-	  if (/^lbtype:(.*)(@.*)$/) {
-	    $pair{"$1$2"} = "${1}_1.00$2";
-	  }
-	}
-	_Findfreeinc(\%pair);
-	$ntype->args(values %pair);
-	$ntype->opts(@cmt, $ntype->opts);
-	$ntype->system;
-	map {
-	  if (defined($pair{$_})) {
-	    my $inc = "lbtype:$pair{$_}";
-	    $silent->argv('mkhlink', $eqhl, "lbtype:$_", $inc)->system;
-	  }
-	} keys %pair;
-      } elsif ($opt{archive}) {
-	my $rc = 0;
-	foreach my $t (@args) {
-	  my ($pfx, $vob) = $t =~ /^lbtype:(.*)(@.*)$/;
-	  my ($prev) = grep s/^-> lbtype:(.*)@.*/$1/,
-	    $ct->argv(qw(des -s -ahl), $prhl, $t)->stderr(0)->qx;
-	  my $arc;
-	  if ($prev) {
-	    if (my ($pfx, $nr) = $prev =~ /^(.*-)(\d+)$/) {
-	      $arc = $pfx . $nr++;
+    } elsif (%opt) {
+      map { s/^$ {type}:(.*)$/$1/ } @args;
+      my @a = @args;
+      my @vob = grep { s/.*\@(.*)$/$1/ } @a;
+      push @vob, $ct->argv(qw(des -s vob:.))->stderr(0)->qx
+	if grep !/@/, @args;
+      die  Msg('E', qq(Unable to determine VOB for pathname ".".\n))
+	unless @vob;
+      _Ensuretypes(@vob);
+      if ($rep) {
+	@args = grep { $ct->argv(qw(des -fmt), '%Xn', "$type:$_")->qx } @args;
+	exit 1 unless @args;
+	if ($opt{family}) {
+	  @a = ();
+	  foreach my $t (@args) {
+	    if ($ct->argv(qw(des -s -ahl), $eqhl, $t)->stderr(0)->qx) {
+	      warn Msg('E', "$t is already a family type\n");
 	    } else {
-	      $arc = $prev . '-001';
+	      push @a, $t;
 	    }
-	  } else {
-	    $arc = $pfx . '-001';
 	  }
-	  ($pfx, my $nr) = $arc =~ /^(.*-)(\d+)$/;
-	  while ($ct->argv(qw(des -s), "lbtype:${arc}$vob")->stderr(0)->qx) {
-	    $arc = $pfx . $nr++;
+	  exit 1 unless @a;
+	  my %pair = ();
+	  foreach (@a) {
+	    if (/^$type:(.*)(@.*)$/) {
+	      $pair{"$1$2"} = "${1}_1.00$2";
+	    }
 	  }
-	  if ($ct->argv('rename', $t, $arc)->system) {
-	    $rc = 1;
-	    next;
-	  }
-	  $ntype->args($t);
+	  _Findfreeinc(\%pair);
+	  $ntype->args(values %pair);
 	  $ntype->opts(@cmt, $ntype->opts);
 	  $ntype->system;
-	  $silent->argv('mkhlink', $prhl, $t, "lbtype:${arc}$vob")->system;
-	}
-	exit $rc;
-      } else {			# increment
-	die Msg('E', "Incompatible flags: replace and incremental");
-      }
-    } else {
-      if ($opt{family}) {
-	map { $_ = "lbtype:$_" } @a;
-	die Msg('E', "Some types already exist among @args")
-	  unless $silent->argv(qw(des -s), @a)->stderr(0)->system;
-	my %pair = ();
-	foreach (@args) {
-	  if (/^(.*?)(@.*)?$/) {
-	    $pair{$_} = "${1}_1.00" . ($2? $2:'');
-	  }
-	}
-	_Findfreeinc(\%pair);
-	my @opts = $ntype->opts();
-	$ntype->args(values %pair);
-	$ntype->opts(@cmt, @opts);
-	$ntype->system;
-	$ntype->args(@args);
-	$ntype->opts('-nc', @opts);
-	$ntype->system;
-	map {
-	  if (defined($pair{$_})) {
-	    my $inc = "lbtype:$pair{$_}";
-	    $silent->argv('mkhlink', $eqhl, "lbtype:$_", $inc)->system;
-	  }
-	} keys %pair;
-      } elsif ($opt{increment}) { # increment
-	for my $t (@args) {
-	  my $pt = "lbtype:$t";
-	  if (!$ct->argv(qw(des -s), $pt)->stderr(0)->qx) {
-	    warn Msg('E', qq(Label type not found: "$t"));
-	    next;
-	  } elsif ($ct->argv(qw(lslock -s), $pt)->stderr(0)->qx) {
-	    warn Msg('E', qq(Lock on label type "$t" )
-		       . qq(prevents operation "make lbtype"));
-	    next;
-	  }
-	  my ($pair) = grep s/^\s*(.*) -> lbtype:(.*)\@(.*)$/$1,$2,$3/,
-	    $ct->argv(qw(des -l -ahl), $eqhl, $pt)->stderr(0)->qx;
-	  my ($hlk, $prev, $vob) = split ',', $pair if $pair;
-	  next unless $prev;
-	  if ($prev =~ /^(.*)_(\d+)(?:\.(\d+))?$/) {
-	    my ($base, $maj, $min) = ($1, $2, $3);
-	    my $new = "${base}_" .
-	      (defined($min)? $maj . '.' . ++$min : ++$maj);
-	    map { $_ .= $1 } ($new, $prev) if $t =~ /^.*(@.*)$/;
+	  map {
+	    if (defined($pair{$_})) {
+	      my $inc = "$type:$pair{$_}";
+	      $silent->argv('mkhlink', $eqhl, "$type:$_", $inc)->system;
+	    }
+	  } keys %pair;
+	} elsif ($opt{archive}) {
+	  my $rc = 0;
+	  foreach my $t (@args) {
+	    my ($pfx, $vob) = $t =~ /^$type:(.*)(@.*)$/;
+	    my ($prev) = grep s/^-> $type:(.*)@.*/$1/,
+	      $ct->argv(qw(des -s -ahl), $prhl, $t)->stderr(0)->qx;
+	    my $arc;
+	    if ($prev) {
+	      if (my ($pfx, $nr) = $prev =~ /^(.*-)(\d+)$/) {
+		$arc = $pfx . $nr++;
+	      } else {
+		$arc = $prev . '-001';
+	      }
+	    } else {
+	      $arc = $pfx . '-001';
+	    }
+	    ($pfx, my $nr) = $arc =~ /^(.*-)(\d+)$/;
+	    while ($ct->argv(qw(des -s), "$type:${arc}$vob")->stderr(0)->qx) {
+	      $arc = $pfx . $nr++;
+	    }
+	    if ($ct->argv('rename', $t, $arc)->system) {
+	      $rc = 1;
+	      next;
+	    }
+	    $ntype->args($t);
 	    $ntype->opts(@cmt, $ntype->opts);
-	    $ntype->args($new)->system;
-	    $silent->argv('rmhlink', $hlk)->system;
-	    $silent->argv(qw(mkhlink -nc), $eqhl,
-			  "lbtype:$t", "lbtype:$new")->system;
-	    $silent->argv(qw(mkhlink -nc), $prhl,
-			  "lbtype:$new", "lbtype:$prev")->system;
-	  } else {
-	    warn "Previous increment non suitable in $t: $prev\n";
-	    next;
+	    $ntype->system;
+	    $silent->argv('mkhlink', $prhl, $t, "$type:${arc}$vob")->system;
+	  }
+	  exit $rc;
+	} else {		# increment
+	  die Msg('E', "Incompatible flags: replace and incremental");
+	}
+      } else {
+	if ($opt{family}) {
+	  map { $_ = "$type:$_" } @a;
+	  die Msg('E', "Some types already exist among @args")
+	    unless $silent->argv(qw(des -s), @a)->stderr(0)->system;
+	  my %pair = ();
+	  foreach (@args) {
+	    if (/^(.*?)(@.*)?$/) {
+	      $pair{$_} = "${1}_1.00" . ($2? $2:'');
+	    }
+	  }
+	  _Findfreeinc(\%pair);
+	  my @opts = $ntype->opts();
+	  $ntype->args(values %pair);
+	  $ntype->opts(@cmt, @opts);
+	  $ntype->system;
+	  $ntype->args(@args);
+	  $ntype->opts('-nc', @opts);
+	  $ntype->system;
+	  map {
+	    if (defined($pair{$_})) {
+	      my $inc = "$type:$pair{$_}";
+	      $silent->argv('mkhlink', $eqhl, "$type:$_", $inc)->system;
+	    }
+	  } keys %pair;
+	} elsif ($opt{increment}) { # increment
+	  for my $t (@args) {
+	    my $pt = "$type:$t";
+	    if (!$ct->argv(qw(des -s), $pt)->stderr(0)->qx) {
+	      warn Msg('E', qq($Name type not found: "$t"));
+	      next;
+	    } elsif ($ct->argv(qw(lslock -s), $pt)->stderr(0)->qx) {
+	      warn Msg('E', qq(Lock on $name type "$t" )
+			 . qq(prevents operation "make $type"));
+	      next;
+	    }
+	    my ($pair) = grep s/^\s*(.*) -> $type:(.*)\@(.*)$/$1,$2,$3/,
+	      $ct->argv(qw(des -l -ahl), $eqhl, $pt)->stderr(0)->qx;
+	    my ($hlk, $prev, $vob) = split ',', $pair if $pair;
+	    next unless $prev;
+	    if ($prev =~ /^(.*)_(\d+)(?:\.(\d+))?$/) {
+	      my ($base, $maj, $min) = ($1, $2, $3);
+	      my $new = "${base}_" .
+		(defined($min)? $maj . '.' . ++$min : ++$maj);
+	      map { $_ .= $1 } ($new, $prev) if $t =~ /^.*(@.*)$/;
+	      $ntype->opts(@cmt, $ntype->opts);
+	      $ntype->args($new)->system;
+	      $silent->argv('rmhlink', $hlk)->system;
+	      $silent->argv(qw(mkhlink -nc), $eqhl,
+			    "$type:$t", "$type:$new")->system;
+	      $silent->argv(qw(mkhlink -nc), $prhl,
+			    "$type:$new", "$type:$prev")->system;
+	    } else {
+	      warn "Previous increment non suitable in $t: $prev\n";
+	      next;
+	    }
 	  }
 	}
       }
-    }
-    exit 0;
-  } else {			# non inc/arc/fam
-    if ($rep) {
-      $ntype->opts(@cmt, '-replace', $ntype->opts);
-      map { $_ = "lbtype:$_" unless /^lbtype:/ } @args;
-      my @a = $ct->argv(qw(des -s), @args)->stderr(0)->qx;
-      if (@a) {
-	map { $_ = "lbtype:$_" } @a;
-	my @link = grep s/^\s*(.*) -> .*$/$1/,
-	  $ct->argv(qw(des -l -ahl), "$eqhl,$prhl", @a)->qx;
-	$ct->argv('rmhlink', @link)->system;
-      } else {
-	foreach (@args) {
-	  s/^lbtype://;
-	  warn Msg('E', qq(Label type not found: "$_".));
+      exit 0;
+    } else {			# non inc/arc/fam
+      if ($rep) {
+	$ntype->opts(@cmt, '-replace', $ntype->opts);
+	map { $_ = "$type:$_" unless /^$type:/ } @args;
+	my @a = $ct->argv(qw(des -s), @args)->stderr(0)->qx;
+	if (@a) {
+	  map { $_ = "$type:$_" } @a;
+	  my @link = grep s/^\s*(.*) -> .*$/$1/,
+	    $ct->argv(qw(des -l -ahl), "$eqhl,$prhl", @a)->qx;
+	  $ct->argv('rmhlink', @link)->system;
+	} else {
+	  foreach (@args) {
+	    s/^$type://;
+	    warn Msg('E', qq($Name type not found: "$_".));
+	  }
+	  exit 1;
 	}
-	exit 1;
+      } else {
+	$ntype->opts(@cmt, $ntype->opts);
+	return $ntype->system;
       }
-    } else {
-      $ntype->opts(@cmt, $ntype->opts);
-      return $ntype->system;
     }
   }
 }
- sub _ExLbType {
-   use strict;
-   use warnings;
-   my ($mkt, $arg) = @_;
-   $arg = 'lbtype:' . $arg unless $arg =~ /^lbtype:/;
-   # Maybe need to check that non locked?
-   return ClearCase::Argv->des('-s', $arg)->stdout(0)->system? 0 : 1;
- }
+sub _GenExTypeSub {
+  use strict;
+  use warnings;
+  my $type = shift;
+  return sub {
+    my ($mkt, $arg) = @_;
+    $arg = "$type:$arg" unless $arg =~ /^$type:/;
+    # Maybe need to check that non locked?
+    return ClearCase::Argv->des('-s', $arg)->stdout(0)->system? 0 : 1;
+  }
+}
 sub mklbtype {
   use strict;
   use warnings;
@@ -1099,8 +1107,31 @@ sub mklbtype {
 		   cquery|cqeach nc c|cfile=s));
   $ntype->{fopts} = \%opt;
   $ntype->{rep} = $opt{archive}? 1 : $rep;
-  my $tst = \&_ExLbType if $ntype->{rep};
-  _Preemptcmt($ntype, \&_Mklbtype, $tst);
+  my $tst = _GenExTypeSub('lbtype') if $ntype->{rep};
+  _Preemptcmt($ntype, _GenMkTypeSub(qw(lbtype Label label)), $tst);
+}
+
+=item * MKBRTYPE
+
+=cut
+
+sub mkbrtype {
+  use strict;
+  use warnings;
+  my (%opt, $rep);
+  GetOptions(\%opt, q(archive));
+  GetOptions('replace' => \$rep);
+  return if !%opt and grep /^-(ord|glo)/, @ARGV;
+  die Msg('E', 'Incompatible options: global types cannot be archived')
+    if %opt and grep /^-glo/, @ARGV;
+  ClearCase::Argv->ipc(1);
+  my $ntype = ClearCase::Argv->new(@ARGV);
+  $ntype->parse(qw(global|ordinary acquire pbranch
+		   cquery|cqeach nc c|cfile=s));
+  $ntype->{fopts} = \%opt;
+  $ntype->{rep} = $opt{archive}? 1 : $rep;
+  my $tst = _GenExTypeSub('brtype') if $ntype->{rep};
+  _Preemptcmt($ntype, _GenMkTypeSub(qw(brtype Branch branch)), $tst);
 }
 
 =item * LOCK
