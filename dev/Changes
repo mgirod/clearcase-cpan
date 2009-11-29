@@ -82,3 +82,7 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
         - co: die if no element
 	- rmbranch: handle the interactive case of missing -f flag
 	- mklbtype -arc, and mkbrtype -arc
+
+0.15 Sun Nov 29 11:59:47 GMTST 2009
+     	- mkbrtype documentation, and comments to the archived type.
+	- postponed 'early return' until after user interaction.

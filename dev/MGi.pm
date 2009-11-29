@@ -1,6 +1,6 @@
 package ClearCase::Wrapper::MGi;
 
-$VERSION = '0.14';
+$VERSION = '0.15';
 
 use warnings;
 use strict;
@@ -30,6 +30,7 @@ use AutoLoader 'AUTOLOAD';
   $lsgenealogy =
     "$z [-short] [-all] [-obsolete] [-depth gen-depth] pname ...";
   $mklbtype = "\n* [-family] [-increment] [-archive] pname ...";
+  $mkbrtype = "\n* [-archive]";
   $mklabel = "\n* [-up] [-force] [-over type [-all]]";
   $checkin = "\n* [-dir|-rec|-all|-avobs] [-ok] [-diff [diff-opts]] [-revert]";
 }
@@ -850,7 +851,15 @@ Types forming a family are related with hyperlinks of two types:
 
 =item B<EqInc>
 
+Equivalent incremental fixed type. A I<fixed> (i.e. which by
+convention, will not been I<moved>), I<sparse> (i.e. applied only to
+changes) type. This helps to mark the history of application of the
+I<floating> type, which is also a I<full> one, for reproducibility
+purposes.
+
 =item B<PrevInc>
+
+Previous incremental fixed type.
 
 =back
 
@@ -859,6 +868,8 @@ One attribute:
 =over 1
 
 =item B<DelInc>
+
+Deleted from increment. This functionality is not implemented yet.
 
 =back
 
@@ -887,6 +898,9 @@ the family.
 Rename the current type to an I<archive> value (name as prefix, and a
 numeral suffix. Initial value: I<-001>), create a new type, and make the
 archived one its predecessor, with a B<PrevInc> hyperlink.
+Comments go to the type being archived.
+
+The implementation is largely shared with I<mkbrtype>.
 
 =item B<-glo/bal>
 
@@ -909,6 +923,10 @@ sub _GenMkTypeSub {
     my %opt = %{$ntype->{fopts}};
     my $silent = $ct->clone;
     $silent->stdout(0);
+    if ($ntype->flag('global')) {
+      $ntype->opts(@cmt, $ntype->opts);
+      return $ntype->system
+    }
     if (!%opt and my ($ahl) = grep /^->/,
 	$ct->desc([qw(-s -ahl AdminVOB vob:.)])->qx) {
       if (my $avob = (split /\s+/, $ahl)[1]) {
@@ -986,9 +1004,12 @@ sub _GenMkTypeSub {
 	      next;
 	    }
 	    $ntype->args($t);
-	    $ntype->opts(@cmt, $ntype->opts);
+	    $ntype->opts('-nc', $ntype->opts);
 	    $ntype->system;
-	    $silent->argv('mkhlink', $prhl, $t, "$type:${arc}$vob")->system;
+	    my $at = "$type:${arc}$vob";
+	    $silent->argv('mkhlink', $prhl, $t, $at)->system;
+	    $ct->argv('chevent', @cmt, $at)->stdout(0)->system
+	      unless $cmt[0] and $cmt[0] =~ /^-nc/;
 	  }
 	  exit $rc;
 	} else {		# increment
@@ -1076,7 +1097,7 @@ sub _GenMkTypeSub {
 	return $ntype->system;
       }
     }
-  }
+  };
 }
 sub _GenExTypeSub {
   use strict;
@@ -1087,7 +1108,7 @@ sub _GenExTypeSub {
     $arg = "$type:$arg" unless $arg =~ /^$type:/;
     # Maybe need to check that non locked?
     return ClearCase::Argv->des('-s', $arg)->stdout(0)->system? 0 : 1;
-  }
+  };
 }
 sub mklbtype {
   use strict;
@@ -1095,7 +1116,6 @@ sub mklbtype {
   my (%opt, $rep);
   GetOptions(\%opt, qw(family increment archive));
   GetOptions('replace' => \$rep);
-  return if !%opt and grep /^-(ord|glo)/, @ARGV;
   die Msg('E', 'Incompatible options: family increment archive')
     if keys %opt > 1;
   die Msg('E', 'Incompatible options: incremental types cannot be global')
@@ -1107,11 +1127,38 @@ sub mklbtype {
 		   cquery|cqeach nc c|cfile=s));
   $ntype->{fopts} = \%opt;
   $ntype->{rep} = $opt{archive}? 1 : $rep;
-  my $tst = _GenExTypeSub('lbtype') if $ntype->{rep};
+  my $tst = $ntype->{rep}? _GenExTypeSub('lbtype') : 0;
   _Preemptcmt($ntype, _GenMkTypeSub(qw(lbtype Label label)), $tst);
 }
 
 =item * MKBRTYPE
+
+Extension: archive a brtype away, in order to avoid having to modify
+config specs using it (rationale: config specs are not versioned, so
+they'd rather be stable). Also, starting new branches from the I<main>
+one (whatever its real type) makes it easier to roll back changes if
+need-be, branch off an earlier version, and bring back again the
+changes rolled back at some later stage, after the problems have been
+fixed.
+
+The implementation is largely shared with I<mklbtype>.
+See its documentation for the B<PrevInc> hyperlink type.
+
+=over 2
+
+=item B<-arc/hive>
+
+Rename the current type to an I<archive> value (name as prefix, and a
+numeral suffix. Initial value: I<-001>), create a new type, and make the
+archived one its predecessor, with a B<PrevInc> hyperlink.
+Comments go to the type being archived.
+
+=item B<-glo/bal>
+
+Global types (in an Admin vob or not) are currently not supported for
+archiving.
+
+=back
 
 =cut
 
@@ -1121,7 +1168,6 @@ sub mkbrtype {
   my (%opt, $rep);
   GetOptions(\%opt, q(archive));
   GetOptions('replace' => \$rep);
-  return if !%opt and grep /^-(ord|glo)/, @ARGV;
   die Msg('E', 'Incompatible options: global types cannot be archived')
     if %opt and grep /^-glo/, @ARGV;
   ClearCase::Argv->ipc(1);
@@ -1130,7 +1176,7 @@ sub mkbrtype {
 		   cquery|cqeach nc c|cfile=s));
   $ntype->{fopts} = \%opt;
   $ntype->{rep} = $opt{archive}? 1 : $rep;
-  my $tst = _GenExTypeSub('brtype') if $ntype->{rep};
+  my $tst = $ntype->{rep}? _GenExTypeSub('brtype') : 0;
   _Preemptcmt($ntype, _GenMkTypeSub(qw(brtype Branch branch)), $tst);
 }
 
