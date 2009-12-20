@@ -2,13 +2,15 @@
 
 = Introduction =
 
-In the current version, commands prompting the user work in a few cases on unix, but fail most of the time, resulting in hanging behaviour.
+In the current version, commands prompting the user, while in ipc mode, work in a few cases on unix, but fail most of the time, resulting in hanging behaviour.
 
-This is not very important for scripts, but is a pain in wrappers. Fortunately, wrappers may handle the issues before invoking !ClearCase::Argv.
+This is not very important for scripts, but is a pain in wrappers. Fortunately, wrappers may handle some of the issues before invoking !ClearCase::Argv.
+The issues which cannot reasonably be handled concerned specific interactions, such as in {{{merge}}}. Generic interactions are those related to comments, or forcing the behaviour for instance: these may be _preempted_ by a wrapper, i.e. fully handled by the wrapper, which inserts flags to avoid them in the {{{cleartool}}} behaviour proper.
 
 Several distinct problems interfere with the code:
   * a !ClearCase bug with {{{setview}}} under {{{cleartool -status}}}
   * differences in behaviour between unix and Windows (Note that they affect !CtCmd as well)
+  * on Windows, {{{cleartool}}} doesn't use {{{pty}}}s but {{{CONIN$}}} and {{{CONOUT$}}} devices
 
 = Details =
   * The MGi wrapper attempts now to preempt the user interactions, and thus to avoid the problem. It does this for now only for comments, and with {{{mklbtype}}}. It will now be extended to the other commands, and to the other interactions (see below: no real fix was found at the !ClearCase::Argv level; however, wrappers may handle them all).
