@@ -86,3 +86,7 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 0.15 Sun Nov 29 11:59:47 GMTST 2009
      	- mkbrtype documentation, and comments to the archived type.
 	- postponed 'early return' until after user interaction.
+
+0.16 Tue Dec 15 10:32:40 GMTST 2009
+        - mklabel: skip symlinks
+	- mklbtype -fam: fix when remote vob non -rep and exists
