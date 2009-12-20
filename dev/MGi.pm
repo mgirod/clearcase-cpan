@@ -1,6 +1,6 @@
 package ClearCase::Wrapper::MGi;
 
-$VERSION = '0.15';
+$VERSION = '0.16';
 
 use warnings;
 use strict;
@@ -1017,6 +1017,7 @@ sub _GenMkTypeSub {
 	}
       } else {
 	if ($opt{family}) {
+	  @a = @args;
 	  map { $_ = "$type:$_" } @a;
 	  die Msg('E', "Some types already exist among @args")
 	    unless $silent->argv(qw(des -s), @a)->stderr(0)->system;
@@ -1456,7 +1457,7 @@ sub mklabel {
   my ($ret, @rec, @mod) = 0;
   if (grep /^-r(ec|$)/, @opt) {
     if (@et) {
-      @rec = $ct->argv(qw(ls -s -r -vob), @elems)->qx;
+      @rec = grep /@@/, $ct->argv(qw(ls -s -r -vob), @elems)->qx;
     } else {
       $mkl->syfail(1) unless $opt{force};
       $ret = $mkl->system;
