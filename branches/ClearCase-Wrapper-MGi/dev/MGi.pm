@@ -1,6 +1,6 @@
 package ClearCase::Wrapper::MGi;
 
-$VERSION = '0.16';
+$VERSION = '0.17';
 
 use warnings;
 use strict;
@@ -1493,7 +1493,7 @@ sub mklabel {
       @mod = grep /^${ver}(\W|$)/, @mod;
     }
   }
-  $mkl->opts(grep !/^-r(ec|$)/, @opt); # recurse handled already
+  $mkl->opts(grep !/^-r(ec|$)/, @opt) if @et; # recurse handled already
   @opt = $mkl->opts;
   if ($opt{up}) {
     my $dsc = ClearCase::Argv->new({-autochomp=>1});
@@ -1537,7 +1537,7 @@ sub mklabel {
   exit $ret unless @mod;
   $ret = $mkl->args($et[0], @mod)->system if @et;
   exit $ret if $ret and !$opt{force};
-  push @opt, '-rep' unless grep /^-rep/, @opt;
+  push @opt, '-rep' if @et; #Moving the floating: replace implicit
   $mkl->opts(@opt);
   $ret |= $mkl->args($lbtype, @mod)->system;
   exit $ret;
