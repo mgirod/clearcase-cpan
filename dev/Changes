@@ -90,3 +90,6 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 0.16 Tue Dec 15 10:32:40 GMTST 2009
         - mklabel: skip symlinks
 	- mklbtype -fam: fix when remote vob non -rep and exists
+
+0.17 Fri Jan  1 14:11:27 GMTST 2010
+        - mklabel: fix to -over ---rep implicit only for family types
