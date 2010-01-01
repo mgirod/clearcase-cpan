@@ -93,3 +93,4 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 
 0.17 Fri Jan  1 14:11:27 GMTST 2010
         - mklabel: fix to -over ---rep implicit only for family types
+	- mklbtype: fix to -fam when explicit type prefix used

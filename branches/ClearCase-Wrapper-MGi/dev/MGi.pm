@@ -15,7 +15,7 @@ sub _Compareincs($$) {
     warn Msg('W', "$t1 and $t2 not comparable\n");
     return 1;
   }
-  return (($M1 <=> $M2) or (defined($m1) and defined($m2) and $m1 <=> $m2));
+  return ($M1 <=> $M2 or (defined($m1) and defined($m2) and $m1 <=> $m2));
 }
 use AutoLoader 'AUTOLOAD';
 
@@ -942,7 +942,7 @@ sub _GenMkTypeSub {
 	return $ntype->system;
       }
     } elsif (%opt) {
-      map { s/^$ {type}:(.*)$/$1/ } @args;
+      map { s/^${type}:(.*)$/$1/ } @args;
       my @a = @args;
       my @vob = grep { s/.*\@(.*)$/$1/ } @a;
       push @vob, $ct->argv(qw(des -s vob:.))->stderr(0)->qx
