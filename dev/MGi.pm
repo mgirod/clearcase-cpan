@@ -1457,7 +1457,8 @@ sub mklabel {
   my ($ret, @rec, @mod) = 0;
   if (grep /^-r(ec|$)/, @opt) {
     if (@et) {
-      @rec = grep /@@/, $ct->argv(qw(ls -s -r -vob), @elems)->qx;
+      #Work around bug on Windows with the -vob option: keep checkout info
+      @rec = grep m%@@[/\\]%, $ct->argv(qw(ls -s -r), @elems)->qx;
     } else {
       $mkl->syfail(1) unless $opt{force};
       $ret = $mkl->system;
@@ -1493,8 +1494,7 @@ sub mklabel {
       @mod = grep /^${ver}(\W|$)/, @mod;
     }
   }
-  $mkl->opts(grep !/^-r(ec|$)/, @opt) if @et; # recurse handled already
-  @opt = $mkl->opts;
+  $mkl->opts(grep !/^-r(ec|$)/, @opt); # recurse handled already
   if ($opt{up}) {
     my $dsc = ClearCase::Argv->new({-autochomp=>1});
     require File::Basename;
@@ -1521,11 +1521,12 @@ sub mklabel {
     if (@et) {
       push @elems, sort {$b cmp $a} keys %ancestors;
     } else {
+      @elems = () if grep /^-r(ec|$)/, @opt; #already labelled
+      push @elems, sort {$b cmp $a} keys %ancestors;
       $ret |= $mkl->args($lbtype, @elems)->system;
       exit $ret;
     }
   }
-  # Necessarily in the incremental type case
   if (!$opt{over}) {
     push @elems, @rec;
     @mod = grep {
@@ -1537,7 +1538,8 @@ sub mklabel {
   exit $ret unless @mod;
   $ret = $mkl->args($et[0], @mod)->system if @et;
   exit $ret if $ret and !$opt{force};
-  push @opt, '-rep' if @et; #Moving the floating: replace implicit
+  @opt = $mkl->opts;
+  push @opt, '-rep' if @et and grep !/^-rep/, @opt; #implicit for floating
   $mkl->opts(@opt);
   $ret |= $mkl->args($lbtype, @mod)->system;
   exit $ret;
