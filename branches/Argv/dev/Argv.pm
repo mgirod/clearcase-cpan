@@ -4,9 +4,10 @@ $VERSION = '1.25';
 @ISA = qw(Exporter);
 
 use constant MSWIN => $^O =~ /MSWin32|Windows_NT/i ? 1 : 0;
+use constant CYGWIN	=> $^O =~ /cygwin/i ? 1 : 0;
 
 # To support the "FUNCTIONAL INTERFACE"
-@EXPORT_OK = qw(system exec qv pipe MSWIN);
+@EXPORT_OK = qw(system exec qv pipe MSWIN CYGWIN);
 
 use strict;
 use Carp;
@@ -574,7 +575,7 @@ sub quote {
 	    $_ = qq(\\"$1\\") if MSWIN;
 	    next;
 	} elsif (m%^".*"$%s) {
-	    $_ = qq(\\"$_\\") if MSWIN;
+	    $_ = qq(\\"$_\\") if MSWIN or CYGWIN;
 	    next;
 	}
 	# Skip if contains no special chars.
