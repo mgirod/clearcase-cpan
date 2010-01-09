@@ -1062,7 +1062,7 @@ sub _GenMkTypeSub {
 		(defined($min)? $maj . '.' . ++$min : ++$maj);
 	      map { $_ .= $1 } ($new, $prev) if $t =~ /^.*(@.*)$/;
 	      $ntype->opts(@cmt, $ntype->opts);
-	      $ntype->args($new)->system;
+	      $ntype->args($new)->system and exit 1;
 	      $silent->argv('rmhlink', $hlk)->system;
 	      $silent->argv(qw(mkhlink -nc), $eqhl,
 			    "$type:$t", "$type:$new")->system;
@@ -1539,7 +1539,7 @@ sub mklabel {
   $ret = $mkl->args($et[0], @mod)->system if @et;
   exit $ret if $ret and !$opt{force};
   @opt = $mkl->opts;
-  push @opt, '-rep' if @et and grep !/^-rep/, @opt; #implicit for floating
+  push @opt, '-rep' if @et and !grep /^-rep/, @opt; #implicit for floating
   $mkl->opts(@opt);
   $ret |= $mkl->args($lbtype, @mod)->system;
   exit $ret;
