@@ -356,14 +356,22 @@ sub _PreCi {
   my $opt = $ci->{opthashre};
   return 1 unless $opt->{diff} || $opt->{revert};
   my $elem = $arg[0]; #Only one because of -cqe
-  # Make sure the -pred flag is there as we're going one at a time.
   my $diff = $ci->clone->prog('diff');
-  $diff->optsDIFF(qw(-pred -serial), $diff->optsDIFF);
+  $ct = $ci->clone;
+  $ct->autochomp(1);
+  my $ver = $ct->argv(qw(des -fmt %En@@%Vn), $elem)->qx;
+  $ver =~ s%\\%/%g;
+  my $bra = $1 if $ver =~ m%^(.*?)/(?:\d+|CHECKEDOUT)$%;
+  my %gen = _Parsevtree($elem, 1, $ver);
+  my $p = $gen{$ver}{'parents'};
+  my ($brp) = grep { m%^$bra/\d+$% } @{$p};
+  $diff->optsDIFF(q(-serial), $diff->optsDIFF);
+  $diff->args($brp? $brp : $p->[0], $elem);
   # Without -diff we only care about return code
   $diff->stdout(0) unless $opt->{diff};
   # With -revert, suppress msgs from typemgrs that don't do diffs
   $diff->stderr(0) if $opt->{revert};
-  if ($diff->args($elem)->system('DIFF')) {
+  if ($diff->system('DIFF')) {
     return 1;
   } else {
     if ($opt->{revert}) { # unco instead of checkin
