@@ -101,7 +101,6 @@ sub prog {
 sub exec {
     $class->new(@_)->exec if !ref($_[0]) || ref($_[0]) eq 'HASH';
     my $self = shift;
-    $self->ipc(1) if CYGWIN;
     if ($self->ctcmd) {
 	exit $self->system(@_) >> 8;
     } elsif ($self->ipc) {
@@ -736,8 +735,7 @@ sub quote {
     my $inpathnorm = $self->inpathnorm;
     for (@_) {
 	if (CYGWIN) {
-	    s%^/cygdrive/([a-za-z])%$1:%;
-	    s%^/%$cygpfx/%;
+	    s%^/cygdrive/([a-zA-Z])%$1:% or s%^/%$cygpfx/%;
 	}
 	# If requested, change / for \ in Windows file paths.
 	s%/%\\%g if $inpathnorm;
