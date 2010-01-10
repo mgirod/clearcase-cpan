@@ -328,7 +328,7 @@ Revision history for Perl extension ClearCase::Argv.
 	- cygwin: support for mounting views under /view
 	- ALL CHANGES FROM 1.41 THROUGH HERE CONTRIBUTED BY Marc Girod.
 
-1.47 Sun Oct 25 15:12:07 GMTST 2009
+1.47 Sat Jan  9 18:55:04 GMTST 2010
         - cygwin: convert vob:/path input arguments
 	- cygwin: return an error code for system
 	- ipc: quote an empty string in the command sent to cleartool
@@ -336,6 +336,7 @@ Revision history for Perl extension ClearCase::Argv.
 	- cygwin: convert non-existing path outside vobs (e.g. arg of: co -out)
 	- ipc: return value for diff
 	- stopped shifting exit codes: $? == 256 results in 0...
+	- cygwin/exec: ipc mode not forced anymore
 
 BACKWARD COMPATIBILITY NOTES:
 
