@@ -584,7 +584,7 @@ sub quote {
 	    # let '*' go by.
 	    next unless m%[^-=:_."\w\\/*]% || tr%\n%%;
 	} else {
-	    next unless m%[^-=:_."\w\\/]% || tr%\n%%;
+	    next unless m%[^-=:_."\w\\/]% || /\\n/ || tr%\n%%;
 	}
 	# Special case - leave things that look like redirections alone.
 	next if /^\d?(?:<{1,2})|(?:>{1,2})/;
