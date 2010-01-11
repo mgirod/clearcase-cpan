@@ -347,7 +347,7 @@ sub _PreCi {
   use strict;
   use warnings;
   my ($ci, @arg) = @_;
-  my $lsco = ClearCase::Argv->lsco([qw(-cview -s)])->stderr(1);
+  my $lsco = ClearCase::Argv->lsco([qw(-cview -s -d)])->stderr(1);
   if (!$lsco->args(@arg)->qx) {
     warn Msg('E', 'Unable to find checked out version for '
 	       . join(', ', @arg) . "\n");
@@ -451,10 +451,11 @@ sub _Preemptcmt { #return the comments apart: e.g. mklbtype needs discrimination
     }
   } elsif ($cqf) {
     my $cqe = grep /^-cqe/, @opts;
-    $cmd->opts(grep !/^-cq/, @opts);
+    @opts = grep !/^-cq/, @opts;
     my @arg = $cmd->args;
     my $go = 1;
     while ($go) {
+      $cmd->opts(@opts); #reset
       if ($cqe) {
 	my $arg = shift @arg;
 	$go = scalar @arg;
