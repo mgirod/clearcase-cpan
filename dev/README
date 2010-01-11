@@ -8,10 +8,10 @@ module. It is built following the example of ClearCase::Wrapper::DSB.
 The extensions contained here are meant to support a consistent
 branching policy, advocated in:
  http://www.cmwiki.com/BranchYesMergeNo
+It also offers a port of cleartool over cygwin.
 Beyond this module, changes were also made to ClearCase::SyncTree,
 which closely relate to the same purpose.
-My intentions are to make this module orthogonal to the DSB ones, so
-that they might be installed separately, or together.
+The module has to adapt many functions from DSB.
 
 INSTALLATION
 
@@ -45,6 +45,8 @@ KNOWN BUGS AND MISSING FEATURES
   - No tests provided.
   - The view attribute is not searched from included config spec
     fragments.
+  - Interactive queries from cleartool require specific attention.
+    When missing, they may result in apparent hanging.
 
 Many more functions need to be modified in order to support the
 'BranchOff: root' functionality:
@@ -77,6 +79,6 @@ See also collaborative maintenance site:
 COPYRIGHT AND LICENCE
 
 Copyright (c) 2007 IONA Technologies PLC until v 0.05.
-Copyright (c) 2008 Marc Girod (marc.girod@gmail.com) for later changes.
+Copyright (c) 2008-2010 Marc Girod (marc.girod@gmail.com) for later changes.
 All rights reserved. This Perl program is free software; you may
 redistribute it and/or modify it under the same terms as Perl itself.

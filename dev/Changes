@@ -91,6 +91,7 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
         - mklabel: skip symlinks
 	- mklbtype -fam: fix when remote vob non -rep and exists
 
-0.17 Fri Jan  1 14:11:27 GMTST 2010
+0.17 Mon Jan 11 17:16:22 GMTST 2010
         - mklabel: fix to -over ---rep implicit only for family types
 	- mklbtype: fix to -fam when explicit type prefix used
+	- checkin: fixes to -diff (from genealogy) and -rec
