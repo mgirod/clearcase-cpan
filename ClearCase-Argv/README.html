@@ -4,7 +4,7 @@
 <head>
 <title>ClearCase::Argv README</title>
 <meta http-equiv="content-type" content="text/html; charset=utf-8" />
-<link rev="made" href="mailto:bela.bodo@ericsson.com" />
+<link rev="made" href="mailto:root@localhost" />
 </head>
 
 <body style="background-color: white">
@@ -62,40 +62,6 @@ protect them from the <code>cmd.exe</code> shell, automatically converting
 /-separated pathnames to \, etc. These features can keep a lot of hair
 out of your script (and on your head).</p>
 </li>
-<<<<<<< .mine
-<li><strong><a name="item_backwards_compatibility">Backwards Compatibility</a></strong>
-=======
-<li><strong><a name="backwards_compatibility" class="item">Backwards Compatibility</a></strong>
-
-<p>A case was reported in which changes (in 1.44) broke backwards
-compatibility, in the domain of quoting arguments.
-This is unfortunate, and was fixed in the critical cases (mkattr).
-However, the changes were not gratuitous, and fixed actually 
-discrepancies between the behavior in the different modes (and brought
-e.g. support for the use of quotes inside comments. So, they were not
-withdrawn, with the effect that total backwards compatibility was not
-restored.
-Version 1.45 brings again some amount of backwards incompatibilities,
-with fixes to the way std output and error may be redirected or thrown
-away. The benefit in increased functionality and consistency is once
-again considered worth the while.</p>
-</li>
-<li><strong><a name="optional_co_process_for_speed" class="item">Optional Co-Process for Speed</a></strong>
->>>>>>> .r302
-
-<p>A case was reported in which changes (in 1.44) broke backwards
-compatibility, in the domain of quoting arguments.
-This is unfortunate, and was fixed in the critical cases (mkattr).
-However, the changes were not gratuitous, and fixed actually 
-discrepancies between the behavior in the different modes (and brought
-e.g. support for the use of quotes inside comments. So, they were not
-withdrawn, with the effect that total backwards compatibility was not
-restored.
-Version 1.45 brings again some amount of backwards incompatibilities,
-with fixes to the way std output and error may be redirected or thrown
-away. The benefit in increased functionality and consistency is once
-again considered worth the while.</p>
-</li>
 <li><strong><a name="item_optional_co_2dprocess_for_speed">Optional Co-Process for Speed</a></strong>
 
 <p>For any script which uses ClearCase::Argv, the 'ipc' class method</p>
@@ -148,6 +114,12 @@ used under it (and not the Windows installation of perl).</p>
 <p>The new support concerns the conversion of paths between Windows
 and Cygwin syntaxes, as well as the standardization of end-of-lines
 conventions.  It is particularly useful under a ClearCase::Wrapper.</p>
+<p>On Windows, cleartool uses, for interactive functions, devices which
+are not supported on cygwin terminals. Interactive behaviours will
+thus appear to 'hang', and should therefore be avoided. Wrappers may
+work around most, but not all, cases.</p>
+<p>Cygwin support implies a post-processing of cleartool output. Over
+<em>exec</em>, this is only supported in the <em>ipc</em> mode.</p>
 </li>
 </ul>
 <p>
