@@ -348,7 +348,8 @@ sub _PreCi {
   use warnings;
   my ($ci, @arg) = @_;
   my $lsco = ClearCase::Argv->lsco([qw(-cview -s -d)])->stderr(1);
-  if (!$lsco->args(@arg)->qx) {
+  my $res = $lsco->args(@arg)->qx;
+  if (!$res or $res =~ /^cleartool: Error/m) {
     warn Msg('E', 'Unable to find checked out version for '
 	       . join(', ', @arg) . "\n");
     return 0;
@@ -511,6 +512,7 @@ sub _Yesno {
   my $ret = 0;
   my @opts = $cmd->opts;
   for my $arg ($cmd->args) {
+    $cmd->opts(@opts); #reset
     if ($test) {
       my $res = $test->args($arg)->qx;
       if (!$res or $res =~ /^cleartool: Error:/) {
@@ -527,8 +529,7 @@ sub _Yesno {
       $ans = $yn->{default} unless $ans;
     }
     if ($yn->{opt}->{$ans}) {
-      push @opts, $yn->{opt}->{$ans};
-      $cmd->opts(@opts);
+      $cmd->opts(@opts, $yn->{opt}->{$ans});
       $cmd->args($arg);
       $ret |= &{$fn}($cmd);
     } else {
@@ -1051,20 +1052,42 @@ sub _GenMkTypeSub {
 	    }
 	  } keys %pair;
 	} elsif ($opt{increment}) { # increment
-	  for my $t (@args) {
-	    my $pt = "$type:$t";
+	  INCT: for my $t (@args) {
+	    my ($pt, $lck) = "$type:$t";
 	    if (!$ct->argv(qw(des -s), $pt)->stderr(0)->qx) {
 	      warn Msg('E', qq($Name type not found: "$t"));
-	      next;
-	    } elsif ($ct->argv(qw(lslock -s), $pt)->stderr(0)->qx) {
-	      warn Msg('E', qq(Lock on $name type "$t" )
-			 . qq(prevents operation "make $type"));
 	      next;
 	    }
 	    my ($pair) = grep s/^\s*(.*) -> $type:(.*)\@(.*)$/$1,$2,$3/,
 	      $ct->argv(qw(des -l -ahl), $eqhl, $pt)->stderr(0)->qx;
 	    my ($hlk, $prev, $vob) = split ',', $pair if $pair;
-	    next unless $prev;
+	    next INCT unless $prev;
+	    my $lct = ClearCase::Argv->new(); #Not autochomp
+	    my ($fl, $loaded) = $ENV{FORCELOCK};
+	    for my $l ($t, $prev) {
+	      if ($ct->argv(qw(lslock -s), "lbtype:$l\@$vob")->stderr(0)->qx) {
+		$lck = 1; #remember to lock the equivalent fixed type
+		#This should happen as vob owner, to retain the timestamp
+		my @out =
+		  $lct->argv('unlock', "lbtype:$l\@$vob")->stderr(1)->qx;
+		if (grep /^cleartool: Error/, @out) {
+		  if ($fl and !$loaded) {
+		    my $fn = $fl; $fn =~ s%::%/%g; $fn .= '.pm';
+		    require $fn;
+		    $fl->import;
+		    $loaded = 1;
+		  }
+		  if (!$fl) {
+		    print @out;
+		    next INCT;
+		  } elsif (funlocklt($l, $vob)) {
+		    next INCT;
+		  }
+		} else {
+		  print @out;
+		}
+	      }
+	    }
 	    if ($prev =~ /^(.*)_(\d+)(?:\.(\d+))?$/) {
 	      my ($base, $maj, $min) = ($1, $2, $3);
 	      my $new = "${base}_" .
@@ -1077,6 +1100,26 @@ sub _GenMkTypeSub {
 			    "$type:$t", "$type:$new")->system;
 	      $silent->argv(qw(mkhlink -nc), $prhl,
 			    "$type:$new", "$type:$prev")->system;
+	      if ($lck) {
+		my @out =
+		  $lct->argv('lock', "lbtype:$prev\@$vob")->stderr(1)->qx;
+		if (grep /^cleartool: Error/, @out) {
+		  if ($fl and !$loaded) {
+		    my $fn = $fl; $fn =~ s%::%/%g; $fn .= '.pm';
+		    require $fn;
+		    $fl->import;
+		    $loaded = 1;
+		  }
+		  if (!$fl) {
+		    print @out;
+		    next INCT;
+		  } elsif (flocklt($prev, $vob)) {
+		    next INCT;
+		  }
+		} else {
+		  print @out;
+		}
+	      }
 	    } else {
 	      warn "Previous increment non suitable in $t: $prev\n";
 	      next;
@@ -1466,7 +1509,7 @@ sub mklabel {
   my ($ret, @rec, @mod) = 0;
   if (grep /^-r(ec|$)/, @opt) {
     if (@et) {
-      #Work around bug on Windows with the -vob option: keep checkout info
+      #The -vob_only flag would hide the checkout info for files
       @rec = grep m%@@[/\\]%, $ct->argv(qw(ls -s -r), @elems)->qx;
     } else {
       $mkl->syfail(1) unless $opt{force};
