@@ -1064,7 +1064,8 @@ sub _GenMkTypeSub {
 	    next INCT unless $prev;
 	    my $lct = ClearCase::Argv->new(); #Not autochomp
 	    my ($fl, $loaded) = $ENV{FORCELOCK};
-	    for my $l ($t, $prev) {
+	    my ($t1) = $t =~ /^(.*?)(@|$)/;
+	    for my $l ($t1, $prev) {
 	      if ($ct->argv(qw(lslock -s), "lbtype:$l\@$vob")->stderr(0)->qx) {
 		$lck = 1; #remember to lock the equivalent fixed type
 		#This should happen as vob owner, to retain the timestamp
@@ -1092,14 +1093,15 @@ sub _GenMkTypeSub {
 	      my ($base, $maj, $min) = ($1, $2, $3);
 	      my $new = "${base}_" .
 		(defined($min)? $maj . '.' . ++$min : ++$maj);
-	      map { $_ .= $1 } ($new, $prev) if $t =~ /^.*(@.*)$/;
+	      my $p1 = $prev;
+	      map { $_ .= $1 } ($new, $p1) if $t =~ /^.*(@.*)$/;
 	      $ntype->opts(@cmt, $ntype->opts);
 	      $ntype->args($new)->system and exit 1;
 	      $silent->argv('rmhlink', $hlk)->system;
 	      $silent->argv(qw(mkhlink -nc), $eqhl,
 			    "$type:$t", "$type:$new")->system;
 	      $silent->argv(qw(mkhlink -nc), $prhl,
-			    "$type:$new", "$type:$prev")->system;
+			    "$type:$new", "$type:$p1")->system;
 	      if ($lck) {
 		my @out =
 		  $lct->argv('lock', "lbtype:$prev\@$vob")->stderr(1)->qx;
