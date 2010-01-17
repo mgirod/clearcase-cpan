@@ -96,3 +96,7 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- mklbtype: fix to -fam when explicit type prefix used
 	- checkin: fixes to -diff (from genealogy) and -rec
 	- mklbtype -inc now unlocks the label types, and re-locks the fixed
+
+0.18 Sat Jan 16 17:15:31 GMTST 2010
+        - co: detect unrecognize option errors
+	- unco: bugfix to removing useless branch

@@ -1,6 +1,6 @@
 package ClearCase::Wrapper::MGi;
 
-$VERSION = '0.17';
+$VERSION = '0.18';
 
 use warnings;
 use strict;
@@ -498,7 +498,7 @@ sub _Unco {
   my @rm = ();
   for my $d (@b0) {
     opendir BR, $d or next;
-    my @f = grep !/\.\.?/, readdir BR;
+    my @f = grep !/^\.\.?$/, readdir BR;
     closedir BR;
     push @rm, $d if (scalar @f == 2) and $f[0] eq '0' and $f[1] eq 'LATEST';
   }
@@ -698,6 +698,8 @@ sub checkout {
   $co->parse(qw(reserved unreserved nmaster out=s ndata ptime nwarn
 		version branch=s query nquery usehijack
 		cquery|cqeach nc c|cfile=s));
+  my ($unsup) = grep /^-/, $co->args;
+  die Msg('E', qq(Unrecognized option "$unsup")) if $unsup;
   if (MSWIN) {
     my @args = $co->args;
     map { $_ = glob($_) } @args;
