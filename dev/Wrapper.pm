@@ -1,6 +1,6 @@
 package ClearCase::Wrapper;
 
-$VERSION = '1.15';
+$VERSION = '1.16';
 
 require 5.006;
 
@@ -18,7 +18,7 @@ BEGIN {
 use constant MSWIN => $^O =~ /MSWin32|Windows_NT/i ? 1 : 0;
 
 # This is the list of functions we want to export to overlay pkgs.
-@exports = qw(MSWIN GetOptions Assert Msg Pred ViewTag
+@exports = qw(MSWIN GetOptions _Burrow Assert Msg Pred ViewTag
 		    AutoCheckedOut AutoNotCheckedOut AutoViewPrivate);
 
 # Hacks for portability with Windows env vars.
@@ -365,6 +365,31 @@ or entirely new commands to be synthesized.
 ## Internal service routines, autoloaded since not always needed.
 ###########################################################################
 
+# Function to parse 'include' stmts recursively.  Used by
+# config-spec parsing meta-commands. The first arg is a
+# "magic incrementing string", the second a filename,
+# the third an "action" which is eval-ed
+# for each line.  It can be as simple as 'print' or as
+# complex a regular expression as desired. If the action is
+# null, only the names of traversed files are printed.
+sub _Burrow {
+    local $input = shift;
+    my($filename, $action) = @_;
+    print $filename, "\n" if !$action;
+    $input++;
+    if (!open($input, $filename)) {
+	warn "$filename: $!";
+	return;
+    }
+    while (<$input>) {
+	if (/^include\s+(.*)/) {
+	    _Burrow($input, $1, $action);
+	    next;
+	}
+	eval $action if $action;
+    }
+}
+
 # For standard format error msgs - see code for examples.
 sub Msg {
     my $key = shift;
@@ -603,7 +628,7 @@ sub extensions {
 	print "$ExtMap{$_}::" if $opt{long};
 	print $_, "\n";
     }
-    exit 0;
+    return(0, 'done');
 }
 
 =item * CI/CHECKIN
@@ -682,7 +707,7 @@ sub checkin {
     }
 
     # Unless -diff or -revert in use, we're done.
-    $ci->exec unless $opt{'diff'} || $opt{revert};
+    return($ci->system, 'done') unless $opt{'diff'} || $opt{revert};
 
     # Make sure the -pred flag is there as we're going one at a time.
     my $diff = $ci->clone->prog('diff');
@@ -711,7 +736,7 @@ sub checkin {
     }
 
     # All done, no need to return to wrapper program.
-    exit $?>>8;
+    return($?>>8, 'done');
 }
 
 =item * CO/CHECKOUT
@@ -778,9 +803,9 @@ sub diff {
     $diff->opts(@opts, @extra) if @extra;
     if ($auto && @elems > 1) {
 	for (@elems) { $diff->args($_)->system }
-	exit $?;
+	return($?, 'done');
     } else {
-	$diff->exec;
+	return($diff->system, 'done');
     }
 }
 
@@ -851,7 +876,7 @@ sub diffcr {
 		print;
 	    }
 	}
-	exit(0);
+	return(0, 'done');
     }
 }
 
@@ -894,12 +919,12 @@ sub edit {
     $co->autofail(1)->system if $co->args;
     # Run the editor, check return code.
     $ed->system;
-    exit $? unless $opt{'ci'};
+    return($?, 'done') unless $opt{'ci'};
     my $ci = Argv->new([$^X, '-S', $0, 'ci']);
     $ci->opts($co->optsCI);
     $ci->opts('-revert') unless $ci->opts;
     $ci->args($ed->args);
-    $ci->exec;
+    return($ci->system, 'done');
 }
 
 # No POD for this one because no options (same as native variant).
@@ -920,7 +945,7 @@ sub help {
 		push(@text, $msg);
 	    }
 	    print @text, "\n";
-	    exit 0;
+	    return(0, 'done');
 	} else {
 	    return 0;
 	}
@@ -937,7 +962,7 @@ sub help {
 	my $star = ClearCase::Wrapper::Native($_) ? '' : '*';
 	print "Usage: $star$_ $text\n";
     }
-    exit 0;
+    return(0, 'done');
 }
 
 =item * LSPRIVATE
@@ -1003,7 +1028,7 @@ sub lsprivate {
 	    $lsp->opts($lsp->opts, '-tag', $tag) if !$lsp->flag('tag');
 	}
 	chomp(my @privs = sort $lsp->qx);
-	exit $? if $? || !@privs;
+	return($?, 'done') if $? || !@privs;
 	# Strip out all results which are not eclipsed. An element
 	# is eclipsed if (a) there's a view-private copy,
 	# (b) there's also a versioned copy, and (c) it's not checked out.
@@ -1038,7 +1063,7 @@ sub lsprivate {
 	    $opt{type} ||= 'e' if $opt{visible};
 	    $job = "grep {-$opt{type}} $job" if $opt{type};
 	    eval qq(\@privs = $job \@privs);
-	    exit 0 if !@privs;
+	    return(0, 'done') if !@privs;
 	}
 	if ($opt{ext}) {	# sort by extension
 	    require File::Basename;
@@ -1048,9 +1073,9 @@ sub lsprivate {
 	       @privs;
 	}
 	for (@privs) { print $_, "\n" }
-	exit 0;
+	return(0, 'done');
     }
-    $lsp->exec;
+    return($lsp->system, 'done');
 }
 
 =item * LSVIEW
@@ -1063,7 +1088,7 @@ searched namespace to E<lt>B<username>E<gt>_*.
 sub lsview {
     my @args = grep !/^-me/, @ARGV;
     push(@args, "$ENV{LOGNAME}_*") if @args != @ARGV;
-    ClearCase::Argv->new(@args)->autoquote(0)->exec;
+    return(ClearCase::Argv->new(@args)->autoquote(0)->system, 'done');
 }
 
 =item * MKELEM
@@ -1163,7 +1188,7 @@ sub mkelem {
     }
 
     # Done - don't drop back to main program.
-    exit $?;
+    return($?, 'done');
 }
 
 =item * UNCO
@@ -1186,7 +1211,7 @@ sub uncheckout {
     $unco->optset('IGNORE');
     $unco->parseIGNORE(qw(c|cfile=s cqe|nc));
     $unco->args(sort {$b cmp $a} AutoCheckedOut($opt{ok}, $unco->args));
-    $unco->exec;
+    return($unco->system, 'done');
 }
 
 =back
