@@ -154,3 +154,7 @@ Revision history for Perl extension ClearCase::Wrapper.
 
 1.15 Sun Dec 14 18:01:56 GMTST 2008
 	- Under CYGWIN as well, default to ipc mode.
+
+1.16 Sat Jan 16 19:02:15 GMTST 2010
+        - _Burrow taken from DSB.pm
+	- Loop reading std input when no args
