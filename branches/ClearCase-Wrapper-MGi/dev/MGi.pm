@@ -1,6 +1,6 @@
 package ClearCase::Wrapper::MGi;
 
-$VERSION = '0.18';
+$VERSION = '0.19';
 
 use warnings;
 use strict;
@@ -564,13 +564,16 @@ sub _Checkin {
 
 =head1 NAME
 
-ClearCase::Wrapper::MGi - Marc Girod's contributed cleartool wrapper functions
+ClearCase::Wrapper::MGi - Support for an alternative to UCM.
 
 =head1 SYNOPSIS
 
 This is an C<overlay module> for B<ClearCase::Wrapper> containing Marc
 Girod's non-standard extensions. See C<perldoc ClearCase::Wrapper> (by
 David Boyce) for more details.
+
+The alternative to UCM consists in a novel branching model, and a concept
+of incremental types.
 
 =head1 CLEARTOOL EXTENSIONS
 
@@ -762,7 +765,7 @@ an equal basis as parents on the same physical branch.
 In case there are multiple parents, consider the one on the same branch as
 'more equal than the others' (least surprise principle).
 
-Preserve the (Wrapper default) assumption of a B<-pred> flag, is only one
+Preserve the (Wrapper default) assumption of a B<-pred> flag, if only one
 argument is given.
 
 =cut
@@ -1062,7 +1065,7 @@ sub _GenMkTypeSub {
 	    }
 	    my ($pair) = grep s/^\s*(.*) -> $type:(.*)\@(.*)$/$1,$2,$3/,
 	      $ct->argv(qw(des -l -ahl), $eqhl, $pt)->stderr(0)->qx;
-	    my ($hlk, $prev, $vob) = split ',', $pair if $pair;
+	    my ($hlk, $prev, $vob) = split /,/, $pair if $pair;
 	    next INCT unless $prev;
 	    my $lct = ClearCase::Argv->new(); #Not autochomp
 	    my ($fl, $loaded) = $ENV{FORCELOCK};
