@@ -100,3 +100,6 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 0.18 Sat Jan 16 17:15:31 GMTST 2010
         - co: detect unrecognize option errors
 	- unco: bugfix to removing useless branch
+
+0.19 Mon Jan 18 19:11:32 GMTST 2010
+        - VobPathConv: fix to the conversion of Windows/cygwin paths

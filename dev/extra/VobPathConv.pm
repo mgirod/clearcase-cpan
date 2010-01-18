@@ -44,7 +44,7 @@ sub winpath2ux($) {
   my $path = shift;
   return $path if $locreg eq $unixreg;
   $path =~ s/[a-zA-Z]:\\+(.*)$/$1/;
-  my @d = split m%/|\\%, $path;
+  my @d = grep {length $_} split m%/|\\%, $path;
   shift @d if $ct->argv(qw(lsview -s), $d[0])->stderr(0)->qx;
   return '' unless @d;
   my ($uuid) = grep s/^\s+Vob tag replica uuid: (.*)$/$1/,
