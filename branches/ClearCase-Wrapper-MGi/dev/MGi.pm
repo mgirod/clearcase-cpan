@@ -749,9 +749,19 @@ sub mkbranch {
   $mkbranch->parse(qw(nwarn nco ptime cquery|cqeach nc c|cfile=s));
   my @args = $mkbranch->args;
   my $bt = shift @args;
-  $bt =~ s/^brtype:(.*)$/$1/;
-  die if $ct->argv(qw(des -s), "brtype:$bt")->stdout(0)->system;
   map { $_ = glob($_) } @args if MSWIN;
+  $bt =~ s/^brtype:(.*)$/$1/;
+  my %v;
+  if ($bt =~ /\@/) {
+    $v{''} = 1;
+  } else {
+    for my $a (@args) {
+      $v{$ct->argv(qw(des -fmt), '@%n', "vob:$a")->stderr(0)->qx}++;
+    }
+  }
+  for (keys %v) {
+    die if $ct->argv(qw(des -s), "brtype:$bt$_")->stdout(0)->system;
+  }
   $mkbranch->args(@args);
   $mkbranch->{bt} = $bt;
   $mkbranch->{ver} = $ver;
@@ -1185,6 +1195,12 @@ sub mklbtype {
   $ntype->parse(qw(global|ordinary vpelement|vpbranch|vpversion
 		   pbranch|shared gt|ge|lt|le|enum|default|vtype=s
 		   cquery|cqeach nc c|cfile=s));
+  if (!$ntype->args) {
+    warn Msg('E', 'Type name required.');
+    @ARGV = qw(help mklbtype);
+    ClearCase::Wrapper->help();
+    return 1;
+  }
   $ntype->{fopts} = \%opt;
   $ntype->{rep} = $opt{archive}? 1 : $rep;
   my $tst = $ntype->{rep}? _GenExTypeSub('lbtype') : 0;
@@ -1658,6 +1674,12 @@ sub checkin {
   }
   # Now do auto-aggregation on the remaining args.
   my @elems = AutoCheckedOut($opt{ok}, $ci->args); # may exit
+  if (!@elems) {
+    warn Msg('E', 'Element pathname required.');
+    @ARGV = qw(help checkin);
+    ClearCase::Wrapper->help();
+    return 1;
+  }
   # Turn symbolic links into their targets so CC will "do the right thing".
   for (@elems) {
     $_ = readlink if -l && defined readlink;
