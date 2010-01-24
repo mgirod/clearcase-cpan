@@ -968,11 +968,15 @@ sub _GenMkTypeSub {
       }
     } elsif (%opt) {
       map { s/^${type}:(.*)$/$1/ } @args;
-      my @a = @args;
-      my @vob = grep { s/.*\@(.*)$/$1/ } @a;
+      my (@a, $unkvob) = @args;
+      my @vob = grep { s/[^@]+\@(.*)$/$1/ } @a;
+      for (@vob) {
+	$unkvob++ if $silent->argv(qw(des -s), "vob:$_")->system;
+      }
+      return 1 if $unkvob;
       push @vob, $ct->argv(qw(des -s vob:.))->stderr(0)->qx
 	if grep !/@/, @args;
-      die  Msg('E', qq(Unable to determine VOB for pathname ".".\n))
+      die  Msg('E', qq(Unable to determine VOB for pathname ".".))
 	unless @vob;
       _Ensuretypes(@vob);
       if ($rep) {
@@ -1076,7 +1080,10 @@ sub _GenMkTypeSub {
 	    my ($pair) = grep s/^\s*(.*) -> $type:(.*)\@(.*)$/$1,$2,$3/,
 	      $ct->argv(qw(des -l -ahl), $eqhl, $pt)->stderr(0)->qx;
 	    my ($hlk, $prev, $vob) = split /,/, $pair if $pair;
-	    next INCT unless $prev;
+	    if (!$prev) {
+	      warn Msg('E', "Not a family type: $t");
+	      next INCT;
+	    }
 	    my $lct = ClearCase::Argv->new(); #Not autochomp
 	    my ($fl, $loaded) = $ENV{FORCELOCK};
 	    my ($t1) = $t =~ /^(.*?)(@|$)/;

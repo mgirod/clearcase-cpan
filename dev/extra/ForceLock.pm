@@ -14,11 +14,10 @@ use ClearCase::VobPathConv;
 our $flk = '/usr/bin/locklbtype';
 our $view = 'perl_view';
 our $exec = '/opt/rational/clearcase/bin/cleartool setview -exec';
-use feature 'state';
 sub ssh() {
   my $host = 'my.unix.sshd.host';
-  state $ssh = Net::SSH::Perl->new($host);
-  state $account = getlogin || getpwuid($<)
+  my $ssh = Net::SSH::Perl->new($host);
+  my $account = getlogin || getpwuid($<)
     or die "Couldn't get the uid: $!\n";
   $ssh->login($account);
   return $ssh;
