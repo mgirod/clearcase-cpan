@@ -121,6 +121,12 @@ sub reuse {
     return $self->{ST_REUSE};
 }
 
+sub vreuse {
+    my $self = shift;
+    $self->{ST_VREUSE} = shift if @_;
+    return $self->{ST_VREUSE};
+}
+
 sub ignore_co {
     my $self = shift;
     $self->{ST_IGNORE_CO} = shift if @_;
@@ -270,7 +276,8 @@ sub dstbase {
 	-e $dbase || mkpath($dbase, 0, 0777) || die "$0: Error: $dbase: $!";
 	my $ct = $self->clone_ct;
 	$ct->autofail(1)->autochomp(1);
-	my $olddir = $ct->_chdir($dbase) || die "$0: Error: $dbase: $!";
+	my $olddir = getcwd;
+	$ct->_chdir($dbase) || die "$0: Error: $dbase: $!";
 	$dbase = getcwd;
 	my $dv = $ct->pwv(['-s'])->qx;
 	die "$0: Error: destination base ($dbase) not in a view/VOB context"
@@ -330,6 +337,8 @@ sub dstbase {
 	}
 	$ct->_chdir($olddir) || die "$0: Error: $olddir: $!";
 	$self->{ST_DSTBASE} = $dbase;
+	$dbase =~ s%^.*?$dvob%$dvob%;
+	$self->{ST_DSTVBAS} = $dbase;
     }
     return $self->{ST_DSTBASE};
 }
@@ -484,6 +493,29 @@ sub dstcheck {
     $self->{ST_PRE} = { map {$_ => 1} @existing };
 }
 
+# Comparator function used to implement the -vreuse option
+# If the default comparaison fails, look at versions of suitable size
+# in the version tree, and apply the comparaison to them.
+# If a suitable version is found, add it to a list of versions on which
+# to apply a label.
+sub vtcomp {
+    my($self, $src, $dst) = @_;
+    my $cmp = $self->cmp_func;
+    return 0 unless &$cmp($src, $dst);
+    my $vt = ClearCase::Argv->lsvtree([qw(-a -s -nco)]);
+    my @vt = grep {m%[\\/][1-9]\d*$%} $vt->args($dst)->qx;
+    chomp @vt;
+    my $sz = (stat $src)[7];
+    for (@vt) {
+        next if (stat)[7] != $sz;
+	if (!&$cmp($src, $_)) {
+	    push @{$self->{ST_LBL}}, $_;
+	    return 0;
+	}
+    }
+    return 1;
+}
+
 sub _needs_update {
     my($self, $src, $dst, $comparator) = @_;
     my $update = 0;
@@ -496,11 +528,12 @@ sub _needs_update {
 	    $update = 1;
 	} elsif (-s $src != -s $dst) {
 	    $update = 1;
+	} elsif ($self->vreuse) {
+	    $update = $self->vtcomp($src, $dst);
 	} else {
 	    $update = &$comparator($src, $dst);
-	    die "$0: Error: failed comparing $src vs $dst: $!"
-							if $update < 0;
 	}
+	die "$0: Error: failed comparing $src vs $dst: $!" if $update < 0;
     } else {
 	$update = 1;
     }
@@ -798,6 +831,7 @@ sub add {
 	my $snapview = $self->snapdest;
 	my $vt = ClearCase::Argv->lsvtree([qw(-a -s -nco)]);
 	my $ds = ClearCase::Argv->desc([qw(-s)]);
+	my $dm = ClearCase::Argv->desc([qw(-fmt %m)]);
 	$ds->stderr(1);
 	my $ln = ClearCase::Argv->ln;
 	my %reused;
@@ -805,11 +839,18 @@ sub add {
 	    my($name, $dir) = fileparse($elem);
 	    chomp(my @vtree = reverse $vt->args($dir)->qx);
 	    for (@vtree) {
-		next unless m%(\d+)$% && $1 > 0;	# optimization
+		next unless m%[/\\](\d+)$% && $1 > 0;	# optimization
 		my $dirext = "$_/$name@@";
 		# case-insensitive file test operator on Windows is a problem
 		if ($snapview ? $ds->args($dirext)->qx !~ /Error:/ :
 							ecs("$_/$name")) {
+		    next if $dm->args("$_/$name") eq 'directory version';
+		    while (-l "$_/$name") {
+		        $name = readlink "$_/$name";
+			$name =~ s/\@\@$//;
+			next if !ecs("$_/$name")
+			  || $dm->args("$_/$name") eq 'directory version';
+		    }
 		    $reused{$elem} = 1;
 		    delete $files{$elem};
 		    unlink($elem);
@@ -883,6 +924,45 @@ sub modify {
 	my @toco;
 	for (@files) {
 	    my $dst = $self->{ST_MOD}->{$_}->{dst};
+	    if (-l $dst) {
+	        # The source is a file, but the destination is a symlink: look
+	        # (recursively) at what this one points to, and link in this
+	        # file.
+	        # Remember the symlinks on the way. Build up the path of the
+	        # destination, in such a way that it may be found, or not, in
+	        # the hash.
+	        use Cwd 'abs_path';
+		my @sl;
+		my $sep = qr%[/\\]%;
+	        while (-l $dst) {
+		    push @sl, $dst;
+		    my $tgt = readlink $dst;
+		    my $dir = dirname $dst;
+		    if ($tgt =~ m%^[^/\\]%) {
+		        $tgt = abs_path(catfile($dir, $tgt));
+			$tgt =~ s%^$self->{DSTVBAS}$sep%%;
+		      } else {
+			$tgt = catfile($dir, $tgt);
+		      }
+		    $dst = $tgt;
+		}
+		if (exists $self->{ST_MOD}->{$dst}) {
+		    if (grep {$_ eq $dst} @symlinks) {
+			# Remove $dst for the list of symlinks
+			my $i = 0;
+			for (@symlinks) {
+			    last if $_ eq $dst;
+			    $i++;
+			}
+			splice @symlinks, $i, 1;
+		    } else {
+			die "Two sources for the same destination: $_ and $dst";
+		    }
+		} else {
+		    # ???
+		}
+		# Process symlinks
+	    }
 	    push(@toco, $dst) if !exists($self->{ST_PRE}->{$dst});
 	}
 	$self->branchco(0, @toco) if @toco;
@@ -929,7 +1009,8 @@ sub subtract {
 	$self->branchco(1, $dad) if !$checkedout{$dad}++;
     }
     my $r_cmnt = $self->comment;
-    $ct->argv('rmname', $r_cmnt, @exfiles)->system if @exfiles;
+    # -force for checkedouts, in case reuse brought some hardlinks back
+    $ct->argv(qw(rmname -f), @{$r_cmnt}, @exfiles)->system if @exfiles;
     my @exdirs;
     while (1) {
 	for (sort {$b cmp $a} keys %dirs) {
@@ -968,12 +1049,17 @@ sub label {
 	$locked = $self->clone_ct->lslock(['-s'], "lbtype:$lbtype\@$dbase")->qx;
 	$ct->unlock("lbtype:$lbtype\@$dbase")->system if $locked;
     }
+    # Allow for labelling errors, in case of hard links: only the link
+    # recorded can be labelled, the other being seen as 'removed'
     if ($self->label_mods) {
-	if (my @mods = $self->_lsco) {
-	    $ctq->mklabel([qw(-nc -rep), $lbtype], @mods)->system;
-	}
+	my @mods = $self->_lsco;
+	push @mods, @{$self->{ST_LBL}} if $self->{ST_LBL};
+	$ctbool->mklabel([qw(-nc -rep), $lbtype], @mods)->system if @mods;
     } else {
-	$ctq->mklabel([qw(-nc -rep -rec), $lbtype], $dbase)->system;
+	$ctbool->mklabel([qw(-nc -rep -rec), $lbtype], $dbase)->system;
+	# Possibly move the label back to the right versions
+	$ctbool->mklabel([qw(-nc -rep), $lbtype], @{$self->{ST_LBL}})->system
+	                                                   if $self->{ST_LBL};
 	# Last, label the ancestors of the destination back to the vob tag.
 	my $dvob = $self->normalize($self->dstvob);
 	my($dad, @ancestors);
@@ -1043,6 +1129,12 @@ sub checkin {
 	    $ct->ci([@ptime, @cmnt, qw(-ide -rm -from), $src], $dst)->system;
 	}
     }
+    # Check-in first the files modified under the recorded names,
+    # in case of hardlinks, since checking the other link first
+    # in a pair would fail.
+    my @mods;
+    push @mods, $self->{ST_MOD}->{$_}->{dst} for keys %{$self->{ST_MOD}};
+    $ct->argv('ci', [@cmnt, '-ide', @ptime], sort @mods)->system if @mods;
     # Check in anything not handled above.
     my %checkedout = map {$_ => 1} $self->_lsco;
     my @todo = grep {m%^\Q$mbase%} keys %checkedout;
@@ -1219,7 +1311,7 @@ given usage may be assumed to look like:
 
     $obj->method;
 
-=over 4
+=over 24
 
 =item * -E<gt>srcbase
 
@@ -1357,6 +1449,14 @@ to be the same element and link the old and new names.
 
     $obj->reuse(1);
 
+=item * -E<gt>vreuse
+
+Attempt "version reuse". Instead of creating a new version, apply the
+label provided onto an old suitable one, even if it wasn't selected by
+the config spec.
+
+    $obj->vreuse(1);
+
 =item * -E<gt>ctime
 
 Sets a boolean indicating whether to throw away the timestamp of the
@@ -1428,7 +1528,7 @@ overridden at creation time. Example:
 BranchOff is a feature you can set up via an attribute in your config
 spec.  The rationale and the design are documented in:
 
- http://www.cmcrossroads.com/cgi-bin/cmwiki/view/CM/BranchOffMain0
+ http://www.cmwiki.com/BranchOffMain0
 
 Instead of branching off the selected version, the strategy is to
 branch off the root of the version tree, copy-merging there from the

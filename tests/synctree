@@ -58,6 +58,7 @@ Flags:
    -verbose <n>		Set to 0 for least verbosity, 2 for most (default=1)
    -Narrow [!]<re>	Limit files found to those which match /re/
    -Version		Print the current $prog version and quit
+   -vreuse		Attempt to reuse existing versions of same element
    -/dbg=1		Verbose mode: show cleartool cmds as they run
 Notes:
     All flags may be abbreviated to their shortest unique name.
@@ -136,8 +137,8 @@ local $Getopt::Long::ignorecase = 0;  # global override for dumb default
 }
 GetOptions(\%opt, qw(sbase=s dbase=s flist=s label|mklabel=s lbmods map
 		     Narrow=s@
-		     ci cr ctime follow force reuse rellinks rmname stop
-		     ignore_co overwrite_co
+		     ci cr ctime follow force rellinks rmname stop
+		     reuse vreuse ignore_co overwrite_co
 		     help no ok quiet yes
 		     summary verbose=i vp Version
 )) || ($noexit?return 1:exit 1);
@@ -150,6 +151,7 @@ usage("-sbase is a required flag") if !$opt{sbase};
 usage("-dbase is a required flag") if !$opt{dbase};
 usage("-force and -stop are mutually exclusive") if $opt{force} && $opt{stop};
 usage("-yes and -no are mutually exclusive") if $opt{yes} && $opt{no};
+usage("-vreuse requires -label") if $opt{vreuse} && !$opt{label};
 
 # Implement the -summary functionality.
 if ($opt{summary}) {
@@ -258,8 +260,9 @@ if ($opt{map}) {
 
 # Allow the protect default to be overridden.
 $sync->protect(0) if $opt{nprotect};
-# Attempt element reconstitution.
+# Attempt element reconstitution, and/or version reuse.
 $sync->reuse(1) if $opt{reuse};
+$sync->vreuse(1) if $opt{vreuse};
 # The user may wish to leave existing checkouts in the dest base untouched ...
 $sync->ignore_co(1) if $opt{ignore_co};
 # ... or may wish to see them overwritten.
@@ -429,7 +432,7 @@ Not all options are described here, only those requiring elaboration
 beyond the C<-help> summary. Run C<synctree -help> for a full option
 summary.
 
-=over 4
+=over 7
 
 =item * I<-force, -stop>
 
@@ -487,6 +490,22 @@ one. They could conceivably even be of different element types.
 
 I<The B<-reuse> feature is not well tested and should still be considered
 B<experimental>.>
+
+=item * I<-vreuse>
+
+If two alternative releases of the same tree are imported in alternance,
+new versions are created at every step, as the result of even imports is
+systematically hidden by odd ones.
+
+This flag will check for suitable versions of the elements in their
+version tree, and apply there the label provided with the I<-label>
+option. This will considerably slow down the processing, but win back on
+avoiding to check in duplicates of large binaries. And avoiding to unduly
+grow the vob size if imports are run for instance from crontabs.
+
+Consider forcing the ipc mode of I<ClearCase::Argv>, with I<-/ipc=1>, and
+using the BranchOff feature, both of which are relevant to this kind of
+situation.
 
 =item * I<-Narrow>
 
@@ -551,7 +570,7 @@ Synctree is comparable to I<citree> and I<clearfsimport>. It is similar
 to citree but has more options and runs on both Windows and UNIX. It
 has the following advantages over clearfsimport:
 
-=over 4
+=over 5
 
 =item *
 
@@ -591,7 +610,7 @@ clearfsimport; check current documentation.
 
 =head1 BUGS
 
-=over 4
+=over 3
 
 =item *
 
