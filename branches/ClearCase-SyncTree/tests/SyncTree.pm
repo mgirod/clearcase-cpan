@@ -503,11 +503,11 @@ sub vtcomp {
     my $cmp = $self->cmp_func;
     return 0 unless &$cmp($src, $dst);
     my $vt = ClearCase::Argv->lsvtree([qw(-a -s -nco)]);
-    my @vt = grep {m%[\\/][1-9]\d*$%} $vt->args($dst)->qx;
+    my @vt = grep {m%[\\/]\d*$%} $vt->args($dst)->qx;
     chomp @vt;
-    my $sz = (stat $src)[7];
+    my $sz = -s $src;
     for (@vt) {
-        next if (stat)[7] != $sz;
+        next if -s $_ != $sz;
 	if (!&$cmp($src, $_)) {
 	    push @{$self->{ST_LBL}}, $_;
 	    return 0;
@@ -526,10 +526,10 @@ sub _needs_update {
     } elsif (! -l $src && ! -l $dst) {
 	if (!defined($comparator)) {
 	    $update = 1;
-	} elsif (-s $src != -s $dst) {
-	    $update = 1;
 	} elsif ($self->vreuse) {
 	    $update = $self->vtcomp($src, $dst);
+	} elsif (-s $src != -s $dst) {
+	    $update = 1;
 	} else {
 	    $update = &$comparator($src, $dst);
 	}
