@@ -739,10 +739,100 @@ sub add {
     my $mbase = $self->_mkbase;
     my $ct = $self->clone_ct;
     return if ! $self->{ST_ADD};
+    if ($self->reuse) { # Reuse directories
+	my (%dir, %rm, %dseen);
+	for my $d (sort keys %{$self->{ST_ADD}}) {
+	    my $dst = $self->{ST_ADD}->{$d}->{dst};
+	    my $dad = dirname($dst);
+	    next if $dseen{$dad}++;
+	    next if -d $dad && ! -l $dad;
+	    $rm{$dad}++ if -f $dad || -l $dad;
+	    $dir{$dad} = dirname($d);
+	}
+	my (%seen, %found, $reused);
+	my $snapview = $self->snapdest;
+	my $vt = ClearCase::Argv->lsvtree([qw(-a -s -nco)]);
+	my $ds = ClearCase::Argv->desc([qw(-s)]);
+	my $dm = ClearCase::Argv->desc([qw(-fmt %m)]);
+	my $rm = ClearCase::Argv->rm();
+	$ds->stderr(1);
+	my $lsco = ClearCase::Argv->lsco([qw(-s -d)]);
+	my $ln = ClearCase::Argv->ln;
+	for my $dst (sort keys %dir) {
+	    next if $seen{$dst}++;
+	    my($name, $dir) = fileparse($dst);
+	    if ($rm{$dst}) {
+	        $self->branchco(1, $dir) unless $lsco->args($dir)->qx;
+		$rm->args($dst)->system;
+	    }
+	    chomp(my @vtree = reverse $vt->args($dir)->qx);
+	    for (@vtree) {
+		next unless m%[/\\][1-9]\d*$% ;	# optimization
+		my $dirext = "$_/$name@@";
+		# case-insensitive file test operator on Windows is a problem
+		if ($snapview ? $ds->args($dirext)->qx !~ /Error:/ :
+							    ecs("$_/$name")) {
+		    next if $dm->args("$_/$name")->qx eq 'file element';
+		    while (-l "$_/$name") {
+		        $name = readlink "$_/$name";
+			$name =~ s/\@\@$//;
+			next if !ecs("$_/$name") || $dm->args("$_/$name")->qx
+			                                    eq 'file element';
+		    }
+		    $reused = 1;
+		    $self->branchco(1, $dir) unless $lsco->args($dir)->qx;
+		    $ln->args("$_/$name", $dst)->system;
+		    # Need to reevaluate all the files under this dir
+		    my $d = $dir{$dst};
+		    my $flt = qr{^(${d}/.*?)(/.*)?$}; # paths normalized
+		    if ($self->remove) {
+		        opendir(DIR, $dst);
+			my @f = grep !m%^\.\.?$%, readdir DIR;
+			closedir DIR;
+			my %ok = map { $_ => 1 } grep s%$flt%$1%,
+			                           keys %{$self->{ST_SRCMAP}};
+			my $dbase = $self->dstbase;
+			for (@f) {
+			    my $f = "$d/$_";
+			    push @{$self->{ST_SUB}->{exfiles}},
+			         join('/', $self->dstbase, $f) unless $ok{$f};
+			}
+		    }
+		    my $cmp = $self->no_cmp ? undef : $self->cmp_func;
+		    my %dseen;
+		    for my $e (grep m%^$d%, keys %{$self->{ST_ADD}}) {
+		        if (exists($self->{ST_ADD}->{$e}->{dst})) {
+			    my $src = $self->{ST_ADD}->{$e}->{src};
+			    my $dst = $self->{ST_ADD}->{$e}->{dst};
+			    if (-e $dst) {
+			        $self->{ST_MOD}->{$e} = $self->{ST_ADD}->{$e}
+			            if $self->_needs_update($src, $dst, $cmp);
+				$found{$e}++;
+			    }
+			    my $dad = dirname($dst);
+			    # No new keys at this stage (inside the loop)!
+			    use Carp;
+			    confess "Error: assertion failure for $dad"
+			                             unless exists $dir{$dad};
+			    if (!($dseen{$dad}++ || (-d $dad && !-l $dad))) {
+			        $rm{$dad}++ if -f $dad || -l $dad;
+			    }
+			    $seen{$dst}++;
+			}
+		    }
+		    last;
+		}
+	    }
+	    if (!$reused) {
+	        mkpath($dst, 0, 0777) || die "$0: Error: $dst: $!";
+	    }
+	}
+	delete $self->{ST_ADD}->{$_} for keys %found;
+    }
     for (sort keys %{$self->{ST_ADD}}) {
 	my $src = $self->{ST_ADD}->{$_}->{src};
 	my $dst = $self->{ST_ADD}->{$_}->{dst};
-	if (-d $src && ! -l $src) {
+	if (-d $src && ! -l $src) { # Already checked in the reuse case
 	    -e $dst || mkpath($dst, 0, 0777) || die "$0: Error: $dst: $!";
 	} elsif (-e $src) {
 	    my $dad = dirname($dst);
@@ -758,10 +848,6 @@ sub add {
 		$self->{ST_CI_FROM}->{$_} = $self->{ST_ADD}->{$_}
 					    if !exists($self->{ST_PRE}->{$dst});
 	    }
-	} elsif (-l $src) {
-	    open(SLINK, ">$dst$lext") || die "$0: Error: $dst$lext: $!";
-	    print SLINK $self->mkrellink($src), "\n";;
-	    close(SLINK);
 	} else {
 	    warn "$0: Error: $src: no such file or directory\n";
 	    $ct->fail;
@@ -809,7 +895,7 @@ sub add {
 	}
 	if ($mkdir->args($cand)->system) {
 	    warn "Warning: unable to rename $tmpdir back to $cand!"
-						unless rename($tmpdir, $cand);
+		                                unless rename($tmpdir, $cand);
 	    $ct->fail;
 	    next;
 	}
@@ -843,13 +929,13 @@ sub add {
 		my $dirext = "$_/$name@@";
 		# case-insensitive file test operator on Windows is a problem
 		if ($snapview ? $ds->args($dirext)->qx !~ /Error:/ :
-							ecs("$_/$name")) {
-		    next if $dm->args("$_/$name") eq 'directory version';
+							    ecs("$_/$name")) {
+		    next if $dm->args("$_/$name")->qx eq 'directory element';
 		    while (-l "$_/$name") {
 		        $name = readlink "$_/$name";
 			$name =~ s/\@\@$//;
-			next if !ecs("$_/$name")
-			  || $dm->args("$_/$name") eq 'directory version';
+			next if !ecs("$_/$name") || $dm->args("$_/$name")->qx
+			                               eq 'directory element';
 		    }
 		    $reused{$elem} = 1;
 		    delete $files{$elem};
