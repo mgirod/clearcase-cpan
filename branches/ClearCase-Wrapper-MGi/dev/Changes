@@ -106,3 +106,6 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- mkbranch: argument in other vob
 	- error handling: mklbtype and checkin
 	- ForceLock: don't use 'state'--the ssh connection may time out
+	- mklbtype -inc: skip existing but unlinked type
+	- mklbtype -inc: add the comment option only once if several types
+	- diff: fix for the no predecessor case, and support for -n flag
