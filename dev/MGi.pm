@@ -785,6 +785,12 @@ sub diff {
     $_ = readlink if -l && defined readlink;
   }
   push(@ARGV, qw(-dir)) if @ARGV == 1;
+  my $limit = 0;
+  if (my @num = grep /^-\d+$/, @ARGV) {
+    @ARGV = grep !/^-\d+$/, @ARGV;
+    die Msg('E', "incompatible flags: @num") if @num > 1;
+    $limit = -int($num[0]);
+  }
   my $diff = ClearCase::Argv->new(@ARGV);
   $diff->autochomp(1);
   $diff->ipc(1) unless $diff->ctcmd(1);
@@ -799,6 +805,7 @@ sub diff {
   $diff->opts(grep !/-pred/, @opts) if $pred;
   $diff->args(@elems);
   $ct = $diff->clone();
+  my $rc = 0;
   for my $e (@elems) {
     my ($ele, $ver, $type) =
       $ct->argv(qw(des -fmt), '%En\n%En@@%Vn\n%m', $e)->qx;
@@ -811,11 +818,17 @@ sub diff {
     my $bra = $1 if $ver =~ m%^(.*?)/(?:\d+|CHECKEDOUT)$%;
     my %gen = _Parsevtree($ele, 1, $ver);
     my $p = $gen{$ver}{'parents'};
+    $p = $gen{$p->[0]}{'parents'} while $p and $limit--;
+    if (!$p) {
+      warn Msg('E', "No predecessor version to compare to: $e");
+      $rc = 1;
+      next;
+    }
     my ($brp) = grep { m%^$bra/\d+$% } @{$p};
     $ver = $ele if $ver =~ m%/CHECKEDOUT$%;
-    $diff->args($brp? $brp : $p->[0], $ver)->system;
+    $rc |= $diff->args($brp? $brp : $p->[0], $ver)->system;
   }
-  exit $?;
+  exit $rc;
 }
 
 =item * UNCHECKOUT
@@ -1071,6 +1084,7 @@ sub _GenMkTypeSub {
 	    }
 	  } keys %pair;
 	} elsif ($opt{increment}) { # increment
+	  $ntype->opts(@cmt, $ntype->opts);
 	  INCT: for my $t (@args) {
 	    my ($pt, $lck) = "$type:$t";
 	    if (!$ct->argv(qw(des -s), $pt)->stderr(0)->qx) {
@@ -1112,12 +1126,14 @@ sub _GenMkTypeSub {
 	      }
 	    }
 	    if ($prev =~ /^(.*)_(\d+)(?:\.(\d+))?$/) {
-	      my ($base, $maj, $min) = ($1, $2, $3);
-	      my $new = "${base}_" .
-		(defined($min)? $maj . '.' . ++$min : ++$maj);
-	      my $p1 = $prev;
-	      map { $_ .= $1 } ($new, $p1) if $t =~ /^.*(@.*)$/;
-	      $ntype->opts(@cmt, $ntype->opts);
+	      my ($base, $maj, $min, $new) = ($1, $2, $3);
+	      my $ext = ($t =~ /^.*(@.*)$/)? $1 : '';
+	      my $p1 = $prev . $ext;
+	      do {
+		$new = "${base}_" .
+		  (defined($min)? $maj . '.' . ++$min : ++$maj);
+		$new .= $ext;
+	      } while ($ct->argv(qw(des -s), "$type:$new")->stderr(0)->qx);
 	      $ntype->args($new)->system and exit 1;
 	      $silent->argv('rmhlink', $hlk)->system;
 	      $silent->argv(qw(mkhlink -nc), $eqhl,
