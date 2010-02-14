@@ -101,7 +101,7 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
         - co: detect unrecognize option errors
 	- unco: bugfix to removing useless branch
 
-0.19 Sun Jan 24 18:10:17 GMTST 2010
+0.19 Sun Feb 14 16:37:43 GMTST 2010
         - VobPathConv: fix to the conversion of Windows/cygwin paths
 	- mkbranch: argument in other vob
 	- error handling: mklbtype and checkin
@@ -109,3 +109,5 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- mklbtype -inc: skip existing but unlinked type
 	- mklbtype -inc: add the comment option only once if several types
 	- diff: fix for the no predecessor case, and support for -n flag
+	- lock -rep: fix for no -nusers
+	- unco: skip the dialog for dirs; rmbranch before handling next arg.
