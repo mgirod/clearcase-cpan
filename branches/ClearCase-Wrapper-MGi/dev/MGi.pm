@@ -431,7 +431,7 @@ sub _Preemptcmt { #return the comments apart: e.g. mklbtype needs discrimination
   if ($ncf or $cf) {
     if ($ncf) {
       $cmd->opts(grep !/^-nc(?:omment)?$/,@opts);
-      $ret = &$fn($cmd, qw(-nc));
+      $ret = $fn->($cmd, qw(-nc));
     } else {
       my $skip = 0;
       for (@opts) {
@@ -448,7 +448,7 @@ sub _Preemptcmt { #return the comments apart: e.g. mklbtype needs discrimination
 	}
       }
       $cmd->opts(@mod);
-      $ret = &$fn($cmd, @copt);
+      $ret = $fn->($cmd, @copt);
     }
   } elsif ($cqf) {
     my $cqe = grep /^-cqe/, @opts;
@@ -460,12 +460,12 @@ sub _Preemptcmt { #return the comments apart: e.g. mklbtype needs discrimination
       if ($cqe) {
 	my $arg = shift @arg;
 	$go = scalar @arg;
-	next if $tst and !&$tst($cmd, $arg);
+	next if $tst and !$tst->($cmd, $arg);
 	$cmd->args($arg);
 	print qq(Comments for "$arg":\n);
       } else {
 	$go = 0;
-	last if $tst and !&$tst($cmd, @arg); #None checked out
+	last if $tst and !$tst->($cmd, @arg); #None checked out
 	print "Comment for all listed objects:\n";
       }
       my $cmt = '';
@@ -478,9 +478,9 @@ sub _Preemptcmt { #return the comments apart: e.g. mklbtype needs discrimination
 	my ($fh, $cfile) = tempfile();
 	print $fh $cmt;
 	close $fh;
-	$ret |= &$fn($cmd, '-cfile', $cfile);
+	$ret |= $fn->($cmd, '-cfile', $cfile);
       } else {
-	$ret |= &$fn($cmd, '-c', $cmt);
+	$ret |= $fn->($cmd, '-c', $cmt);
       }
     }
   }
@@ -489,20 +489,19 @@ sub _Preemptcmt { #return the comments apart: e.g. mklbtype needs discrimination
 sub _Unco {
   use warnings;
   use strict;
-  my $unco = shift;
+  my ($unco, $rc) = (shift, 0);
   $ct = ClearCase::Argv->new({autochomp=>1});
-  my @b0 = grep { m%[\\/]CHECKEDOUT$% }
-    $ct->argv(qw(ls -s -d), $unco->args)->qx;
-  my $rc = $unco->system;
-  map { s%^(.*)[\\/]CHECKEDOUT$%$1% } @b0;
-  my @rm = ();
-  for my $d (@b0) {
-    opendir BR, $d or next;
-    my @f = grep !/^\.\.?$/, readdir BR;
-    closedir BR;
-    push @rm, $d if (scalar @f == 2) and $f[0] eq '0' and $f[1] eq 'LATEST';
+  for my $arg ($unco->args) { # Already sorted if several
+    my $b0 = $ct->argv(qw(ls -s -d), $arg)->qx;
+    $rc |= $unco->args($arg)->system;
+    if ($b0 =~ s%^(.*)[\\/]CHECKEDOUT$%$1%) {
+      opendir BR, $b0 or next;
+      my @f = grep !/^\.\.?$/, readdir BR;
+      closedir BR;
+      $ct->argv(qw(rmbranch -f), $b0)->system
+	if (scalar @f == 2) and $f[0] eq '0' and $f[1] eq 'LATEST';
+    }
   }
-  $ct->argv(qw(rmbranch -f), @rm)->system if @rm;
   return $rc;
 }
 sub _Yesno {
@@ -514,9 +513,12 @@ sub _Yesno {
   for my $arg ($cmd->args) {
     $cmd->opts(@opts); #reset
     if ($test) {
-      my $res = $test->args($arg)->qx;
-      if (!$res or $res =~ /^cleartool: Error:/) {
+      my $res = $test->($arg);
+      if (!$res) {
 	warn ($res or Msg('E', $errmsg . '"' . $arg . "\".\n"));
+	next;
+      } elsif ($res == -1) { # Skip interactive part
+	$ret |= $fn->($cmd);
 	next;
       }
     }
@@ -531,7 +533,7 @@ sub _Yesno {
     if ($yn->{opt}->{$ans}) {
       $cmd->opts(@opts, $yn->{opt}->{$ans});
       $cmd->args($arg);
-      $ret |= &{$fn}($cmd);
+      $ret |= $fn->($cmd);
     } else {
       $ret = 1;
     }
@@ -554,9 +556,10 @@ sub _Checkin {
     );
     my $lsco = ClearCase::Argv->lsco([qw(-cview -s)]);
     $lsco->stderr(1);
+    my $ok = sub { return $lsco->args(shift)->qx? 1:0 };
     my $err = 'Unable to find checked out version for ';
     my $run = sub { my $ci = shift; $ci->system };
-    _Yesno($ci, $run, \%yn, $lsco, $err); #only one arg: may exit
+    _Yesno($ci, $run, \%yn, $ok, $err); #only one arg: may exit
   } else {
     return $ci->system;
   }
@@ -864,8 +867,15 @@ sub uncheckout {
     );
     my $lsco = ClearCase::Argv->lsco([qw(-cview -s)]);
     $lsco->stderr(1);
+    my $dm = ClearCase::Argv->des([qw(-fmt %m)]);
+    $dm->stderr(1);
+    my $ok = sub {
+      my $e = shift;
+      return -1 if $dm->args($e)->qx =~ /^directory/;
+      return $lsco->args($e)->qx? 1:0;
+    };
     my $err = 'Unable to find checked out version for ';
-    _Yesno($unco, \&_Unco, \%yn, $lsco, $err);
+    _Yesno($unco, \&_Unco, \%yn, $ok, $err);
   }
 }
 
@@ -1085,6 +1095,8 @@ sub _GenMkTypeSub {
 	  } keys %pair;
 	} elsif ($opt{increment}) { # increment
 	  $ntype->opts(@cmt, $ntype->opts);
+	  my $lct = ClearCase::Argv->new(); #Not autochomp
+	  my ($fl, $loaded) = $ENV{FORCELOCK};
 	  INCT: for my $t (@args) {
 	    my ($pt, $lck) = "$type:$t";
 	    if (!$ct->argv(qw(des -s), $pt)->stderr(0)->qx) {
@@ -1098,8 +1110,6 @@ sub _GenMkTypeSub {
 	      warn Msg('E', "Not a family type: $t");
 	      next INCT;
 	    }
-	    my $lct = ClearCase::Argv->new(); #Not autochomp
-	    my ($fl, $loaded) = $ENV{FORCELOCK};
 	    my ($t1) = $t =~ /^(.*?)(@|$)/;
 	    for my $l ($t1, $prev) {
 	      if ($ct->argv(qw(lslock -s), "lbtype:$l\@$vob")->stderr(0)->qx) {
@@ -1335,7 +1345,7 @@ sub lock {
     $lock->opts($lock->opts, '-nusers', join(',', sort keys %nusers))
       if %nusers;
   } elsif (($nusers or $opt{allow}) and
-	     (!$currlock or $opt{iflocked}) or $lock->flag('replace')) {
+	     (!$currlock or $opt{iflocked} or $lock->flag('replace')) {
     $lock->opts($lock->opts, '-nusers', ($nusers or $opt{allow}));
   }
   if ($currlock and !$lock->flag('replace')) {
@@ -1752,8 +1762,10 @@ sub rmbranch {
       instruct => "Please answer with one of the following: yes, no\n",
       opt      => \%forceorabort,
     );
-    my $exists = ClearCase::Argv->des([qw(-s)]);
-    $exists->stderr(1);
+    my $des = ClearCase::Argv->des([qw(-s)]);
+    $des->stderr(0);
+    $des->stdout(0);
+    my $exists = sub { return $des->args(shift)->system? 0:1 };
     my $err = q(Pathname not found: );
     my $run = sub { my $rmbranch = shift; $rmbranch->system };
     _Yesno($rmbranch, $run, \%yn, $exists, $err);
@@ -1765,7 +1777,7 @@ sub rmbranch {
 =head1 COPYRIGHT AND LICENSE
 
 Copyright (c) 2007 IONA Technologies PLC (until v0.05),
-2008-2009 Marc Girod (marc.girod@gmail.com) for later versions.
+2008-2010 Marc Girod (marc.girod@gmail.com) for later versions.
 All rights reserved.
 This Perl program is free software; you may redistribute it
 and/or modify it under the same terms as Perl itself.
