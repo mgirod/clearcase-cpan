@@ -326,7 +326,6 @@ Revision history for Perl extension ClearCase::Argv.
 	- ipc mode: question marks in the comments
 	- cygwin: support for ci -from outside the vob
 	- cygwin: support for mounting views under /view
-	- ALL CHANGES FROM 1.41 THROUGH HERE CONTRIBUTED BY Marc Girod.
 
 1.47 Sat Jan  9 18:55:04 GMTST 2010
         - cygwin: convert vob:/path input arguments
@@ -337,6 +336,10 @@ Revision history for Perl extension ClearCase::Argv.
 	- ipc: return value for diff
 	- stopped shifting exit codes: $? == 256 results in 0...
 	- cygwin/exec: ipc mode not forced anymore
+	- ALL CHANGES FROM 1.41 THROUGH HERE CONTRIBUTED BY Marc Girod.
+
+1.48 Sun Feb 21 16:26:59 GMT 2010
+        - _ipc_cmd: localize $_ to avoid modifying it in the caller context
 
 BACKWARD COMPATIBILITY NOTES:
 
