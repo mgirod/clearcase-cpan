@@ -1,6 +1,6 @@
 package ClearCase::Argv;
 
-$VERSION = '1.47';
+$VERSION = '1.48';
 
 use Argv 1.23;
 
@@ -600,7 +600,7 @@ sub _cvt_input_cw {
 sub _ipc_cmd {
     my $self = shift;
     my ($disposition, $stdout, $stderr, @cmd) = @_;
-
+    local *_;
     # Send the command to cleartool.
     my $cmd = join(' ', map {
         m%^$|\s|[\[\]*"'?]% ? (m%'% ? (m%"% ? $_ : qq("$_")) : qq('$_')) : $_
@@ -655,7 +655,7 @@ sub _ipc_cmd {
 	    $manok = 1;
 	}
 	print '+ <=', $_ if $_ && $dbg >= 2;
-	$rc = 1 if $diff and !/^Files are identical/;
+	$rc = 1 if $diff && !m%^Files are identical%;
 	next if $next;
 	$self->unixpath($_) if CYGWIN;
 	if ($stdout || ($err && $stderr)) {
@@ -735,7 +735,7 @@ sub quote {
     my $inpathnorm = $self->inpathnorm;
     for (@_) {
 	if (CYGWIN) {
-	    s%^/cygdrive/([a-zA-Z])%$1:% or s%^/%$cygpfx/%;
+	    s%^/cygdrive/([a-zA-Z])%$1:% || s%^/%$cygpfx/%;
 	}
 	# If requested, change / for \ in Windows file paths.
 	s%/%\\%g if $inpathnorm;
