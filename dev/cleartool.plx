@@ -23,7 +23,7 @@ BEGIN {
         *ClearCase::Wrapper::exit = $exit;
 	*ClearCase::Wrapper::exec = $exec;
 	eval {
-	    no warnings qw(redefine); #Argv::exec
+	    local $^W = 0; #Argv::exec
 	    require ClearCase::Wrapper;
 	};
 	if ($@) {
@@ -40,7 +40,7 @@ sub one_cmd {
     if (@ARGV && !$ENV{CLEARCASE_WRAPPER_NATIVE} &&
 	  (defined($ClearCase::Wrapper::{$ARGV[0]}) || $ARGV[0] eq 'help')) {
 	# This provides support for writing extensions.
-        no warnings qw(redefine);
+	local $^W = 0; #redefine
 	require ClearCase::Argv;
 	ClearCase::Argv->VERSION(1.07);
 	ClearCase::Argv->attropts; # this is what parses -/dbg=1 et al
@@ -81,7 +81,7 @@ sub one_cmd {
     # we skip all that overhead and just exec.
     if ($^O =~ /MSWin32|cygwin/ || defined $Argv::{new} || grep(m%^-/%, @ARGV)) {
 	if (grep !m%^-/%, @ARGV) {
-	    no warnings qw(redefine);
+	    local $^W = 0;
 	    require ClearCase::Argv;
 	    ClearCase::Argv->VERSION(1.43);
 	    ClearCase::Argv->attropts;
