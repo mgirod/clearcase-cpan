@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl -w
 
 use strict;
-use vars qw($prog $exit $exec);
+use vars qw($prog $dieexit $dieexec);
 
 # The bulk of the code comes from ClearCase::Wrapper ...
 BEGIN {
@@ -10,18 +10,18 @@ BEGIN {
 
     # Derive the name we were run as and make it available globally for msgs.
     $prog = $ENV{CLEARCASE_WRAPPER_PROG} || (split m%[/\\]+%, $0)[-1];
-    $exit = sub { die @_, "\n" };
-    $exec = sub { die system(@_), "\n" };
-    *Argv::exit = $exit;
-    *Argv::exec = $exec;
-    *ClearCase::Argv::exit = $exit;
+    $dieexit = sub { die @_, "\n" };
+    $dieexec = sub { die system(@_), "\n" };
+    *Argv::exit = $dieexit;
+    *Argv::exec = $dieexec;
+    *ClearCase::Argv::exit = $dieexit;
 
     # The "standard" set of overrides supplied with the package.
     # These are autoloaded and thus fairly cheap to read in
     # even though there's lots of code inside.
     if (!$ENV{CLEARCASE_WRAPPER_NATIVE}) {
-        *ClearCase::Wrapper::exit = $exit;
-	*ClearCase::Wrapper::exec = $exec;
+        *ClearCase::Wrapper::exit = $dieexit;
+	*ClearCase::Wrapper::exec = $dieexec;
 	eval {
 	    local $^W = 0; #Argv::exec
 	    require ClearCase::Wrapper;
@@ -56,16 +56,14 @@ sub one_cmd {
 	}
 	# Convert "ct <cmd> -h" to "ct help <cmd>" for simplicity.
 	@ARGV = ('help', $ARGV[0])
-	  if $ARGV[0] ne 'help' && grep(/^-h(elp)?$/, @ARGV);
+	                   if $ARGV[0] ne 'help' && grep(/^-h(elp)?$/, @ARGV);
 	# Call the override subroutine ...
 	no strict 'refs';
 	my $cmd = "ClearCase::Wrapper::$ARGV[0]";
 	my $rc = eval { $cmd->(@ARGV) };
 	if ($@) {
-	  chomp $@;
-	  $rc = $@;
-	} else {
-	  warn "Normal return: $rc";
+	    chomp $@;
+	    $rc = $@;
 	}
 	# ... and exit unless it returned zero.
 	return $rc;

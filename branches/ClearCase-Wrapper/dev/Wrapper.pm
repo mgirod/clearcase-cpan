@@ -12,8 +12,8 @@ use vars qw(%Packages %ExtMap $libdir);
 # these to all overlay packages as well.
 BEGIN {
     *prog = \$::prog;
-    *exit = \$::exit;
-    *exec = \$::exec;
+    *dieexit = \$::dieexit;
+    *dieexec = \$::dieexec;
 }
 
 # For some reason this can't be handled the same as $prog above ...
@@ -76,8 +76,8 @@ for my $subdir (qw(ClearCase/Wrapper ClearCase/Wrapper/Site)) {
 	for my $pm (@pms) {
 	    $pm =~ s%^$dir/(.*)\.pm$%$1%;
 	    (my $pkg = $pm) =~ s%[/\\]+%::%g;
-	    *pkg::exit = $exit;
-	    *pkg::exec = $exec;
+	    eval "*${pkg}::exit = \$dieexit";
+	    eval "*${pkg}::exec = \$dieexec";
 
 	    # In this block we temporarily enter the overlay's package
 	    # just in case the overlay module forgot its package stmt.
