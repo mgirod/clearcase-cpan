@@ -12,6 +12,8 @@ use vars qw(%Packages %ExtMap $libdir);
 # these to all overlay packages as well.
 BEGIN {
     *prog = \$::prog;
+    *exit = \$::exit;
+    *exec = \$::exec;
 }
 
 # For some reason this can't be handled the same as $prog above ...
@@ -74,6 +76,8 @@ for my $subdir (qw(ClearCase/Wrapper ClearCase/Wrapper/Site)) {
 	for my $pm (@pms) {
 	    $pm =~ s%^$dir/(.*)\.pm$%$1%;
 	    (my $pkg = $pm) =~ s%[/\\]+%::%g;
+	    *pkg::exit = $exit;
+	    *pkg::exec = $exec;
 
 	    # In this block we temporarily enter the overlay's package
 	    # just in case the overlay module forgot its package stmt.
@@ -111,7 +115,8 @@ for my $subdir (qw(ClearCase/Wrapper ClearCase/Wrapper/Site)) {
 		# is a new feature. The eval is needed to avoid a compile-
 		# time error in <5.6.0.
 		if ($] >= 5.006) {
-		    next unless eval "exists \&$tglob";
+		    # next unless exists &{$tglob};
+		    next unless eval { exists &{$tglob} };
 		}
 		# Take what survives the above tests and create a hash
 		# mapping defined functions to the pkg that defines them.
@@ -255,6 +260,7 @@ if (my $pflag = _FirstIndex('-P', @ARGV)) {
 # Access to this feature is suppressed if the 'NO_OVERRIDES' file exists.
 #############################################################################
 if (-r "$ENV{HOME}/.clearcase_profile.pl" && ! -e "$libdir/NO_OVERRIDES") {
+    local $^W = 0; #in case of function redefine, e.g. Argv::exec
     require "$ENV{HOME}/.clearcase_profile.pl";
 }
 
@@ -628,7 +634,7 @@ sub extensions {
 	print "$ExtMap{$_}::" if $opt{long};
 	print $_, "\n";
     }
-    return(0, 'done');
+    exit 0;
 }
 
 =item * CI/CHECKIN
@@ -707,7 +713,7 @@ sub checkin {
     }
 
     # Unless -diff or -revert in use, we're done.
-    return($ci->system, 'done') unless $opt{'diff'} || $opt{revert};
+    $ci->exec unless $opt{'diff'} || $opt{revert};
 
     # Make sure the -pred flag is there as we're going one at a time.
     my $diff = $ci->clone->prog('diff');
@@ -736,7 +742,7 @@ sub checkin {
     }
 
     # All done, no need to return to wrapper program.
-    return($?>>8, 'done');
+    exit $?>>8;
 }
 
 =item * CO/CHECKOUT
@@ -803,9 +809,9 @@ sub diff {
     $diff->opts(@opts, @extra) if @extra;
     if ($auto && @elems > 1) {
 	for (@elems) { $diff->args($_)->system }
-	return($?, 'done');
+	exit $?;
     } else {
-	return($diff->system, 'done');
+	$diff->exec;
     }
 }
 
@@ -876,7 +882,7 @@ sub diffcr {
 		print;
 	    }
 	}
-	return(0, 'done');
+	exit(0);
     }
 }
 
@@ -919,12 +925,12 @@ sub edit {
     $co->autofail(1)->system if $co->args;
     # Run the editor, check return code.
     $ed->system;
-    return($?, 'done') unless $opt{'ci'};
+    exit $? unless $opt{'ci'};
     my $ci = Argv->new([$^X, '-S', $0, 'ci']);
     $ci->opts($co->optsCI);
     $ci->opts('-revert') unless $ci->opts;
     $ci->args($ed->args);
-    return($ci->system, 'done');
+    $ci->exec;
 }
 
 # No POD for this one because no options (same as native variant).
@@ -945,7 +951,7 @@ sub help {
 		push(@text, $msg);
 	    }
 	    print @text, "\n";
-	    return(0, 'done');
+	    exit 0;
 	} else {
 	    return 0;
 	}
@@ -962,7 +968,7 @@ sub help {
 	my $star = ClearCase::Wrapper::Native($_) ? '' : '*';
 	print "Usage: $star$_ $text\n";
     }
-    return(0, 'done');
+    exit 0;
 }
 
 =item * LSPRIVATE
@@ -1028,7 +1034,7 @@ sub lsprivate {
 	    $lsp->opts($lsp->opts, '-tag', $tag) if !$lsp->flag('tag');
 	}
 	chomp(my @privs = sort $lsp->qx);
-	return($?, 'done') if $? || !@privs;
+	exit $? if $? || !@privs;
 	# Strip out all results which are not eclipsed. An element
 	# is eclipsed if (a) there's a view-private copy,
 	# (b) there's also a versioned copy, and (c) it's not checked out.
@@ -1063,7 +1069,7 @@ sub lsprivate {
 	    $opt{type} ||= 'e' if $opt{visible};
 	    $job = "grep {-$opt{type}} $job" if $opt{type};
 	    eval qq(\@privs = $job \@privs);
-	    return(0, 'done') if !@privs;
+	    exit 0 if !@privs;
 	}
 	if ($opt{ext}) {	# sort by extension
 	    require File::Basename;
@@ -1073,9 +1079,9 @@ sub lsprivate {
 	       @privs;
 	}
 	for (@privs) { print $_, "\n" }
-	return(0, 'done');
+	exit 0;
     }
-    return($lsp->system, 'done');
+    $lsp->exec;
 }
 
 =item * LSVIEW
@@ -1088,7 +1094,7 @@ searched namespace to E<lt>B<username>E<gt>_*.
 sub lsview {
     my @args = grep !/^-me/, @ARGV;
     push(@args, "$ENV{LOGNAME}_*") if @args != @ARGV;
-    return(ClearCase::Argv->new(@args)->autoquote(0)->system, 'done');
+    ClearCase::Argv->new(@args)->autoquote(0)->exec;
 }
 
 =item * MKELEM
@@ -1188,7 +1194,7 @@ sub mkelem {
     }
 
     # Done - don't drop back to main program.
-    return($?, 'done');
+    exit $?;
 }
 
 =item * UNCO
@@ -1211,7 +1217,7 @@ sub uncheckout {
     $unco->optset('IGNORE');
     $unco->parseIGNORE(qw(c|cfile=s cqe|nc));
     $unco->args(sort {$b cmp $a} AutoCheckedOut($opt{ok}, $unco->args));
-    return($unco->system, 'done');
+    $unco->exec;
 }
 
 =back
