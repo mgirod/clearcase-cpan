@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl -w
 
 use strict;
-use vars '$prog';
+use vars qw($prog $exit $exec);
 
 # The bulk of the code comes from ClearCase::Wrapper ...
 BEGIN {
@@ -10,12 +10,22 @@ BEGIN {
 
     # Derive the name we were run as and make it available globally for msgs.
     $prog = $ENV{CLEARCASE_WRAPPER_PROG} || (split m%[/\\]+%, $0)[-1];
+    $exit = sub { die @_, "\n" };
+    $exec = sub { die system(@_), "\n" };
+    *Argv::exit = $exit;
+    *Argv::exec = $exec;
+    *ClearCase::Argv::exit = $exit;
 
     # The "standard" set of overrides supplied with the package.
     # These are autoloaded and thus fairly cheap to read in
     # even though there's lots of code inside.
     if (!$ENV{CLEARCASE_WRAPPER_NATIVE}) {
-	eval { require ClearCase::Wrapper; };
+        *ClearCase::Wrapper::exit = $exit;
+	*ClearCase::Wrapper::exec = $exec;
+	eval {
+	    no warnings qw(redefine); #Argv::exec
+	    require ClearCase::Wrapper;
+	};
 	if ($@) {
 	    (my $msg = $@) =~ s%\s*\(.*%!%;
 	    warn "$prog: Warning: $msg";
@@ -30,6 +40,7 @@ sub one_cmd {
     if (@ARGV && !$ENV{CLEARCASE_WRAPPER_NATIVE} &&
 	  (defined($ClearCase::Wrapper::{$ARGV[0]}) || $ARGV[0] eq 'help')) {
 	# This provides support for writing extensions.
+        no warnings qw(redefine);
 	require ClearCase::Argv;
 	ClearCase::Argv->VERSION(1.07);
 	ClearCase::Argv->attropts; # this is what parses -/dbg=1 et al
@@ -49,9 +60,15 @@ sub one_cmd {
 	# Call the override subroutine ...
 	no strict 'refs';
 	my $cmd = "ClearCase::Wrapper::$ARGV[0]";
-	my ($rc, $done) = &$cmd(@ARGV);
-	# ... and return unless it returned zero and not done.
-	return $rc if $done || $rc;
+	my $rc = eval { $cmd->(@ARGV) };
+	if ($@) {
+	  chomp $@;
+	  $rc = $@;
+	} else {
+	  warn "Normal return: $rc";
+	}
+	# ... and exit unless it returned zero.
+	return $rc;
     }
 
     # Either there was no override defined for this command or the override
@@ -64,6 +81,7 @@ sub one_cmd {
     # we skip all that overhead and just exec.
     if ($^O =~ /MSWin32|cygwin/ || defined $Argv::{new} || grep(m%^-/%, @ARGV)) {
 	if (grep !m%^-/%, @ARGV) {
+	    no warnings qw(redefine);
 	    require ClearCase::Argv;
 	    ClearCase::Argv->VERSION(1.43);
 	    ClearCase::Argv->attropts;
@@ -90,18 +108,20 @@ if (scalar @ARGV == 1 && $ARGV[0] eq '-status') {
 if (@ARGV) {
     exit one_cmd;
 } else {
-    my $rc;
+    my $rc = 0;
+    my $interactive = -t STDIN;
     require Text::ParseWords;
-    print "$prog $status> " if $status;
+    print "$prog ", $status?$status:'', '> ' if $interactive;
     while (my $line = <>) {
 	chomp $line;
 	last if $line eq 'quit';
 	local @ARGV = Text::ParseWords::shellwords($line);
 	$rc = one_cmd;
 	if ($status) {
-	    print "Command $status returned status $rc\n$prog $status> ";
+	    print "Command $status returned status $rc\n";
 	    $status++;
 	}
+	print "$prog", $status?" $status":'', '> ' if $interactive;
     }
     exit $rc;
 }
