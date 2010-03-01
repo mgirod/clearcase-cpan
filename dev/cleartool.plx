@@ -63,10 +63,10 @@ sub one_cmd {
 	my $rc = eval { $cmd->(@ARGV) };
 	if ($@) {
 	    chomp $@;
-	    $rc = $@;
+	    return $@; # Processing completed, successful or not
 	}
-	# ... and exit unless it returned zero.
-	return $rc;
+	# a zero return signals falling back to cleartool
+	return $rc if $rc;
     }
 
     # Either there was no override defined for this command or the override
