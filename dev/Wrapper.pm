@@ -260,8 +260,12 @@ if (my $pflag = _FirstIndex('-P', @ARGV)) {
 # Access to this feature is suppressed if the 'NO_OVERRIDES' file exists.
 #############################################################################
 if (-r "$ENV{HOME}/.clearcase_profile.pl" && ! -e "$libdir/NO_OVERRIDES") {
-    local $^W = 0; #in case of function redefine, e.g. Argv::exec
     require "$ENV{HOME}/.clearcase_profile.pl";
+    no warnings qw(redefine);
+    *Argv::exec = sub {
+        my $self = shift;
+        die $self->system(@_), "\n";
+    };
 }
 
 # Add to ExtMap the names of extensions defined in the base package.

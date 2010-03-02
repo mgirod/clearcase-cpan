@@ -13,7 +13,6 @@ BEGIN {
     $dieexit = sub { die @_, "\n" };
     $dieexec = sub { die system(@_), "\n" };
     *Argv::exit = $dieexit;
-    *Argv::exec = $dieexec;
     *ClearCase::Argv::exit = $dieexit;
 
     # The "standard" set of overrides supplied with the package.
@@ -23,8 +22,12 @@ BEGIN {
         *ClearCase::Wrapper::exit = $dieexit;
 	*ClearCase::Wrapper::exec = $dieexec;
 	eval {
-	    local $^W = 0; #Argv::exec
 	    require ClearCase::Wrapper;
+	    no warnings qw(redefine);
+	    *Argv::exec = sub {
+	        my $self = shift;
+		die $self->system(@_), "\n";
+	    };
 	};
 	if ($@) {
 	    (my $msg = $@) =~ s%\s*\(.*%!%;
@@ -40,8 +43,12 @@ sub one_cmd {
     if (@ARGV && !$ENV{CLEARCASE_WRAPPER_NATIVE} &&
 	  (defined($ClearCase::Wrapper::{$ARGV[0]}) || $ARGV[0] eq 'help')) {
 	# This provides support for writing extensions.
-	local $^W = 0; #redefine
+	local $^W = 0;
 	require ClearCase::Argv;
+	*Argv::exec = sub {
+	    my $self = shift;
+	    die $self->system(@_), "\n";
+	};
 	ClearCase::Argv->VERSION(1.07);
 	ClearCase::Argv->attropts; # this is what parses -/dbg=1 et al
 	{
@@ -79,8 +86,12 @@ sub one_cmd {
     # we skip all that overhead and just exec.
     if ($^O =~ /MSWin32|cygwin/ || defined $Argv::{new} || grep(m%^-/%, @ARGV)) {
 	if (grep !m%^-/%, @ARGV) {
-	    local $^W = 0;
 	    require ClearCase::Argv;
+	    no warnings qw(redefine);
+	    *Argv::exec = sub {
+	        my $self = shift;
+	        die $self->system(@_), "\n";
+	    };
 	    ClearCase::Argv->VERSION(1.43);
 	    ClearCase::Argv->attropts;
 	    # The -ver flag/cmd is a special case - must be exec-ed.
