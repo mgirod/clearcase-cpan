@@ -389,7 +389,7 @@ sub _Burrow {
     $input++;
     if (!open($input, $filename)) {
 	warn "$filename: $!";
-	return;
+	return 1;
     }
     while (<$input>) {
 	if (/^include\s+(.*)/) {
@@ -398,6 +398,7 @@ sub _Burrow {
 	}
 	eval $action if $action;
     }
+    return 0;
 }
 
 # For standard format error msgs - see code for examples.
