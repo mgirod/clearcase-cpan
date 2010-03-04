@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl -w
 
 use strict;
-use vars qw($prog $dieexit $dieexec);
+use vars qw($prog $dieexit $dieexec $diemexec);
 
 # The bulk of the code comes from ClearCase::Wrapper ...
 BEGIN {
@@ -11,7 +11,11 @@ BEGIN {
     # Derive the name we were run as and make it available globally for msgs.
     $prog = $ENV{CLEARCASE_WRAPPER_PROG} || (split m%[/\\]+%, $0)[-1];
     $dieexit = sub { die @_, "\n" };
-    $dieexec = sub { die system(@_), "\n" };
+    $dieexec = sub { die system(@_), "\n" }; #function
+    $diemexec = sub { #method: patch after loading
+        my $self = shift;
+        die $self->system(@_), "\n";
+    };
     *Argv::exit = $dieexit;
     *ClearCase::Argv::exit = $dieexit;
 
@@ -24,10 +28,7 @@ BEGIN {
 	eval {
 	    require ClearCase::Wrapper;
 	    no warnings qw(redefine);
-	    *Argv::exec = sub {
-	        my $self = shift;
-		die $self->system(@_), "\n";
-	    };
+	    *Argv::exec = $diemexec;
 	};
 	if ($@) {
 	    (my $msg = $@) =~ s%\s*\(.*%!%;
@@ -45,10 +46,7 @@ sub one_cmd {
 	# This provides support for writing extensions.
 	local $^W = 0;
 	require ClearCase::Argv;
-	*Argv::exec = sub {
-	    my $self = shift;
-	    die $self->system(@_), "\n";
-	};
+	*Argv::exec = $diemexec;
 	ClearCase::Argv->VERSION(1.07);
 	ClearCase::Argv->attropts; # this is what parses -/dbg=1 et al
 	{
@@ -86,12 +84,9 @@ sub one_cmd {
     # we skip all that overhead and just exec.
     if ($^O =~ /MSWin32|cygwin/ || defined $Argv::{new} || grep(m%^-/%, @ARGV)) {
 	if (grep !m%^-/%, @ARGV) {
+	    local $^W = 0;
 	    require ClearCase::Argv;
-	    no warnings qw(redefine);
-	    *Argv::exec = sub {
-	        my $self = shift;
-	        die $self->system(@_), "\n";
-	    };
+	    *Argv::exec = $diemexec;
 	    ClearCase::Argv->VERSION(1.43);
 	    ClearCase::Argv->attropts;
 	    # The -ver flag/cmd is a special case - must be exec-ed.
@@ -120,10 +115,10 @@ if (@ARGV) {
     my $rc = 0;
     my $interactive = -t STDIN;
     require Text::ParseWords;
-    print "$prog ", $status?$status:'', '> ' if $interactive;
+    print "$prog", $status?$status:'', '> ' if $interactive;
     while (my $line = <>) {
 	chomp $line;
-	last if $line eq 'quit';
+	last if $line =~ '^(quit|exit)$';
 	local @ARGV = Text::ParseWords::shellwords($line);
 	$rc = one_cmd;
 	if ($status) {
