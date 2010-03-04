@@ -341,6 +341,9 @@ Revision history for Perl extension ClearCase::Argv.
 1.48 Sun Feb 21 16:26:59 GMT 2010
         - _ipc_cmd: localize $_ to avoid modifying it in the caller context
 
+1.49 Thu Mar  4 19:36:08 GMTST 2010
+        - Removed an extra newline in fork mode under cygwin.
+
 BACKWARD COMPATIBILITY NOTES:
 
 A case was reported in which changes in 1.44 broke backward

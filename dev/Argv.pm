@@ -1,6 +1,6 @@
 package ClearCase::Argv;
 
-$VERSION = '1.48';
+$VERSION = '1.49';
 
 use Argv 1.23;
 
@@ -123,7 +123,7 @@ sub system {
         if (CYGWIN) {
 	    my @ret = $self->SUPER::qv(@rargs);
 	    $self->unixpath(@ret);
-	    print join("", @ret), "\n" if @ret;
+	    print join("", @ret) if @ret;
 	    return $?;
 	} else {
 	    return $self->SUPER::system(@rargs);
