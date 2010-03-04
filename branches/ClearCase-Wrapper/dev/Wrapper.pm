@@ -6,7 +6,7 @@ require 5.006;
 
 use AutoLoader 'AUTOLOAD';
 
-use vars qw(%Packages %ExtMap $libdir);
+use vars qw(%Packages %ExtMap $libdir $diemexec);
 
 # Inherit some symbols from the main package. We will later "donate"
 # these to all overlay packages as well.
@@ -14,6 +14,7 @@ BEGIN {
     *prog = \$::prog;
     *dieexit = \$::dieexit;
     *dieexec = \$::dieexec;
+    *diemexec = \$::diemexec;
 }
 
 # For some reason this can't be handled the same as $prog above ...
@@ -262,10 +263,7 @@ if (my $pflag = _FirstIndex('-P', @ARGV)) {
 if (-r "$ENV{HOME}/.clearcase_profile.pl" && ! -e "$libdir/NO_OVERRIDES") {
     require "$ENV{HOME}/.clearcase_profile.pl";
     no warnings qw(redefine);
-    *Argv::exec = sub {
-        my $self = shift;
-        die $self->system(@_), "\n";
-    };
+    *Argv::exec = $diemexec;
 }
 
 # Add to ExtMap the names of extensions defined in the base package.
