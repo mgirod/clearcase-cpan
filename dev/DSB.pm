@@ -1,6 +1,6 @@
 package ClearCase::Wrapper::DSB;
 
-$VERSION = '1.12';
+$VERSION = '1.13';
 
 use AutoLoader 'AUTOLOAD';
 
@@ -58,32 +58,6 @@ use strict;
 1;
 
 __END__
-
-## Internal service routines, undocumented.
-# Function to parse 'include' stmts recursively.  Used by
-# config-spec parsing meta-commands. The first arg is a
-# "magic incrementing string", the second a filename,
-# the third an "action" which is eval-ed
-# for each line.  It can be as simple as 'print' or as
-# complex a regular expression as desired. If the action is
-# null, only the names of traversed files are printed.
-sub _Burrow {
-    local $input = shift;
-    my($filename, $action) = @_;
-    print $filename, "\n" if !$action;
-    $input++;
-    if (!open($input, $filename)) {
-	warn "$filename: $!";
-	return;
-    }
-    while (<$input>) {
-	if (/^include\s+(.*)/) {
-	    _Burrow($input, $1, $action);
-	    next;
-	}
-	eval $action if $action;
-    }
-}
 
 =head1 NAME
 

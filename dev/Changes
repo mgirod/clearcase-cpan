@@ -53,3 +53,6 @@ Revision history for Perl extension ClearCase::Wrapper::DSB.
 	  renamed the ->cleartool method to ->find_cleartool;
 	  this module forgot to track that change till now.
 	  This caused "ct setcs -clone <view-tag>" to fail.
+
+1.13 Thu Mar  4 19:36:08 GMTST 2010
+        - Moved the internal _Burrow function up to ClearCase::Wrapper
