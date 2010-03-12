@@ -1,6 +1,6 @@
 package Argv;
 
-$VERSION = '1.25';
+$VERSION = '1.26';
 @ISA = qw(Exporter);
 
 use constant MSWIN => $^O =~ /MSWin32|Windows_NT/i ? 1 : 0;
@@ -531,7 +531,11 @@ sub extract {
 sub argpathnorm {
     my $self = shift;
     my $norm = $self->inpathnorm;
-    return unless MSWIN && $norm && !ref($norm);
+    return unless $norm && !ref($norm);
+    if (CYGWIN) { #for the cygwin shell
+        s%\\%\\\\%g for @_;
+    }
+    return unless MSWIN;
     for my $word (@_) {
 	# If requested, change / for \ in Windows file paths.
 	# This is necessarily an inexact science.
@@ -564,7 +568,7 @@ sub argpathnorm {
 # Quotes @_ in place against shell expansion. Usually called via autoquote attr
 sub quote {
     my $self = shift;
-    for (@_) {
+    for (grep {defined} @_) {
 	# Hack - allow user to exempt any arg from quoting by prefixing '^'.
 	next if s%^\^%%;
 	# Special case - turn internal newlines back to literal \n on Win32
@@ -575,7 +579,7 @@ sub quote {
 	    $_ = qq(\\"$1\\") if MSWIN;
 	    next;
 	} elsif (m%^".*"$%s) {
-	    $_ = qq(\\"$_\\") if MSWIN or CYGWIN;
+	    $_ = qq(\\"$_\\") if MSWIN || CYGWIN;
 	    next;
 	}
 	# Skip if contains no special chars.
@@ -584,7 +588,7 @@ sub quote {
 	    # let '*' go by.
 	    next unless m%[^-=:_."\w\\/*]% || tr%\n%%;
 	} else {
-	    next unless m%[^-=:_."\w\\/]% || /\\n/ || tr%\n%%;
+	    next unless m%[^-=:_."\w\\/]% || m%\\n% || tr%\n%%;
 	}
 	# Special case - leave things that look like redirections alone.
 	next if /^\d?(?:<{1,2})|(?:>{1,2})/;
@@ -829,7 +833,7 @@ sub _chunk_by_length {
     my @chunk = ();
     my $chunklen = 0;
     my $extra = $Config::Config{ptrsize} + 1;
-    while (@{$args}) {
+    while (grep {defined} @{$args}) {
 	# Reached max length?
 	if (($chunklen + length(${$args}[0]) + $extra) >= $max) {
 	    # Always send at least one chunk no matter what.
@@ -842,7 +846,7 @@ sub _chunk_by_length {
     }
     #printf STDERR "CHUNK: $chunklen (MAX=$max, LEFT=%d)\n", scalar(@{$args});
     return @chunk;
-}  
+}
 
 # Wrapper around Perl's exec().
 sub exec {
