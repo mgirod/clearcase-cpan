@@ -350,7 +350,7 @@ sub unixpath {
 	    my @bit = $odd? split/(\s+)/,$line
 	      : Text::ParseWords::parse_line('\s+', 'delimiters', $line);
 	    map {
-	        s%\\%/%g if m%(?:^(?:\..*|"|[A-Za-z]:|\w*)|\@)\\%;
+	        s%\\%/%g if m%(?:^(?:\..*|"|[A-Za-z]:|vob:|\w*)|\@)\\%;
 		if (m%\A([A-Za-z]):(.*)\Z%) {
 		  $_ = "/cygdrive/" . lc($1) . $2;
 		} else {
@@ -604,7 +604,7 @@ sub _ipc_cmd {
     # Send the command to cleartool.
     my $cmd = join(' ', map {
         m%^$|\s|[\[\]*"'?]% ? (m%'% ? (m%"% ? $_ : qq("$_")) : qq('$_')) : $_
-    } @cmd);
+    } grep {defined} @cmd);
     # Handle verbosity.
     my $dbg = $self->dbglevel;
     $self->_dbg($dbg, '=>', \*STDERR, $cmd) if $dbg;
@@ -1109,7 +1109,7 @@ reports or patches gratefully accepted.
 Commands using a format option defining a multi-line output fail in
 many cases in fork mode, because of the underlying Argv module.
 
-ClearCase::Argv will use IPC::ChildSafe if it finds it, which may 
+ClearCase::Argv will use IPC::ChildSafe if it finds it, which may
 introduce differences of behavior with the newer code to replace it.
 It should probably just drop it, unless explicitly driven to use it.
 
