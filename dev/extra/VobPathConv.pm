@@ -12,7 +12,8 @@ our (@ISA, @EXPORT);
 ClearCase::Argv->ipc(1);
 our $ct = ClearCase::Argv->new({autochomp=>1, stderr=>0});
 our ($rgyhost, $locreg) = grep s/^\s+Registry (?:host|region): (.*)$/$1/,
-  $ct->argv(qw(hostinfo -l))->qx;
+  $ct->argv(qw(hostinfo -l))->stderr(2)->qx;
+die "Couldn't access a rgy host, stopped" unless $rgyhost;
 our ($unixreg) = grep s/^\s+Registry region: (.*)$/$1/,
   $ct->argv(qw(hostinfo -l), $rgyhost)->qx;
 
