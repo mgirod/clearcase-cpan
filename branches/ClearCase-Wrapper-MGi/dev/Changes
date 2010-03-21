@@ -111,3 +111,7 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- diff: fix for the no predecessor case, and support for -n flag
 	- lock -rep: fix for no -nusers
 	- unco: skip the dialog for dirs; rmbranch before handling next arg.
+
+0.20 Sat Feb 20 17:58:45 GMTST 2010
+        - mkbrtype -arc -ord and in a remote vob
+	- support for global types.

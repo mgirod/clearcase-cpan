@@ -1,6 +1,6 @@
 package ClearCase::Wrapper::MGi;
 
-$VERSION = '0.19';
+$VERSION = '0.20';
 
 use warnings;
 use strict;
@@ -278,25 +278,27 @@ sub _Mkbco {
   }
   return $rc;
 }
-sub _Ensuretypes(@) {
-  my @vob = shift;
+sub _Ensuretypes($@) {
+  my ($glb, @vob) = @_;
   my %cmt = ($eqhl => q(Equivalent increment),
 	     $prhl => q(Previous increment in a type chain),
 	     $diat => q(Deleted in increment));
   my $silent = $ct->clone;
   $silent->stdout(0);
   $silent->stderr(0);
+  my $gflg = $glb? '-glo' : '';
   for my $t ($eqhl, $prhl) {
     for my $v (@vob) {
       my $t2 = "$t\@$v";
       if ($silent->argv(qw(des -s), "hltype:$t2")->system) {
-	$ct->argv(qw(mkhltype -c), $cmt{$t}, $t2)->system and die;
+	$ct->argv(qw(mkhltype -c), $cmt{$t}, $gflg, $t2)->system and die;
       }
     }
   }
   for my $v (@vob) {
     if ($silent->argv(qw(des -s), "attype:$diat\@$v")->system) {
-      $ct->argv(qw(mkattype -c), $cmt{$diat}, "$diat\@$v")->system and die;
+      $ct->argv(qw(mkattype -c), $cmt{$diat}, $gflg, "$diat\@$v")->system
+	and die;
     }
   }
 }
@@ -667,9 +669,9 @@ branch off the root of the version tree, copy-merging there from the
 former.
 
 This allows to avoid both merging back to /main or to a delivery
-branch, and to cascade branches indefinitely.  The logical version tree
-is restituted by navigating the merge arrows, to find all the direct or
-indirect contributors.
+branch, and cascading branches indefinitely.  The logical version tree
+is restituted by navigating the merge arrows, to find all the direct
+or indirect contributors.
 
 Flag:
 
@@ -952,8 +954,9 @@ The implementation is largely shared with I<mkbrtype>.
 
 =item B<-glo/bal>
 
-Global types (in an Admin vob or not) are incompatible with the family
-property.
+Make global types of types in a vob with an admin vob, if the variable
+I<$ClearCase::Wrapper::MGi::global> is set (in .clearcase_profile.pl).
+Actually then: it is enough that one type needs to be made global.
 
 =back
 
@@ -971,39 +974,42 @@ sub _GenMkTypeSub {
     my %opt = %{$ntype->{fopts}};
     my $silent = $ct->clone;
     $silent->stdout(0);
-    if ($ntype->flag('global')) {
+    if ((grep /^-glo/, $ntype->opts) or ($ntype->flag('global') and !%opt)) {
       $ntype->opts(@cmt, $ntype->opts);
       return $ntype->system
     }
-    if (!%opt and my ($ahl) = grep /^->/,
-	$ct->desc([qw(-s -ahl AdminVOB vob:.)])->qx) {
-      if (my $avob = (split /\s+/, $ahl)[1]) {
-	for (@args) {
-	  next if /\@/;
-	  $_ = "$_\@$avob";
-	  warn Msg('W', "making global type $_ ...");
+    my (%vob, $unkvob);
+    /\@(.*)$/? $vob{$1}++ : $vob{'.'}++ for @args;
+    my @vob = keys %vob;
+    for (@vob) { #Diagnose all the errors, even if one is enough to fail
+      $unkvob++ if $silent->argv(qw(des -s), "vob:$_")->system;
+    }
+    return 1 if $unkvob;
+    if ($ClearCase::Wrapper::MGi::global and !$ntype->flag('global')) {
+      my %avob;
+      for my $v (@vob) {
+	my ($hl) = grep s/^-> (?:vob:)(.*)$/$1/,
+	  $ct->desc([qw(-s -ahl AdminVOB), "vob:$v"])->qx;
+	$avob{$v} = $hl if $hl;
+      }
+      if (scalar keys %avob) {
+	$ntype->opts('-global', $ntype->opts);
+	for (@vob) { #Fix the vobs, to ensure the metadata types
+	  $_ = $avob{$_} if $avob{$_};
 	}
-	$ntype->args(@args);
-	my @opts = (@cmt, '-global', $ntype->opts);
-	push @opts, '-replace' if $rep;
-	$ntype->opts(@opts);
-	return $ntype->system;
+	for (@args) { #Fix the types, to create them in the admin vob(s)
+	  $_ = $1 . $avob{$2} if /^(.*\@)(.*)$/ and $avob{$2};
+	}
+	warn Msg('W', "making global type(s) @args");
       }
-    } elsif (%opt) {
+    }
+    if (%opt) {
       map { s/^${type}:(.*)$/$1/ } @args;
-      my (@a, $unkvob) = @args;
-      my @vob = grep { s/[^@]+\@(.*)$/$1/ } @a;
-      for (@vob) {
-	$unkvob++ if $silent->argv(qw(des -s), "vob:$_")->system;
-      }
-      return 1 if $unkvob;
-      push @vob, $ct->argv(qw(des -s vob:.))->stderr(0)->qx
-	if grep !/@/, @args;
-      die  Msg('E', qq(Unable to determine VOB for pathname ".".))
-	unless @vob;
-      _Ensuretypes(@vob);
+      my @a = @args;
+      _Ensuretypes((grep /^-glo/, $ntype->opts), @vob);
       if ($rep) {
-	@args = grep { $ct->argv(qw(des -fmt), '%Xn', "$type:$_")->qx } @args;
+	@args =
+	  grep { $_ = $ct->argv(qw(des -fmt), '%Xn', "$type:$_")->qx } @args;
 	exit 1 unless @args;
 	if ($opt{family}) {
 	  @a = ();
@@ -1196,6 +1202,7 @@ sub _GenMkTypeSub {
 	  exit 1;
 	}
       } else {
+	$ntype->args(@args);
 	$ntype->opts(@cmt, $ntype->opts);
 	return $ntype->system;
       }
@@ -1221,8 +1228,6 @@ sub mklbtype {
   GetOptions('replace' => \$rep);
   die Msg('E', 'Incompatible options: family increment archive')
     if keys %opt > 1;
-  die Msg('E', 'Incompatible options: incremental types cannot be global')
-    if %opt and grep /^-glo/, @ARGV;
   ClearCase::Argv->ipc(1);
   my $ntype = ClearCase::Argv->new(@ARGV);
   $ntype->parse(qw(global|ordinary vpelement|vpbranch|vpversion
