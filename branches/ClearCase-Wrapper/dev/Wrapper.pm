@@ -341,7 +341,7 @@ sub man {
 	if (!Native($page)) {
 	    ClearCase::Argv->new(@ARGV)->exec;
 	} else {
-	    exit($? != 0);
+	    exit($? ? 1 : 0);
 	}
     }
     my $psep = MSWIN ? ';' : ':';
