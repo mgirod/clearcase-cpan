@@ -7,7 +7,7 @@ use constant PTHSEP => $^O =~ /MSWin32/ ? '\\' : '/';
 require Exporter;
 our (@ISA, @EXPORT);
 @ISA = qw(Exporter);
-@EXPORT = qw(uxpath2local uxtag2local uxpath2localtag winpath2ux);
+@EXPORT = qw(uxpath2local uxtag2local uxpath2localtag winpath2ux localtag2rgy);
 
 ClearCase::Argv->ipc(1);
 our $ct = ClearCase::Argv->new({autochomp=>1, stderr=>0});
@@ -52,5 +52,12 @@ sub winpath2ux($) {
   return '' unless $uuid;
   my $uxtag = $ct->argv(qw(lsvob -s -reg), $unixreg, '-uuid', $uuid)->qx;
   return $uxtag? join('/', $uxtag, @d): '';
+}
+sub localtag2rgy($) {
+  my $tag = shift;
+  return $tag if $locreg eq $unixreg;
+  my ($uuid) = grep s/^\s+Vob tag replica uuid: (.*)$/$1/,
+    $ct->argv(qw(lsvob -l -reg), $locreg, $tag)->qx;
+  return $uuid? $ct->argv(qw(lsvob -s -uuid), $uuid, qw(-reg), $unixreg)->qx : '';
 }
 1;
