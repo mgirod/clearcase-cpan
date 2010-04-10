@@ -7,9 +7,9 @@ reference unix region (this of the registry server).
 
 =head1 SYNOPSYS
 
-Only three functions are exported:
+Only five functions are exported:
 
-=over 3
+=over 5
 
 =item uxtag2local
 
@@ -36,12 +36,35 @@ Contrarily to the other two, this one actually works even in the reference
 unix region, even if it acts there as a suboptimal replacement for
 C<ct des -s vob:path>.
 
+=item winpath2ux
+
+This function works backwards from the former ones: the path it takes
+is a Windows one (probably local).
+
+It takes a Windows path (in a vob) and returns the equivalent one in a
+target unix region (this of the registry host, unless a host was
+explicitely passed as argument).
+
+The path accessibility is not tested beyond the validity of the vob
+tag: the function is intended to be usable on non reachable paths.
+
+=item localtag2tgt
+
+This function is on the one hand the counterpart of the previous one
+for vob tags. This means however that it is not restricted to work
+exclusively on Windows tags.
+
+On an other hand, if the target region matches the local one, the
+input tag is tested for existence I<as a directory> (this is a
+compromise for performance).
+
 =back
 
 =head1 DETAILS
 
 The module is designed to be independent from any local configuration.
-It relies upon the following assumptions:
+The functions except I<localtag2tgt> rely upon the following
+assumptions:
 
 =over 2
 

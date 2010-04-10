@@ -41,9 +41,10 @@ sub uxpath2localtag($) {
 	   and $i) { $i-- }
   return $i? uxtag2local(join('/', @d[0..$i])): '';
 }
-sub winpath2ux($) {
-  my $path = shift;
-  return $path if $locreg eq $unixreg;
+sub winpath2ux($;$) {
+  my ($path, $host) = @_;
+  my ($tgtreg) = $host? grep s/^\s+Registry region: (.*)$/$1/,
+    $ct->argv(qw(hostinfo -l), $host)->qx : ($unixreg);
   $path =~ s/[a-zA-Z]:\\+(.*)$/$1/;
   my @d = grep {length $_} split m%/|\\%, $path;
   shift @d if $ct->argv(qw(lsview -s), $d[0])->stderr(0)->qx;
@@ -51,13 +52,13 @@ sub winpath2ux($) {
   my ($uuid) = grep s/^\s+Vob tag replica uuid: (.*)$/$1/,
     $ct->argv(qw(lsvob -l), '\\' . shift @d)->qx;
   return '' unless $uuid;
-  my $uxtag = $ct->argv(qw(lsvob -s -reg), $unixreg, '-uuid', $uuid)->qx;
+  my $uxtag = $ct->argv(qw(lsvob -s -reg), $tgtreg, '-uuid', $uuid)->qx;
   return $uxtag? join('/', $uxtag, @d): '';
 }
 sub localtag2tgt($;$) {
   my ($tag, $host) = @_;
-  my ($tgtreg) = $host? grep s/^\s+Registry region: (.*)$/$1/,
-    $ct->argv(qw(hostinfo -l), $host)->qx : ($unixreg);
+  my ($tgtreg) = $host? (grep s/^\s+Registry region: (.*)$/$1/,
+    $ct->argv(qw(hostinfo -l), $host)->qx) : ($unixreg);
   return (-d $tag? $tag : '') if $locreg eq $tgtreg;
   my ($uuid) = grep s/^\s+Vob tag replica uuid: (.*)$/$1/,
     $ct->argv(qw(lsvob -l -reg), $locreg, $tag)->qx;
