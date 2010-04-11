@@ -4,9 +4,11 @@ ClearCase::Wrapper::MGi Configuration
 
 =head1 SYNOPSIS
 
-Three methods, to configure different aspects:
+Four methods, to configure different aspects:
 
-=over 3
+=over 4
+
+=item C<##:BranchOff: root> in the config spec
 
 =item .clearcase_profile.pl
 
@@ -23,7 +25,7 @@ the wrapper for specific needs, either on a site on a user basis.
 
 =head2 VobPathConv.pm
 
-I<VobPathConv.pm> (and its pod files) does however not require any
+I<VobPathConv.pm> (and its pod file) does however not require any
 configuration and may be used as such. I may even consider to extract
 it and publish it as a separate package in its own, albeit modest,
 right.
