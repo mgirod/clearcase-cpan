@@ -68,7 +68,7 @@ sub one_cmd {
 	my $rc = eval { $cmd->(@ARGV) };
 	if ($@) {
 	    chomp $@;
-	    return $@; # Processing completed, successful or not
+	    return $@? 1:0; # Processing completed, successful or not
 	}
 	# a zero return signals falling back to cleartool
 	return $rc if $rc;
