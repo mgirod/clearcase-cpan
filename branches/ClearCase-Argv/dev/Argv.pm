@@ -597,13 +597,28 @@ sub _cvt_input_cw {
     }
 }
 
+sub _qmeta {
+  my $arg = shift;
+  if (CYGWIN || MSWIN) {
+      $arg =~ s%\'%^'%g;
+      $arg = q(') . $arg . q(');
+    } else {
+      $arg = quotemeta($arg);
+    }
+  return $arg;
+}
 sub _ipc_cmd {
     my $self = shift;
     my ($disposition, $stdout, $stderr, @cmd) = @_;
     local *_;
     # Send the command to cleartool.
     my $cmd = join(' ', map {
-        m%^$|\s|[\[\]*"'?]% ? (m%'% ? (m%"% ? $_ : qq("$_")) : qq('$_')) : $_
+        m%^$|\s|[\[\]*"'?]% ?
+	  (m%'% ?
+	     (m%"% ?
+		_qmeta($_) : qq("$_"))
+	       : qq('$_'))
+	    : $_
     } grep {defined} @cmd);
     # Handle verbosity.
     my $dbg = $self->dbglevel;
