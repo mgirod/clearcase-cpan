@@ -67,8 +67,16 @@ sub one_cmd {
 	my $cmd = "ClearCase::Wrapper::$ARGV[0]";
 	my $rc = eval { $cmd->(@ARGV) };
 	if ($@) {
-	    chomp $@;
-	    return $@ =~ m%^\d+$% ? $@ : 1; # Completed, successful or not
+	    chomp $@; #One extra newline to avoid dumping the stack
+	    if ($@ =~ m%^\d+$%) {
+	      $rc = $@;
+	    } elsif ($@) {
+	      print STDERR "$@\n";
+	      $rc = 1;
+	    } else {
+	      $rc = 0;
+	    }
+	    return $rc; # Completed, successful or not
 	}
 	# a zero return signals falling back to cleartool
 	return $rc if $rc;
