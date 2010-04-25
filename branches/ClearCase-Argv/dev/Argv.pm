@@ -598,19 +598,41 @@ sub _cvt_input_cw {
 }
 
 sub _qmeta {
-  my $arg = shift;
-  if (CYGWIN || MSWIN) {
-      $arg =~ s%\'%^'%g;
-      $arg = q(') . $arg . q(');
+    my $arg = shift;
+    if (CYGWIN || MSWIN) {
+        $arg =~ s%\'%^'%g;
+        $arg = q(') . $arg . q(');
     } else {
       $arg = quotemeta($arg);
     }
-  return $arg;
+    return $arg;
+}
+# commands sent to ipc must be single line ones
+sub _ipc_nl_in_cmt {
+    my $r = shift;
+    my ($i, $c, $v) = 0;
+    for (@{$r}) {
+        if (m%^-c(omment)?$%) {
+	    $c = $i;
+	} elsif ($c and $i == $c + 1) {
+	    $v = $_ if m%\n%;
+	    last;
+	}
+	$i++;
+    }
+    if ($v) {
+        use File::Temp qw(tempfile);
+        my ($fh,$cfile) = tempfile;
+	print $fh $v;
+	close $fh;
+	splice @{$r} ,$c ,2 , ('-cfile', $cfile);
+    }
 }
 sub _ipc_cmd {
     my $self = shift;
     my ($disposition, $stdout, $stderr, @cmd) = @_;
     local *_;
+    _ipc_nl_in_cmt(\@cmd);
     # Send the command to cleartool.
     my $cmd = join(' ', map {
         m%^$|\s|[\[\]*"'?]% ?
