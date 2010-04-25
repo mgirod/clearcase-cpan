@@ -1185,10 +1185,10 @@ versions. It's currently maintained on Solaris 9 and Windows XP with CC
 7.0 using Perl5.8.x.  Viability on other platforms and/or earlier
 versions is untestable by me.
 
-Marc Girod's testing environment: Solaris 8 and 10, and Windows 2000,
-with CtCmd on Windows, without IPC::ChildSafe, with Clone.
-Tatyana Shpichko's testing environment: RedHat Linux 4, with and without
-CtCmd, and Windows XP without CtCmd.
+Marc Girod's testing environment: Solaris 10 (sparc and i386), and
+Windows Vista, with CtCmd on Windows, without IPC::ChildSafe, with
+Clone. Perl 5.8.8 and 5.10.x. Tatyana Shpichko's testing environment:
+RedHat Linux 4, with and without CtCmd, and Windows XP without CtCmd.
 
 =head1 FILES
 
