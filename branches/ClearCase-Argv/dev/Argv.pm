@@ -614,6 +614,8 @@ sub _ipc_nl_in_cmt {
     for (@{$r}) {
         if (m%^-c(omment)?$%) {
 	    $c = $i;
+	} elsif (m%^-(nc|c[fq])%) {
+	    last;
 	} elsif ($c and $i == $c + 1) {
 	    $v = $_ if m%\n%;
 	    last;
