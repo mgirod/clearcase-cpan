@@ -1,6 +1,6 @@
 package ClearCase::Wrapper::MGi;
 
-$VERSION = '0.20';
+$VERSION = '0.21';
 
 use warnings;
 use strict;
@@ -272,8 +272,11 @@ sub _Mkbco {
       }
     } else {
       my @args;
-      push @args, @opts, @cmt, $e; # Ensure non empty array
-      $rc |= $ct->argv('co', @args)->system;
+      push @args, @opts, @cmt;
+      push @args, $bt if $bt;
+      push @args, $e; # Ensure non empty array
+      $rc |= $bt? $ct->argv('mkbranch', @args)->system
+	: $ct->argv('co', @args)->system;
     }
   }
   return $rc;
