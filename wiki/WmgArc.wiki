@@ -11,7 +11,7 @@ However, whereas it is satisfying and useful as is with branch types, it is clum
 
 With branch types, the driving semantic is to _archive_ the existing type _away_, so that existing config specs will stop selecting the branches after they have been rolled out (published), and will select the public labels (baseline) instead.
 
-This is fine, since although a new type is created, which is useed nowhere, this is fine: the type will get used _implicitly_ at the next checkout.
+This is fine, since although a new type is created, which is used nowhere, this situation is not problematic: the type will get used _implicitly_ at the next checkout.
 
 ==Label Types==
 
