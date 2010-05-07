@@ -483,33 +483,33 @@ sub optset {
 sub factor {
     my $self = shift;
     my($pset, $r_desc, $r_opts, $r_args, $r_cfg) = @_;
-    my %vgra;
+    my @vgra;
     {
-	local @ARGV = @$r_args;
-	if ($r_desc && @$r_desc) {
-	    require Getopt::Long;
-	    # Need this version so Configure() returns prev state.
-	    Getopt::Long->VERSION(2.23);
-	    if ($r_cfg && @$r_cfg) {
-		my $prev = Getopt::Long::Configure(@$r_cfg);
-		GetOptions($self->{AV_LKG}{$pset}, @$r_desc);
-		Getopt::Long::Configure($prev);
-	    } else {
-		local $Getopt::Long::passthrough = 1;
-		local $Getopt::Long::autoabbrev = 1;
-		local $Getopt::Long::debug = 1 if $self->dbglevel == 5;
-		GetOptions($self->{AV_LKG}{$pset}, @$r_desc);
-	    }
-	}
-	for (0..$#ARGV) { $vgra{$ARGV[$_]} = $_ }
+        local @ARGV = @$r_args;
+        if ($r_desc && @$r_desc) {
+            require Getopt::Long;
+            # Need this version so Configure() returns prev state.
+            Getopt::Long->VERSION(2.23);
+            if ($r_cfg && @$r_cfg) {
+                my $prev = Getopt::Long::Configure(@$r_cfg);
+                GetOptions($self->{AV_LKG}{$pset}, @$r_desc);
+                Getopt::Long::Configure($prev);
+            } else {
+                local $Getopt::Long::passthrough = 1;
+                local $Getopt::Long::autoabbrev = 1;
+                local $Getopt::Long::debug = 1 if $self->dbglevel == 5;
+                GetOptions($self->{AV_LKG}{$pset}, @$r_desc);
+            }
+        }
+        @vgra = @ARGV;
     }
     my(@opts, @args);
-    for (@$r_args) {
-	if (defined $vgra{$_}) {
-	    push(@args, $_);
-	} else {
-	    push(@opts, $_);
-	}
+    for (reverse @$r_args) {
+        if (@vgra && $vgra[$#vgra] eq $_) {
+            unshift(@args, pop (@vgra));
+        } else {
+            unshift(@opts, $_);
+        }
     }
     @$r_opts = @opts if $r_opts;
     @$r_args = @args;
