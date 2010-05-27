@@ -7,16 +7,6 @@ PATTERN=$2
 IND=$3
 EXTDO=$($ct des -fmt "%n\n" $DO)
 SUBDOS=$($ct catcr $DO | grep -E '@@[-0-9]+' | grep -v $EXTDO)
-SUBDOS1=
-
-
-if [ -n "$SUBDOS" ]; then
-  for sd in $SUBDOS; do
-    if [ -n "$($ct diffcr $sd $DO)" ]; then
-      SUBDOS1="$SUBDOS1 $sd"
-    fi
-  done
-fi
 
 if [ -n "$SUBDOS" ]; then
   for cr in $SUBDOS; do
