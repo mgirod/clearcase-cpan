@@ -1,6 +1,6 @@
 package ClearCase::Wrapper::DSB;
 
-$VERSION = '1.13';
+$VERSION = '1.14';
 
 use AutoLoader 'AUTOLOAD';
 
@@ -151,7 +151,7 @@ sub catcs {
 	my $tag = ViewTag(@ARGV);
 	die Msg('E', "view tag cannot be determined") if !$tag;;
 	my($vws) = reverse split '\s+', ClearCase::Argv->lsview($tag)->qx;
-	exit _Burrow('CATCS_00', "$vws/config_spec", $op);
+	exit Burrow('CATCS_00', "$vws/config_spec", $op);
     }
 }
 
@@ -899,7 +899,8 @@ sub recheckout {
 	unlink $keep;
 	if (rename($_, $keep)) {
 	    if (File::Copy::copy($pred, $_)) {
-		chmod 0644, $_;
+		my $mode = (stat $keep)[2];
+		chmod $mode, $_;
 	    } else {
 		die Msg('E', (-r $_ ? $keep : $_) . ": $!");
 	    }
@@ -1096,7 +1097,8 @@ sub setview {
 
 Adds a B<-quiet> option to strip out all those annoying
 C<Processing dir ...> and C<End dir ...> messages so you can see what
-files actually changed.
+files actually changed. It also suppresses logging by redirecting the
+log file to /dev/null.
 
 =cut
 
@@ -1104,11 +1106,15 @@ sub update {
     my %opt;
     GetOptions(\%opt, qw(quiet));
     return 0 if !$opt{quiet};
+    if (!grep m%^-log%, @ARGV) {
+	splice(@ARGV, 1, 0, '-log', MSWIN ? 'NUL' : '/dev/null');
+    }
     my $ct = ClearCase::Argv->find_cleartool;
     open(CMD, "$ct @ARGV |") || exit(2);
     while(<CMD>) {
 	next if m%^(?:Processing|End)\s%;
 	next if m%^[.]+$%;
+	next if m%, copied 0 %;
 	print;
     }
     exit(close(CMD));
