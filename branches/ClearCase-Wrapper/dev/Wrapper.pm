@@ -21,7 +21,7 @@ BEGIN {
 use constant MSWIN => $^O =~ /MSWin32|Windows_NT/i ? 1 : 0;
 
 # This is the list of functions we want to export to overlay pkgs.
-@exports = qw(MSWIN GetOptions _Burrow Assert Msg Pred ViewTag
+@exports = qw(MSWIN GetOptions Assert Burrow Msg Pred ViewTag
 		    AutoCheckedOut AutoNotCheckedOut AutoViewPrivate);
 
 # Hacks for portability with Windows env vars.
@@ -116,7 +116,6 @@ for my $subdir (qw(ClearCase/Wrapper ClearCase/Wrapper/Site)) {
 		# is a new feature. The eval is needed to avoid a compile-
 		# time error in <5.6.0.
 		if ($] >= 5.006) {
-		    # next unless exists &{$tglob};
 		    next unless eval { exists &{$tglob} };
 		}
 		# Take what survives the above tests and create a hash
@@ -373,14 +372,14 @@ or entirely new commands to be synthesized.
 ## Internal service routines, autoloaded since not always needed.
 ###########################################################################
 
-# Function to parse 'include' stmts recursively.  Used by
+# Function to read through include files recursively, used by
 # config-spec parsing meta-commands. The first arg is a
 # "magic incrementing string", the second a filename,
 # the third an "action" which is eval-ed
 # for each line.  It can be as simple as 'print' or as
 # complex a regular expression as desired. If the action is
 # null, only the names of traversed files are printed.
-sub _Burrow {
+sub Burrow {
     local $input = shift;
     my($filename, $action) = @_;
     print $filename, "\n" if !$action;
@@ -391,7 +390,7 @@ sub _Burrow {
     }
     while (<$input>) {
 	if (/^include\s+(.*)/) {
-	    _Burrow($input, $1, $action);
+	    Burrow($input, $1, $action);
 	    next;
 	}
 	eval $action if $action;
@@ -1340,7 +1339,18 @@ read before launching any of the sitewide enhancements. Note that this
 file is passed to the Perl interpreter and thus has access to the full
 array of Perl syntax. This mechanism is powerful but the corollary is
 that users must be experienced with both ClearCase and Perl, and to
-some degree wth the ClearCase::Wrapper module, to use it.
+some degree with the ClearCase::Wrapper module, to use it. Here's an
+example:
+ 
+    % cat ~/.clearcase_profile.pl
+    require ClearCase::Argv;
+    Argv->dbglevel(1);
+    ClearCase::Argv->ipc(2);
+
+The purpose of the above is to turn on ClearCase::Argv "IPC mode"
+for all commands. The verbosity (Argv->dbglevel) is only set to
+demonstrate that the setting works. The require statement is used
+to ensure that the module is loaded before we attempt to configure it.
 
 =item * Sitewide ClearCase Comment Defaults
 

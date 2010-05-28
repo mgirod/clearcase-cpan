@@ -155,7 +155,8 @@ Revision history for Perl extension ClearCase::Wrapper.
 1.15 Sun Dec 14 18:01:56 GMTST 2008
 	- Under CYGWIN as well, default to ipc mode.
 
-1.16 Wed Mar 24 18:03:30 GMT 2010
-        - _Burrow taken from DSB.pm
-	- Loop reading std input when no args, including support for -status
-	- man success return value was not a numeric 0
+1.16 Fri May 14 07:40:25 EDT 2010
+        - Burrow function moved here from from DSB.pm and exported.
+	- Loop reading std input when no args, including support for -status.
+	- Fixed man success return code.
+	- POD work.

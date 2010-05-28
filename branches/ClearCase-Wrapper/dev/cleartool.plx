@@ -104,7 +104,9 @@ sub one_cmd {
 	    return system 'cleartool', @ARGV;
 	}
     } else {
-	if (-d '/usr/atria') {
+	if (-d '/opt/rational') {
+	    unshift(@ARGV, '/opt/rational/clearcase/bin/cleartool');
+	} elsif (-d '/usr/atria') {
 	    unshift(@ARGV, '/usr/atria/bin/cleartool');
 	} else {
 	    unshift(@ARGV, 'cleartool');
@@ -123,7 +125,7 @@ if (@ARGV) {
     my $rc = 0;
     my $interactive = -t STDIN;
     require Text::ParseWords;
-    print "$prog", $status?$status:'', '> ' if $interactive;
+    print "$prog", $status ? $status : '', '> ' if $interactive;
     while (my $line = <>) {
 	chomp $line;
 	last if $line =~ '^(quit|exit)$';
