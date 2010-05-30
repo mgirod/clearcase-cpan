@@ -14,33 +14,33 @@ use strict;
    no strict 'vars';
 
    # Usage message additions for actual cleartool commands that we extend.
-   $catcs	= "\n\t   * [-cmnt|-expand|-sources|-start]";
+   $catcs	= "\n* [-cmnt|-expand|-sources|-start]";
    $describe	= "\n* [--par/ents <n>]";
    $lock	= "\n* [-allow|-deny login-name[,...]] [-iflocked]";
-   $lsregion	= " * [-current]";
+   $lsregion	= "\n* [-current]";
    $mklabel	= "\n* [-up]";
-   $setcs	= "\n\t   * [-clone view-tag] [-expand] [-sync|-needed]";
-   $setview	= "\n\t     * [-me] [-drive drive:] [-persistent]";
+   $setcs	= "\n* [-clone view-tag] [-expand] [-sync|-needed]";
+   $setview	= "\n* [-me] [-drive drive:] [-persistent]";
    $update	= "\n* [-quiet]";
    $winkin	= "\n* [-vp] [-tag view-tag]";
 
    # Usage messages for pseudo cleartool commands that we implement here.
    # Note: we used to localize $0 but that turns out to trigger a bug
    # in perl 5.6.1.
-   my $z = $ARGV[0] || '';
+   my $z = (($ARGV[0] eq 'help') ? $ARGV[1] : $ARGV[0]) || '';
    $comment	= "$z [-new] [-element] object-selector ...";
    $diffcs	= "$z view-tag-1 [view-tag-2]";
    $eclipse	= "$z element ...";
    $edattr	= "$z [-view [-tag view-tag]] | [-element] object-selector ...";
    $grep	= "$z [grep-flags] pattern element";
-   $protectview	= "$z [-force] [-replace]
-                    [-chown login-name] [-chgrp group-name] [-chmod permissions]
-                    [-add_group group-name[,...]]
-                    [-delete_group group-name[,...]]
-		    {-tag view-tag | view-storage-dir-pname ...}";
+   $protectview	= "$z [-force] [-replace]"
+		.  "\n[-chown login-name] [-chgrp group-name] [-chmod permissions]"
+		.  "\n[-add_group group-name[,...]]"
+		.  "\n[-delete_group group-name[,...]]"
+		.  "\n{-tag view-tag | view-storage-dir-pname ...}";
    $recheckout	= "$z [-keep|-rm] pname ...";
-   $winkout	= "$z [-dir|-rec|-all] [-f file] [-pro/mote] [-do]
-		[-meta file [-print] file ...";
+   $winkout	= "$z [-dir|-rec|-all] [-f file] [-pro/mote] [-do]"
+		.  "\n[-meta file [-print] file ...";
    $workon	= "$z [-me] [-login] [-exec command-invocation] view-tag";
 }
 

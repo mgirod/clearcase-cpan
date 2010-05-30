@@ -61,3 +61,5 @@ Revision history for Perl extension ClearCase::Wrapper::DSB.
 	- Fixed a file-mode bug in "ct reco/recheckout".
 	- Pushed recursion support up into ClearCase::Wrapper for
 	  use by other overlay modules.
+	- Tweaked indenting in show usage functions
+
