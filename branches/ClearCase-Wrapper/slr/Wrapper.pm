@@ -226,12 +226,13 @@ if (my $pflag = _FirstIndex('-P', @ARGV)) {
    no strict 'vars';
 
    # Extended messages for actual cleartool commands that we extend.
-   $checkin	= "\n* [-dir|-rec|-all|-avobs] [-ok] [-diff [diff-opts]] [-revert]";
+   $checkin	= "\n* [-dir|-rec|-all|-avobs] [-ok] [-diff [diff-opts]]" .
+                  "\n* [-revert [-mkhlink]]";
    $checkout	= "\n* [-dir|-rec] [-ok]";
    $diff	= "\n* [-<n>] [-dir|-rec|-all|-avobs]";
    $diffcr	= "\n* [-data]";
-   $lsprivate	= "\n* [-dir|-rec|-all] [-ecl/ipsed] [-type d|f]
-* [-rel/ative] [-ext] [pname]";
+   $lsprivate	= "\n* [-dir|-rec|-all] [-ecl/ipsed] [-type d|f]" .
+		  "\n* [-rel/ative] [-ext] [pname]";
    $lsview	= "\n* [-me]";
    $mkelem	= "\n* [-dir|-rec] [-do] [-ok]";
    $uncheckout	= " * [-nc]";
@@ -239,7 +240,7 @@ if (my $pflag = _FirstIndex('-P', @ARGV)) {
    # Extended messages for pseudo cleartool commands that we implement here.
    # Note: we used to localize $0 but that turns out to trigger a bug
    # in perl 5.6.1.
-   my $z = $ARGV[0] || '';
+   my $z = (($ARGV[0] eq 'help') ? $ARGV[1] : $ARGV[0]) || '';
    $edit	= "$z <co-flags> [-ci] <ci-flags> pname ...";
    $extensions	= "$z [-long]";
 }
@@ -418,16 +419,19 @@ sub Msg {
 sub Assert {
     my($assertion, @msg) = @_;
     return if $assertion;
-    (my $op = (caller(1))[3]) =~ s%.*:%%;
+    my $op = "";
+    for (my $i=1; ((caller($i))[3]) =~ /ClearCase::Wrapper::/; $i++) { 
+        $op = (caller($i))[3];
+    }
+    $op =~ s%.*:%%;
     no strict 'refs';
-    my $str = ${$op} || $op;
-    my $star = '*' if !Native($op);
+    my $str = ${$op} || $op || 'help';
+
     for (@msg) {
 	chomp;
 	print STDERR Msg('E', $_);
     }
-    print STDERR "Usage: $star$str\n";
-    exit 1;
+    _helpmsg(STDERR, 1, "help", $op);
 }
 
 # Recursive function to find the n'th predecessor of a given version.
@@ -657,6 +661,11 @@ before typing the comment.
 Implements a new B<-revert> flag. This causes identical (unchanged)
 elements to be unchecked-out instead of being checked in.
 
+Implements a new B<-mkhlink> flag. This works in the context of the 
+B<-revert> flag and causes any inbound merge hyperlinks to an unchanged
+checked-out element to be copied to its predecessor before the unchanged
+element is unchecked-out.
+
 Since checkin is such a common operation, a special fature is supported
 to save typing: an unadorned I<ci> cmd is C<promoted> to I<ci -dir -me
 -diff -revert>. In other words typing I<ct ci> will step through each
@@ -673,8 +682,11 @@ sub checkin {
     # -re999 isn't a real flag, it's to disambiguate -rec from -rev
     # Same for -cr999.
     my %opt;
-    GetOptions(\%opt, qw(crnum=s cr999=s diff ok revert re999))
-			if grep /^-(crn|dif|ok|rev)/, @ARGV;
+    GetOptions(\%opt, qw(crnum=s cr999=s diff ok revert re999 mkhlink mk999))
+			if grep /^-(crn|dif|ok|rev|mkh)/, @ARGV;
+
+    die Msg('E', "-mkhlink flag requires -revert flag")
+                        if ($opt{mkhlink} && ! $opt{revert});
 
     # This is a hidden flag to support my checkin_post trigger.
     # It allows the bug number to be supplied as a cmdline option.
@@ -736,6 +748,18 @@ sub checkin {
     for $elem (@elems) {
 	my $chng = $diff->args($elem)->system('DIFF');
 	if ($opt{revert} && !$chng) {
+	    # If -revert and -mkhlink and no changes, copy hlinks before unco
+            if ($opt{mkhlink}) {
+                my $ct = ClearCase::Argv->new({autochomp=>1});
+                my @links = grep {s/^<- //}
+                    $ct->desc(['-s', '-ahl', 'Merge'], $elem)->qx;
+                my $pred = Pred($elem,1,$ct);
+                $pred = Pred($pred,1,$ct) if $pred =~ m#/0$#;
+                for (@links) {
+                    $ct->mkhlink(['-unidir','Merge'], $_, $pred)->system;
+                }
+            }
+
 	    # If -revert and no changes, unco instead of checkin
 	    ClearCase::Argv->unco(['-rm'], $elem)->system;
 	} else {
@@ -936,41 +960,63 @@ sub edit {
 }
 
 # No POD for this one because no options (same as native variant).
-sub help {
-    my @text = ClearCase::Argv->new(@ARGV)->stderr(0)->qx;
+sub _helpmsg {
+    my $FH = shift;
+    my $rc = shift;
+    my @text = ClearCase::Argv->new(@_)->stderr(0)->qx;
     # Let cleartool handle any malformed requests.
-    return 0 if @ARGV > 2;
-    if (@ARGV == 2) {
-	my $op = $ARGV[1];
+    return 0 if @_ > 2;
+    if (@_ == 2) {
+	my $op = $_[1];
 	if (Extension($op)) {
-	    @text = ('Usage: *') if !@text;
-	    chomp $text[-1];
+	    chomp $text[-1] if @text;;
 	    if (my $msg = $$op) {
 		chomp $msg;
-		my($indent) = ($text[-1] =~ /^(\s*)/);
-		substr($indent, -2, 2) = '';
+
+		my $indent;
+                if (! @text) {
+	            @text = ("Usage: * ");
+                    $indent = "Usage: * $op ";
+                } else {
+		    ($indent) = ($text[-1] =~ /^(\s*)/);
+                    if (!$indent) {
+		        ($indent) = ($text[0] =~ /^([^\s]+[\s*]+[^\s]+\s+)/);
+                    }
+                }
+                $indent = " " x (length($indent) - 2);
+		$msg =~ s/\n([^\*])/\n  $1/gs;
 		$msg =~ s/\n/\n$indent/gs;
 		push(@text, $msg);
 	    }
-	    print @text, "\n";
-	    exit 0;
-	} else {
-	    return 0;
+            push @text, "\n";
 	}
+        print $FH @text;
+	exit $rc;
     }
-    print @text, "\n";
+    print $FH @text, "\n";
     my $bars = '='x70;
-    print "$bars\n= ClearCase::Wrapper Extensions:\n$bars\n\n";
+    print $FH "$bars\n= ClearCase::Wrapper Extensions:\n$bars\n\n";
     for (sort grep !/^_/, keys %ClearCase::Wrapper::ExtMap) {
 	next if m%^(lsp(riv)?|c.)$%;
 	$cmd = "ClearCase::Wrapper::$_";
-	my $text = $$cmd;
-	next unless $text;
+	my (@text) = grep {$_} split /\n/, $$cmd;
+	next unless @text;
+        for (@text[1..$#text]) {s/^/ /;}
 	$text =~ s%^(help)?\s+%%s;
-	my $star = ClearCase::Wrapper::Native($_) ? '' : '*';
-	print "Usage: $star$_ $text\n";
+	my $star = ClearCase::Wrapper::Native($_) ? '' : '* ';
+        my $leader = "Usage: $star$_";
+        for (@text) {
+            s/^\*/ */;
+	    print $FH "$leader$_\n";
+            $leader =~ s/./ /g;
+        }
     }
-    exit 0;
+    exit $rc
+}
+
+sub help {
+
+    _helpmsg(STDOUT, 0, @ARGV);
 }
 
 =item * LSPRIVATE
