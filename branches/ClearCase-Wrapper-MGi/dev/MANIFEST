@@ -5,10 +5,10 @@ MANIFEST
 README
 test.pl
 extra/.clearcase_profile.pl
+extra/Configuration.pod
 extra/ForceLock.pm
 extra/ForceLockSudo.pm
 extra/ForceLockUnix.pm
-extra/README
 extra/VobPathConv.pm
 extra/VobPathConv.pod
 extra/locklbtype
