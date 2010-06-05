@@ -116,5 +116,7 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
         - mkbrtype -arc -ord and in a remote vob
 	- support for global types.
 
-0.21 Mon May  3 16:58:02 GMTDT 2010
+0.21 Sat Jun  5 17:00:24 GMTDT 2010
         - mkbranch with standard view (not ##:BranchOff)
+	- hyperlink and attribute types -shared
+	- mklbtype -arc: renamed new type to temporary, for later use

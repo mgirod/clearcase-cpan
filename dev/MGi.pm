@@ -294,14 +294,15 @@ sub _Ensuretypes($@) {
     for my $v (@vob) {
       my $t2 = "$t\@$v";
       if ($silent->argv(qw(des -s), "hltype:$t2")->system) {
-	$ct->argv(qw(mkhltype -c), $cmt{$t}, $gflg, $t2)->system and die;
+	$ct->argv(qw(mkhltype -shared -c), $cmt{$t}, $gflg, $t2)->system
+	  and die;
       }
     }
   }
   for my $v (@vob) {
     if ($silent->argv(qw(des -s), "attype:$diat\@$v")->system) {
-      $ct->argv(qw(mkattype -c), $cmt{$diat}, $gflg, "$diat\@$v")->system
-	and die;
+      $ct->argv(qw(mkattype -shared -c), $cmt{$diat}, $gflg,
+		"$diat\@$v")->system and die;
     }
   }
 }
@@ -768,7 +769,7 @@ sub mkbranch {
     }
   }
   for (keys %v) {
-    die if $ct->argv(qw(des -s), "brtype:$bt$_")->stdout(0)->system;
+    die "\n" if $ct->argv(qw(des -s), "brtype:$bt$_")->stdout(0)->system;
   }
   $mkbranch->args(@args);
   $mkbranch->{bt} = $bt;
@@ -955,6 +956,10 @@ Comments go to the type being archived.
 
 The implementation is largely shared with I<mkbrtype>.
 
+For label types, the newly created type is hidden away (with a suffix
+of I<_0>) and locked. It is being restored the next time C<mklbtype -fam>
+is given for the same name.
+
 =item B<-glo/bal>
 
 Make global types of types in a vob with an admin vob, if the variable
@@ -1069,6 +1074,12 @@ sub _GenMkTypeSub {
 	    $ntype->system;
 	    my $at = "$type:${arc}$vob";
 	    $silent->argv('mkhlink', $prhl, $t, $at)->system;
+	    if ($type eq 'lbtype') {
+	      my $t0 = $t;
+	      $t0 =~ s/^lbtype:(.*)(@.*)$/lbtype:$ {1}_0$2/;
+	      $ct->argv('rename', $t, $t0)->system;
+	      $ct->argv('lock', $t0)->system;
+	    }
 	    $ct->argv('chevent', @cmt, $at)->stdout(0)->system
 	      unless $cmt[0] and $cmt[0] =~ /^-nc/;
 	  }
@@ -1082,10 +1093,20 @@ sub _GenMkTypeSub {
 	  map { $_ = "$type:$_" } @a;
 	  die Msg('E', "Some types already exist among @args")
 	    unless $silent->argv(qw(des -s), @a)->stderr(0)->system;
-	  my %pair = ();
-	  foreach (@args) {
-	    if (/^(.*?)(@.*)?$/) {
-	      $pair{$_} = "${1}_1.00" . ($2? $2:'');
+	  my (%pair, @skip) = ();
+	  TYPE: foreach my $t (@args) {
+	    if ($t =~ /^(.*?)(@.*)?$/) {
+	      my ($pfx, $sfx) = ($1, $2?$2:'');
+	      if ($type eq 'lbtype') {
+		my $t0 = "lbtype:${pfx}_0$sfx";
+		if ($ct->argv(qw(des -s), $t0)->stderr(0)->qx) {
+		  $ct->argv('unlock', $t0)->system;
+		  $ct->argv('rename', $t0, "lbtype:$t")->stderr(0)->system
+		    and die Msg('E', qq(Failed to restore "$t0" into "$t".));
+		  push @skip, $t;
+		}
+	      }
+	      $pair{$t} = "${pfx}_1.00$sfx";
 	    }
 	  }
 	  _Findfreeinc(\%pair);
@@ -1093,9 +1114,17 @@ sub _GenMkTypeSub {
 	  $ntype->args(values %pair);
 	  $ntype->opts(@cmt, @opts);
 	  $ntype->system;
-	  $ntype->args(@args);
-	  $ntype->opts('-nc', @opts);
-	  $ntype->system;
+	  if (@skip) {
+	    my $sk = '(' . join('|', @skip) . ')';
+	    @a = grep !/$sk/, @args;
+	  } else {
+	    @a = @args;
+	  }
+	  if (@a) {
+	    $ntype->args(@a);
+	    $ntype->opts('-nc', @opts);
+	    $ntype->system;
+	  }
 	  map {
 	    if (defined($pair{$_})) {
 	      my $inc = "$type:$pair{$_}";
