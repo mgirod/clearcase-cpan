@@ -120,3 +120,5 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
         - mkbranch with standard view (not ##:BranchOff)
 	- hyperlink and attribute types -shared
 	- mklbtype -arc: renamed new type to temporary, for later use
+	- rmlabel: support for family types and RmLBTYPE attribute
+	- mklabel: removes the RmLBTYPE attribute on the same version

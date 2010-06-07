@@ -5,7 +5,7 @@ $VERSION = '0.21';
 use warnings;
 use strict;
 use vars qw($ct $eqhl $prhl $diat);
-($eqhl, $prhl, $diat) = qw(EqInc PrevInc DelInc);
+($eqhl, $prhl) = qw(EqInc PrevInc);
 
 sub _Compareincs($$) {
   my ($t1, $t2) = @_;
@@ -284,8 +284,7 @@ sub _Mkbco {
 sub _Ensuretypes($@) {
   my ($glb, @vob) = @_;
   my %cmt = ($eqhl => q(Equivalent increment),
-	     $prhl => q(Previous increment in a type chain),
-	     $diat => q(Deleted in increment));
+	     $prhl => q(Previous increment in a type chain));
   my $silent = $ct->clone;
   $silent->stdout(0);
   $silent->stderr(0);
@@ -297,12 +296,6 @@ sub _Ensuretypes($@) {
 	$ct->argv(qw(mkhltype -shared -c), $cmt{$t}, $gflg, $t2)->system
 	  and die;
       }
-    }
-  }
-  for my $v (@vob) {
-    if ($silent->argv(qw(des -s), "attype:$diat\@$v")->system) {
-      $ct->argv(qw(mkattype -shared -c), $cmt{$diat}, $gflg,
-		"$diat\@$v")->system and die;
     }
   }
 }
@@ -586,7 +579,7 @@ of incremental types.
 
 =head1 CLEARTOOL EXTENSIONS
 
-=over 12
+=over 13
 
 =item * LSGENEALOGY
 
@@ -939,6 +932,8 @@ increments of the second. It is the I<family> type.
 The name of the initial incremental type is this of the I<family> type, with
 a suffix of I<_1.00>.
 
+Also create a I<RmLBTYPE> attribute type to record removals of labels.
+
 =item B<-inc/rement>
 
 Create a new increment of an existing label type family, given as argument.
@@ -1125,12 +1120,17 @@ sub _GenMkTypeSub {
 	    $ntype->opts('-nc', @opts);
 	    $ntype->system;
 	  }
-	  map {
+	  my $gflg = (grep /^-glo/, $ntype->opts)? '-glo' : '-ord';
+	  for (keys %pair) {
 	    if (defined($pair{$_})) {
 	      my $inc = "$type:$pair{$_}";
 	      $silent->argv('mkhlink', $eqhl, "$type:$_", $inc)->system;
+	      next if $ntype eq 'mkbrtype';
+	      my $att = "Rm$_";
+	      $ct->argv(qw(mkattype -shared -c), q(Deleted in increment),
+			$gflg, "$att")->system and die "\n";
 	    }
-	  } keys %pair;
+	  }
 	} elsif ($opt{increment}) { # increment
 	  $ntype->opts(@cmt, $ntype->opts);
 	  my $lct = ClearCase::Argv->new(); #Not autochomp
@@ -1561,8 +1561,8 @@ sub mklabel {
   GetOptions(\%opt, qw(up force over=s all));
   ClearCase::Argv->ipc(1);
   my $mkl = ClearCase::Argv->new(@ARGV);
-  $mkl->parse(qw(replace|recurse|ci|cq|nc
-		 version|c|cfile|select|type|name|config=s));
+  $mkl->parse(qw(replace|recurse|follow|ci|cq|nc
+		 version=s c|cfile|select|type|name|config=s));
   my @opt = $mkl->opts();
   die Msg('E', 'all is only supported in conjunction with over')
     if $opt{all} and !$opt{over};
@@ -1681,12 +1681,22 @@ sub mklabel {
     } @elems;
   }
   exit $ret unless @mod;
-  $ret = $mkl->args($et[0], @mod)->system if @et;
-  exit $ret if $ret and !$opt{force};
-  @opt = $mkl->opts;
-  push @opt, '-rep' if @et and !grep /^-rep/, @opt; #implicit for floating
-  $mkl->opts(@opt);
-  $ret |= $mkl->args($lbtype, @mod)->system;
+  my $rmattr = ClearCase::Argv->rmattr([("Rm$lbtype")])->stderr(0);
+  my @raopts = $rmattr->opts;
+  push(@raopts, '-ver', $mkl->flag('version')) if $mkl->flag('version');
+  $rmattr->opts(@raopts);
+  for (@mod) {
+    if (@et) {
+      my $rc = $mkl->args($et[0], $_)->system;
+      $ret |= $rc;
+      next if $rc and !$opt{force};
+      $rmattr->args($_)->system unless $rc;
+    }
+    @opt = $mkl->opts;
+    push @opt, '-rep' if @et and !grep /^-rep/, @opt; #implicit for floating
+    $mkl->opts(@opt);
+    $ret |= $mkl->args($lbtype, $_)->system;
+  }
   exit $ret;
 }
 
@@ -1777,7 +1787,7 @@ sub checkin {
 
 No semantic change. This implementation is only needed to handle the
 optional interactive dialog in the context of the ipc mode of the
-underlying I<ClearCase::Argv>, to work around a bug in I<cleartool status>.
+underlying I<ClearCase::Argv>.
 
 =cut
 
@@ -1807,6 +1817,79 @@ sub rmbranch {
     my $run = sub { my $rmbranch = shift; $rmbranch->system };
     _Yesno($rmbranch, $run, \%yn, $exists, $err);
   }
+}
+
+=item * RMLABEL
+
+For family types, remove both types, and add a I<RmLBTYPE> attribute
+mentioning the increment of the removal of the LBTYPE label, for use
+in config specs based on sparse fixed types equivalent to a given
+state of the floating type.
+
+=cut
+
+sub rmlabel {
+  use strict;
+  use warnings;
+  ClearCase::Argv->ipc(1);
+  my $rmlabel = ClearCase::Argv->new(@ARGV);
+  $rmlabel->parse(qw(cquery|cqeach nc c|cfile=s recurse follow version=s));
+  my($lbtype, @elems) = $rmlabel->args;
+  $ct = ClearCase::Argv->new({autochomp=>1});
+  if (!($lbtype and @elems)) {
+    warn Msg('E', 'Type name required') unless $lbtype;
+    warn Msg('E', 'Element pathname required') unless @elems;
+    $ct->argv(qw(help rmlabel))->system;
+    exit 1;
+  }
+  if (MSWIN) {
+    $_ = glob($_) for @elems;
+  }
+  $lbtype =~ s/^lbtype://;
+  my (%vb, @lt, %et);
+  for my $e (@elems) {
+    my $v = $ct->argv(qw(des -s), "vob:$e")->stderr(0)->qx;
+    $vb{$v}++ if $v;
+  }
+  if ($lbtype =~ /@(.*)$/) {
+    my ($v, @v) = ($1, keys %vb);
+    die Msg('E', qq(Object is in unexpected VOB: "$lbtype".))
+      if scalar @v > 1 or (scalar @v == 1 and $v !~ /^$v[0]/);
+    push @lt, $lbtype;
+  } else {
+    push @lt, "$lbtype\@$_" for keys %vb;
+  }
+  $et{$_}++ for grep s/^-> lbtype:(.*)@.*$/$1/,
+    map { $ct->argv(qw(des -s -ahl), $eqhl, "lbtype:$_")->qx } @lt;
+  my @et = keys %et;
+  die Msg('E', qq("$lbtype" must have the same equivalent type in all vobs.))
+    if scalar @et > 1;
+  my $et = (scalar @et == 1)? $et[0] : '';
+  my $fn = sub {
+    my ($rml, @cmt) = @_;
+    my @opts = $rml->opts;
+    my @opcm = @opts;
+    push @opcm, @cmt;
+    my $rc = 0;
+    for (@elems) {
+      $rml->opts(@opcm);
+      $rml->args($lbtype, $_);
+      my $r1 = $rml->system;
+      if ($et) {
+	my $att = "Rm$lbtype";
+	my $val = $et;
+	$val =~ s/^.*_//;
+	$ct->argv('mkattr', $att, qq("$val"), $_)->system
+	  unless $r1 or $ct->argv(qw(des -fmt), qq(\%\[$att\]NSa), $_)->qx;
+	$rml->opts(@opts);
+	$rml->args($et, $_);
+	$r1 |= $rml->system;
+      }
+      $rc |= $r1;
+    }
+    return $rc;
+  };
+  _Preemptcmt($rmlabel, $fn);
 }
 
 =back
