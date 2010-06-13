@@ -68,8 +68,8 @@ An other functionality is needed to support in-place publication,
 directly from the development branches, in order to make the
 application of labels cheaper than it currently is.
 
-The intended strategy is to support yet another 'view attribute':
-'##:TypeFamilies: incremental'.
+An other 'view attribute' is supported:
+'##:IncrementalLabels: LBTYPE@/vob/tag'.
 Preliminary documentation can be found at:
   http://www.cmwiki.com/LabelFamily
   http://www.cmwiki.com/IncrementalTypesImp

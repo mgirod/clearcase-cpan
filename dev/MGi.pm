@@ -1698,7 +1698,7 @@ sub mklabel {
     } @elems;
   }
   exit $ret unless @mod;
-  my $rmattr = ClearCase::Argv->rmattr([("Rm$lbtype")])->stderr(0);
+  my $rmattr = ClearCase::Argv->rmattr([("Rm$lbtype")]);
   my @raopts = $rmattr->opts;
   push(@raopts, '-ver', $mkl->flag('version')) if $mkl->flag('version');
   $rmattr->opts(@raopts);
@@ -1707,7 +1707,7 @@ sub mklabel {
       my $rc = $mkl->args($et[0], $_)->system;
       $ret |= $rc;
       next if $rc and !$opt{force};
-      $rmattr->args($_)->system unless $rc;
+      $rmattr->args($_)->stderr(0)->system unless $rc;
     }
     @opt = $mkl->opts;
     push @opt, '-rep' if @et and !grep /^-rep/, @opt; #implicit for floating
@@ -1848,7 +1848,6 @@ state of the floating type.
 sub rmlabel {
   use strict;
   use warnings;
-  ClearCase::Argv->ipc(1);
   my $rmlabel = ClearCase::Argv->new(@ARGV);
   $rmlabel->parse(qw(cquery|cqeach nc c|cfile=s recurse follow version=s));
   my($lbtype, @elems) = $rmlabel->args;
@@ -1896,7 +1895,7 @@ sub rmlabel {
 	my $att = "Rm$lbtype";
 	my $val = $et;
 	$val =~ s/^.*_//;
-	$ct->argv('mkattr', $att, qq("$val"), $_)->system
+	$ct->argv('mkattr', $att, $val, $_)->system
 	  unless $r1 or $ct->argv(qw(des -fmt), qq(\%\[$att\]NSa), $_)->qx;
 	$rml->opts(@opts);
 	$rml->args($et, $_);
@@ -2021,7 +2020,9 @@ sub setcs {
   print $fh "include $vws/$lbtype\n";
   print $fh @cs2;
   close $fh;
-  exit $setcs->args($cs)->system;
+  my $rc = $setcs->args($cs)->system;
+  unlink $cs;
+  exit $rc;
 }
 
 =back
