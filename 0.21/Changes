@@ -1,0 +1,127 @@
+Revision history for Perl extension ClearCase::Wrapper::MGi.
+
+0.01 Tue Sep 25 15:51:36 IST 2007
+	- Initial version: port of lsgen on top of ClearCase::Wrapper
+
+0.02 Tue Oct  2 20:39:17 IST 2007
+	- Fixed bug reported by Tatyana Shpichko: tested the argument(s)
+
+0.03 Fri Oct  5 18:04:50 IST 2007
+	- Fixed bug with branch names matching part of one another
+	- Initial version of checkout
+
+0.04 Wed Oct 10 12:00:38 IST 2007
+	- Run lsgen and checkout under CtCmd or IPC if installed.
+	- Bug fixes: Branch type constraint check on Windows; respect
+	  for functionality added in ClearCase::Wrapper; support for
+	  all options; initialisation of the return value.
+
+0.05 Thu Oct 11 18:09:17 IST 2007
+	- Bug fixes: lsgen input rejected unless version.  Wildcards
+	  supported on Windows.  Wrong semantics for -bra[nch] in
+	  checkout. Returned to default if either -ver or -bra used.
+
+0.06 Tue Nov  6 17:51:41 GMT 2007
+	- Support for checkout via view extended path
+
+0.07 Fri Oct 24 17:48:25 BST 2008
+	- lsgen: skip branch objects with digits in their name
+	- lsgen: when checked out from version 0, use source of merge arrow
+	- lsgen: use of portable quoting pattern
+	- checkcs/co: fix for use of relative path
+	- co: less verbose, and cleaning away the trivial contrib files
+
+0.08 Sat Mar  7 10:58:19 GMTST 2009
+	- co: the internal mkbranch defaults to -nc
+	- lsgen: extracted the parsing of the version tree
+
+0.09 Sun Mar 22 17:50:40 GMTST 2009
+	- lsgen: fix to the handling of -obs
+	- lsgen: indentation of incestual parent
+	- diff: -predecessor from the genealogy
+	- diff: special case for checkedout version
+	- lsgen/diff: fix when selected branch/0
+	- mkbranch
+	- unco, with rmbranch if leaving only branch/0
+
+0.10 Sat Apr 25 18:37:47 GMTDT 2009
+	- co: fixed typo--restored standard flags support
+	- mklbtype -fam and -inc, including -rep
+	- lock, and unlock, forcing if necessary
+	- added the extra directory, with scripts to enable group locking
+
+0.11 Sun Jul 19 10:22:41 GMTDT 2009
+	- added replace option to lock lbtype:
+	- preliminary handling to force locking from Windows/cygwin
+	- mklabel: incremental by default, and for -rec and -up 
+	- mkbranch: error when no brtype
+	- mklabel and mklbtype -inc: check lock on lbtype
+	- mklabel -over
+	- mklbtype: fixes for remote and existing types
+	- mkbco: fix for multiple arguments
+	- mklbtype: comments processed, and distributed to fixed or floating
+
+0.12 Sun Aug 16 15:04:39 GMTDT 2009
+     	- lsgen: print the parent version from which checked out
+	- lsgen: -all option
+	- lsgen: print parent merged in back (fix... was skipped)
+	- co/mkbranch: use preemptcmt
+	- preemptcmt: support multiline comments
+	- forcelock: sudo based solution (contributed: Tatyana Shpichko)
+	- uncheckout: interactive negociation of -rm/-keep options
+	- hidden internal function: renaming according to convention
+
+0.13 Sun Oct  4 14:28:00 GMTDT 2009
+        - lock/unlock: preserve original error message in case of failure
+	- unco: exit after running, do not fall back to default behaviour
+	- mklabel: argument in remote vob; and -all option with -over
+	- mklbtype: fix to Label type not found: "-rep"; error report
+	- ci in user interactions preempting mode
+
+0.14 Sat Nov 28 22:07:04 GMTST 2009
+        - co: die if no element
+	- rmbranch: handle the interactive case of missing -f flag
+	- mklbtype -arc, and mkbrtype -arc
+
+0.15 Sun Nov 29 11:59:47 GMTST 2009
+     	- mkbrtype documentation, and comments to the archived type.
+	- postponed 'early return' until after user interaction.
+
+0.16 Tue Dec 15 10:32:40 GMTST 2009
+        - mklabel: skip symlinks
+	- mklbtype -fam: fix when remote vob non -rep and exists
+
+0.17 Thu Jan 14 13:09:43 GMTST 2010
+        - mklabel: fix to -over ---rep implicit only for family types
+	- mklbtype: fix to -fam when explicit type prefix used
+	- checkin: fixes to -diff (from genealogy) and -rec
+	- mklbtype -inc now unlocks the label types, and re-locks the fixed
+
+0.18 Sat Jan 16 17:15:31 GMTST 2010
+        - co: detect unrecognize option errors
+	- unco: bugfix to removing useless branch
+
+0.19 Sun Feb 14 16:37:43 GMTST 2010
+        - VobPathConv: fix to the conversion of Windows/cygwin paths
+	- mkbranch: argument in other vob
+	- error handling: mklbtype and checkin
+	- ForceLock: don't use 'state'--the ssh connection may time out
+	- mklbtype -inc: skip existing but unlinked type
+	- mklbtype -inc: add the comment option only once if several types
+	- diff: fix for the no predecessor case, and support for -n flag
+	- lock -rep: fix for no -nusers
+	- unco: skip the dialog for dirs; rmbranch before handling next arg.
+
+0.20 Sat Feb 20 17:58:45 GMTST 2010
+        - mkbrtype -arc -ord and in a remote vob
+	- support for global types.
+
+0.21 Sun Jun 13 13:26:59 GMTDT 2010
+        - mkbranch with standard view (not ##:BranchOff)
+	- hyperlink and attribute types -shared
+	- mklbtype -arc: renamed new type to temporary, for later use
+	- rmlabel: support for family types and RmLBTYPE attribute
+	- mklabel: removes the RmLBTYPE attribute on the same version
+	- _EqLbTypeList: produce a list of equivalent fixed lbtypes
+	- setcs: support for incremental types
+	- updthltypes: tool to convert existing hltypes to -shared
