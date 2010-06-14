@@ -2,7 +2,9 @@ use ExtUtils::MakeMaker;
 use File::Basename;
 use File::Find;
 
-# The upgrade from 0.25 to 1.00 is cleaner if the old version is uninstalled.
+### Sample installation: perl Makefile.PL PREFIX=/opt/local/perl5
+
+# The upgrade may be cleaner if the old version is uninstalled manually.
 # Try to catch that situation here.
 my $cnt = 0;
 sub wanted {
@@ -11,7 +13,7 @@ sub wanted {
     return unless $d =~ /Wrapper/;
     return if $cnt++;
     warn qq(Warning: found old version in $d/....
-Remove before 'make install' - see README.upgrade for details.\n);
+You may prefer to remove this manually - see README for details.\n);
 }
 find(\&wanted, @INC);
 
@@ -22,16 +24,16 @@ print q(
     'Ct', or even just 'c'. This must be set up by hand and may be
     done on UNIX via a symbolic link, e.g.:
 
-	% cd /usr/local/bin; ln -s cleartool.plx ct
+	% cd /opt/local/bin; ln -s cleartool.plx ct
 
     or on Windows by making a tiny ct.bat file containing:
 
 	@echo off
 	perl //UNC/path/to/cleartool.plx %*
 
-*NOTE*  Consider installing ClearCase::Wrapper::DSB too.
-*NOTE*  As of version 1.00, much of the functionality previously
-*NOTE*  in this module has been moved to that one.
+*NOTE*  There are additional 'overlay' modules available which
+*NOTE*  extend the functionality of this module.
+*NOTE*  Consider ClearCase::Wrapper::DSB, ClearCase::Wrapper::MGi, etc.
 
 );
 

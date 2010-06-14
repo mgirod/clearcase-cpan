@@ -1,24 +1,27 @@
 package ClearCase::Wrapper;
 
-$VERSION = '1.15';
+$VERSION = '1.16';
 
 require 5.006;
 
 use AutoLoader 'AUTOLOAD';
 
-use vars qw(%Packages %ExtMap $libdir);
+use vars qw(%Packages %ExtMap $libdir $diemexec);
 
 # Inherit some symbols from the main package. We will later "donate"
 # these to all overlay packages as well.
 BEGIN {
     *prog = \$::prog;
+    *dieexit = \$::dieexit;
+    *dieexec = \$::dieexec;
+    *diemexec = \$::diemexec;
 }
 
 # For some reason this can't be handled the same as $prog above ...
 use constant MSWIN => $^O =~ /MSWin32|Windows_NT/i ? 1 : 0;
 
 # This is the list of functions we want to export to overlay pkgs.
-@exports = qw(MSWIN GetOptions Assert Msg Pred ViewTag
+@exports = qw(MSWIN GetOptions Assert Burrow Msg Pred ViewTag
 		    AutoCheckedOut AutoNotCheckedOut AutoViewPrivate);
 
 # Hacks for portability with Windows env vars.
@@ -74,6 +77,8 @@ for my $subdir (qw(ClearCase/Wrapper ClearCase/Wrapper/Site)) {
 	for my $pm (@pms) {
 	    $pm =~ s%^$dir/(.*)\.pm$%$1%;
 	    (my $pkg = $pm) =~ s%[/\\]+%::%g;
+	    eval "*${pkg}::exit = \$dieexit";
+	    eval "*${pkg}::exec = \$dieexec";
 
 	    # In this block we temporarily enter the overlay's package
 	    # just in case the overlay module forgot its package stmt.
@@ -111,7 +116,7 @@ for my $subdir (qw(ClearCase/Wrapper ClearCase/Wrapper/Site)) {
 		# is a new feature. The eval is needed to avoid a compile-
 		# time error in <5.6.0.
 		if ($] >= 5.006) {
-		    next unless eval "exists \&$tglob";
+		    next unless eval { exists &{$tglob} };
 		}
 		# Take what survives the above tests and create a hash
 		# mapping defined functions to the pkg that defines them.
@@ -221,12 +226,13 @@ if (my $pflag = _FirstIndex('-P', @ARGV)) {
    no strict 'vars';
 
    # Extended messages for actual cleartool commands that we extend.
-   $checkin	= "\n* [-dir|-rec|-all|-avobs] [-ok] [-diff [diff-opts]] [-revert]";
+   $checkin	= "\n* [-dir|-rec|-all|-avobs] [-ok] [-diff [diff-opts]]" .
+                  "\n* [-revert [-mkhlink]]";
    $checkout	= "\n* [-dir|-rec] [-ok]";
    $diff	= "\n* [-<n>] [-dir|-rec|-all|-avobs]";
    $diffcr	= "\n* [-data]";
-   $lsprivate	= "\n* [-dir|-rec|-all] [-ecl/ipsed] [-type d|f]
-* [-rel/ative] [-ext] [pname]";
+   $lsprivate	= "\n* [-dir|-rec|-all] [-ecl/ipsed] [-type d|f]" .
+		  "\n* [-rel/ative] [-ext] [pname]";
    $lsview	= "\n* [-me]";
    $mkelem	= "\n* [-dir|-rec] [-do] [-ok]";
    $uncheckout	= " * [-nc]";
@@ -234,7 +240,7 @@ if (my $pflag = _FirstIndex('-P', @ARGV)) {
    # Extended messages for pseudo cleartool commands that we implement here.
    # Note: we used to localize $0 but that turns out to trigger a bug
    # in perl 5.6.1.
-   my $z = $ARGV[0] || '';
+   my $z = (($ARGV[0] eq 'help') ? $ARGV[1] : $ARGV[0]) || '';
    $edit	= "$z <co-flags> [-ci] <ci-flags> pname ...";
    $extensions	= "$z [-long]";
 }
@@ -256,6 +262,8 @@ if (my $pflag = _FirstIndex('-P', @ARGV)) {
 #############################################################################
 if (-r "$ENV{HOME}/.clearcase_profile.pl" && ! -e "$libdir/NO_OVERRIDES") {
     require "$ENV{HOME}/.clearcase_profile.pl";
+    no warnings qw(redefine);
+    *Argv::exec = $diemexec;
 }
 
 # Add to ExtMap the names of extensions defined in the base package.
@@ -333,7 +341,7 @@ sub man {
 	if (!Native($page)) {
 	    ClearCase::Argv->new(@ARGV)->exec;
 	} else {
-	    exit($? != 0);
+	    exit($? ? 1 : 0);
 	}
     }
     my $psep = MSWIN ? ';' : ':';
@@ -365,6 +373,32 @@ or entirely new commands to be synthesized.
 ## Internal service routines, autoloaded since not always needed.
 ###########################################################################
 
+# Function to read through include files recursively, used by
+# config-spec parsing meta-commands. The first arg is a
+# "magic incrementing string", the second a filename,
+# the third an "action" which is eval-ed
+# for each line.  It can be as simple as 'print' or as
+# complex a regular expression as desired. If the action is
+# null, only the names of traversed files are printed.
+sub Burrow {
+    local $input = shift;
+    my($filename, $action) = @_;
+    print $filename, "\n" if !$action;
+    $input++;
+    if (!open($input, $filename)) {
+	warn "$filename: $!";
+	return 1;
+    }
+    while (<$input>) {
+	if (/^include\s+(.*)/) {
+	    Burrow($input, $1, $action);
+	    next;
+	}
+	eval $action if $action;
+    }
+    return 0;
+}
+
 # For standard format error msgs - see code for examples.
 sub Msg {
     my $key = shift;
@@ -385,16 +419,19 @@ sub Msg {
 sub Assert {
     my($assertion, @msg) = @_;
     return if $assertion;
-    (my $op = (caller(1))[3]) =~ s%.*:%%;
+    my $op = "";
+    for (my $i=1; ((caller($i))[3]) =~ /ClearCase::Wrapper::/; $i++) { 
+        $op = (caller($i))[3];
+    }
+    $op =~ s%.*:%%;
     no strict 'refs';
-    my $str = ${$op} || $op;
-    my $star = '*' if !Native($op);
+    my $str = ${$op} || $op || 'help';
+
     for (@msg) {
 	chomp;
 	print STDERR Msg('E', $_);
     }
-    print STDERR "Usage: $star$str\n";
-    exit 1;
+    _helpmsg(STDERR, 1, "help", $op);
 }
 
 # Recursive function to find the n'th predecessor of a given version.
@@ -624,7 +661,12 @@ before typing the comment.
 Implements a new B<-revert> flag. This causes identical (unchanged)
 elements to be unchecked-out instead of being checked in.
 
-Since checkin is such a common operation, a special fature is supported
+Implements a new B<-mkhlink> flag. This works in the context of the 
+B<-revert> flag and causes any inbound merge hyperlinks to an unchanged
+checked-out element to be copied to its predecessor before the unchanged
+element is unchecked-out.
+
+Since checkin is such a common operation a special feature is supported
 to save typing: an unadorned I<ci> cmd is C<promoted> to I<ci -dir -me
 -diff -revert>. In other words typing I<ct ci> will step through each
 file checked out by you in the current directory and view,
@@ -640,8 +682,11 @@ sub checkin {
     # -re999 isn't a real flag, it's to disambiguate -rec from -rev
     # Same for -cr999.
     my %opt;
-    GetOptions(\%opt, qw(crnum=s cr999=s diff ok revert re999))
-			if grep /^-(crn|dif|ok|rev)/, @ARGV;
+    GetOptions(\%opt, qw(crnum=s cr999=s diff ok revert re999 mkhlink mk999))
+			if grep /^-(crn|dif|ok|rev|mkh)/, @ARGV;
+
+    die Msg('E', "-mkhlink flag requires -revert flag")
+                        if ($opt{mkhlink} && ! $opt{revert});
 
     # This is a hidden flag to support my checkin_post trigger.
     # It allows the bug number to be supplied as a cmdline option.
@@ -703,6 +748,18 @@ sub checkin {
     for $elem (@elems) {
 	my $chng = $diff->args($elem)->system('DIFF');
 	if ($opt{revert} && !$chng) {
+	    # If -revert and -mkhlink and no changes, copy hlinks before unco
+            if ($opt{mkhlink}) {
+                my $ct = ClearCase::Argv->new({autochomp=>1});
+                my @links = grep {s/^<- //}
+                    $ct->desc(['-s', '-ahl', 'Merge'], $elem)->qx;
+                my $pred = Pred($elem,1,$ct);
+                $pred = Pred($pred,1,$ct) if $pred =~ m#/0$#;
+                for (@links) {
+                    $ct->mkhlink(['-unidir','Merge'], $_, $pred)->system;
+                }
+            }
+
 	    # If -revert and no changes, unco instead of checkin
 	    ClearCase::Argv->unco(['-rm'], $elem)->system;
 	} else {
@@ -903,41 +960,63 @@ sub edit {
 }
 
 # No POD for this one because no options (same as native variant).
-sub help {
-    my @text = ClearCase::Argv->new(@ARGV)->stderr(0)->qx;
+sub _helpmsg {
+    my $FH = shift;
+    my $rc = shift;
+    my @text = ClearCase::Argv->new(@_)->stderr(0)->qx;
     # Let cleartool handle any malformed requests.
-    return 0 if @ARGV > 2;
-    if (@ARGV == 2) {
-	my $op = $ARGV[1];
+    return 0 if @_ > 2;
+    if (@_ == 2) {
+	my $op = $_[1];
 	if (Extension($op)) {
-	    @text = ('Usage: *') if !@text;
-	    chomp $text[-1];
+	    chomp $text[-1] if @text;;
 	    if (my $msg = $$op) {
 		chomp $msg;
-		my($indent) = ($text[-1] =~ /^(\s*)/);
-		substr($indent, -2, 2) = '';
+
+		my $indent;
+                if (! @text) {
+	            @text = ("Usage: * ");
+                    $indent = "Usage: * $op ";
+                } else {
+		    ($indent) = ($text[-1] =~ /^(\s*)/);
+                    if (!$indent) {
+		        ($indent) = ($text[0] =~ /^([^\s]+[\s*]+[^\s]+\s+)/);
+                    }
+                }
+                $indent = " " x (length($indent) - 2);
+		$msg =~ s/\n([^\*])/\n  $1/gs;
 		$msg =~ s/\n/\n$indent/gs;
 		push(@text, $msg);
 	    }
-	    print @text, "\n";
-	    exit 0;
-	} else {
-	    return 0;
+            push @text, "\n";
 	}
+        print $FH @text;
+	exit $rc;
     }
-    print @text, "\n";
+    print $FH @text, "\n";
     my $bars = '='x70;
-    print "$bars\n= ClearCase::Wrapper Extensions:\n$bars\n\n";
+    print $FH "$bars\n= ClearCase::Wrapper Extensions:\n$bars\n\n";
     for (sort grep !/^_/, keys %ClearCase::Wrapper::ExtMap) {
 	next if m%^(lsp(riv)?|c.)$%;
 	$cmd = "ClearCase::Wrapper::$_";
-	my $text = $$cmd;
-	next unless $text;
+	my (@text) = grep {$_} split /\n/, $$cmd;
+	next unless @text;
+        for (@text[1..$#text]) {s/^/ /;}
 	$text =~ s%^(help)?\s+%%s;
-	my $star = ClearCase::Wrapper::Native($_) ? '' : '*';
-	print "Usage: $star$_ $text\n";
+	my $star = ClearCase::Wrapper::Native($_) ? '' : '* ';
+        my $leader = "Usage: $star$_";
+        for (@text) {
+            s/^\*/ */;
+	    print $FH "$leader$_\n";
+            $leader =~ s/./ /g;
+        }
     }
-    exit 0;
+    exit $rc
+}
+
+sub help {
+
+    _helpmsg(STDOUT, 0, @ARGV);
 }
 
 =item * LSPRIVATE
@@ -1306,7 +1385,18 @@ read before launching any of the sitewide enhancements. Note that this
 file is passed to the Perl interpreter and thus has access to the full
 array of Perl syntax. This mechanism is powerful but the corollary is
 that users must be experienced with both ClearCase and Perl, and to
-some degree wth the ClearCase::Wrapper module, to use it.
+some degree with the ClearCase::Wrapper module, to use it. Here's an
+example:
+ 
+    % cat ~/.clearcase_profile.pl
+    require ClearCase::Argv;
+    Argv->dbglevel(1);
+    ClearCase::Argv->ipc(2);
+
+The purpose of the above is to turn on ClearCase::Argv "IPC mode"
+for all commands. The verbosity (Argv->dbglevel) is only set to
+demonstrate that the setting works. The require statement is used
+to ensure that the module is loaded before we attempt to configure it.
 
 =item * Sitewide ClearCase Comment Defaults
 
