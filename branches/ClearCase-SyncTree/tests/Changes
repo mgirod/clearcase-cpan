@@ -211,3 +211,8 @@ Revision history for Perl extension ClearCase::SyncTree.
 	- reuse: branch names ending in numbers
 	- reuse: symlinks or dirs with same name in lshis of directory
 	- vreuse option
+	- completing the processing if checkouts left (required fix to _lsco)
+	- removed the Modulino structure set in 0.50 (test strategy reverted)
+	- cygwin support
+	- clone simplified to support ipc reference counting
+	- indentation fixes in the pod parts
