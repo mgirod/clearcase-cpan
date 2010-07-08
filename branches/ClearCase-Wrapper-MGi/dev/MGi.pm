@@ -1,6 +1,6 @@
 package ClearCase::Wrapper::MGi;
 
-$VERSION = '0.21';
+$VERSION = '0.22';
 
 use warnings;
 use strict;
@@ -27,12 +27,14 @@ use AutoLoader 'AUTOLOAD';
   no strict 'vars';
 
   my $z = $ARGV[0] || '';
+  $checkin = "\n* [-dir|-rec|-all|-avobs] [-ok] [-diff [diff-opts]] [-revert]";
   $lsgenealogy =
     "$z [-short] [-all] [-obsolete] [-depth gen-depth] pname ...";
-  $mklbtype = "\n* [-family] [-increment] [-archive] pname ...";
   $mkbrtype = "\n* [-archive]";
   $mklabel = "\n* [-up] [-force] [-over type [-all]]";
-  $checkin = "\n* [-dir|-rec|-all|-avobs] [-ok] [-diff [diff-opts]] [-revert]";
+  $mklbtype = "\n* [-family] [-increment] [-archive]";
+  $rmtype = "\n* [-family] [-increment]";
+  $setcs = "\n* [-clone view-tag] [-expand] [-sync|-needed]";
 }
 
 #############################################################################
@@ -600,7 +602,7 @@ of incremental types.
 
 =head1 CLEARTOOL EXTENSIONS
 
-=over 14
+=over 2
 
 =item * LSGENEALOGY
 
@@ -615,13 +617,13 @@ advocated branching strategy.
 
 Flags:
 
-=over 4
+=over 1
 
 =item B<-all>
 
 Show 'uninteresting' versions, otherwise skipped:
 
-=over 2
+=over 1
 
 =item - bearing no label
 
@@ -915,7 +917,7 @@ type are just chains, and can still be used with the B<-inc/rement> flag.
 
 Types forming a family are related with hyperlinks of two types:
 
-=over 2
+=over 1
 
 =item B<EqInc>
 
@@ -938,7 +940,7 @@ the numeric (treated as I<real>) value of the increment.
 
 Flags:
 
-=over 4
+=over 1
 
 =item B<-fam/ily>
 
@@ -994,6 +996,7 @@ sub _GenMkTypeSub {
     my $silent = $ct->clone;
     $silent->stdout(0);
     if ((grep /^-glo/, $ntype->opts) or ($ntype->flag('global') and !%opt)) {
+      push @cmt, '-rep' if $rep;
       $ntype->opts(@cmt, $ntype->opts);
       return $ntype->system
     }
@@ -1115,16 +1118,21 @@ sub _GenMkTypeSub {
 		  $ct->argv('rename', $t0, "lbtype:$t")->stderr(0)->system
 		    and die Msg('E', qq(Failed to restore "$t0" into "$t".));
 		  push @skip, $t;
+		} else {
+		  $pair{$t} = "${pfx}_1.00$sfx";
 		}
+	      } else {
+		$pair{$t} = "${pfx}_1.00$sfx";
 	      }
-	      $pair{$t} = "${pfx}_1.00$sfx";
 	    }
 	  }
-	  _Findfreeinc(\%pair);
 	  my @opts = $ntype->opts();
-	  $ntype->args(values %pair);
-	  $ntype->opts(@cmt, @opts);
-	  $ntype->system;
+	  if (%pair) {
+	    _Findfreeinc(\%pair);
+	    $ntype->args(values %pair);
+	    $ntype->opts(@cmt, @opts);
+	    $ntype->system;
+	  }
 	  if (@skip) {
 	    my $sk = '(' . join('|', @skip) . ')';
 	    @a = grep !/$sk/, @args;
@@ -1143,9 +1151,8 @@ sub _GenMkTypeSub {
 	      $silent->argv('mkhlink', $eqhl, "$type:$_", $inc)->system;
 	      next if $ntype eq 'mkbrtype';
 	      my $att = "Rm$_";
-	      $ct->argv(qw(mkattype -shared -vtype real -c),
-			q(Deleted in increment), $gflg, "$att")->system
-			  and die "\n";
+	      $ct->argv(qw(mkattype -vtype real -c), q(Deleted in increment),
+			$gflg, "$att")->stderr(0)->system;
 	    }
 	  }
 	} elsif ($opt{increment}) { # increment
@@ -1208,26 +1215,14 @@ sub _GenMkTypeSub {
 	      if ($lck) {
 		my @out =
 		  $lct->argv('lock', "lbtype:$prev\@$vob")->stderr(1)->qx;
-		if (grep /^cleartool: Error/, @out) {
-		  if ($fl and !$loaded) {
-		    my $fn = $fl; $fn =~ s%::%/%g; $fn .= '.pm';
-		    require $fn;
-		    $fl->import;
-		    $loaded = 1;
-		  }
-		  if (!$fl) {
-		    print @out;
-		    next INCT;
-		  } elsif (flocklt($prev, $vob)) {
-		    next INCT;
-		  }
+		if ($fl and grep /^cleartool: Error/, @out) {
+		  flocklt($prev, $vob); # loaded while unlocking
 		} else {
 		  print @out;
 		}
 	      }
 	    } else {
-	      warn "Previous increment non suitable in $t: $prev\n";
-	      next;
+	      warn Msg('W',qq(Previous increment non suitable in $t: "$prev"));
 	    }
 	  }
 	}
@@ -1307,7 +1302,7 @@ fixed.
 The implementation is largely shared with I<mklbtype>.
 See its documentation for the B<PrevInc> hyperlink type.
 
-=over 2
+=over 1
 
 =item B<-arc/hive>
 
@@ -1908,6 +1903,158 @@ sub rmlabel {
   _Preemptcmt($rmlabel, $fn);
 }
 
+=item * RMTYPE
+
+For family label types, 3 cases:
+
+=over
+
+=item -fam: remove all types in the family, as well as the I<RmLBTYPE>
+attribute type. This is a rare and destructive situation, unless the
+equivalent type is I<LBTYPE_1.00> (the family was just created).
+The types actually affected ought of course to be unlocked.
+
+=item -inc: remove the current increment, and move back the family
+type onto the previous one. Note: I<RmLBTYPE> attributes ... may be
+left behind (for now...)
+
+=item default (no flag): remove the family (floating) type and the
+current increment, storing the information about the previous one into
+the "hidden" I<LBTYPE_0> type, from which it may be recovered with a
+later C<mklbtype -fam LBTYPE>.
+
+=back
+
+Note that removing directly an incremental fixed type is left
+unchanged for low level purposes, and thus may corrupt the whole
+hierarchy: you need to restore links and take care of possible
+I<RmLBTYPE> attributes.
+
+=cut
+
+sub rmtype {
+  use strict;
+  use warnings;
+  my %opt;
+  GetOptions(\%opt, qw(f999 family increment)); # f999 to disambiguate -force
+  die Msg('E', qq("-family" and "-increment" are mutualy exclusive.))
+    if $opt{family} and $opt{increment};
+  my $rmtype = ClearCase::Argv->new(@ARGV);
+  $rmtype->parse(qw(cquery|cqeach nc c|cfile=s ignore rmall force));
+  my @type = $rmtype->args;
+  my (@lbt, @oth);
+  for (@type) {
+    if (/^lbtype:/) {
+      push @lbt, $_;
+    } else {
+      push @oth, $_;
+    }
+  }
+  if (!@lbt) {
+    warn Msg('W', '"-family" applies only to label types') if $opt{family};
+    warn Msg('W', '"-increment" applies only to label types')
+      if $opt{increment};
+    exit $rmtype->system;
+  }
+  my $rs;
+  $rs = $rmtype->args(@oth)->system if @oth;
+  $ct = ClearCase::Argv->new({autochomp=>1});
+  if (!$rmtype->flag('rmall')) {
+    my @glb;
+    for (@lbt) {
+      push @glb, $_
+	if $ct->argv(qw(des fmt %[type_scope]p), $_)->qx eq 'global';
+    }
+    if (@glb) {
+      warn Msg('E',
+	       "Must specify removal of all instances when removing a global "
+		 . "label type (or its local copies).");
+      warn Msg('E', qq(Unable to remove label type "$_"))
+	for map { s/^lbtype:(.*)(\@.*)?$/$1/ } @glb;
+      exit 1;
+    }
+  }
+  my (@args, @eq, @lck) = @lbt;
+  my $lct = ClearCase::Argv->new(); #Not autochomp
+  my ($fl, $loaded) = $ENV{FORCELOCK};
+ LBT:for my $t (@lbt) {
+    my ($eq) = grep s/^-> (lbtype:.*)/$1/,
+      $ct->argv(qw(des -s -ahl), $eqhl, $t)->qx;
+    if ($eq) {
+      my ($base, $vob) = ($1, $2?$2:'') if $t =~ /^lbtype:(.*)(\@.*)?$/;
+      if ($opt{family} or $eq =~ /_1.00(\@.*)?$/) {
+	push @eq, map($_ = "lbtype:${_}$vob", _EqLbTypeList($t)),
+	  "attype:Rm${base}$vob";
+      } else {
+	my ($prev) = grep s/^-> (lbtype:.*)/$1/,
+	  $ct->argv(qw(des -s -ahl), $prhl, $eq)->qx;
+	if ($ct->argv(qw(lslock -s), $prev)->stderr(0)->qx) {
+	  push @lck, $prev;
+	  my @out = $lct->argv('unlock', $prev)->stderr(1)->qx;
+	  if (grep /^cleartool: Error/, @out) {
+	    if ($fl and !$loaded) {
+	      my $fn = $fl; $fn =~ s%::%/%g; $fn .= '.pm';
+	      require $fn;
+	      $fl->import;
+	      $loaded = 1;
+	    }
+	    if (!$fl) {
+	      print @out;
+	      next LBT;
+	    } else {
+	      my ($p, $v) = ($1, $2) if $prev =~ /^lbtype:(.*)\@(.*)$/;
+	      next LBT if funlocklt($p, $v);
+	    }
+	  } else {
+	    print @out;
+	  }
+	}
+	if ($opt{increment}) {
+	  my ($hl) = grep s/^\s+(.*) -> $eq/$1/,
+	    $ct->argv(qw(des -l -ahl), $eqhl, $t)->qx;
+	  if ($hl) {
+	    $rs |= $ct->argv('rmhlink', $hl)->stdout(0)->system;
+	    $rs |= $ct->argv('mkhlink', $eqhl, $t, $prev)->stdout(0)->system;
+	    for (@args) {
+	      $_ = $eq if $_ eq $t;
+	    }
+	    # rollback... for all vobs referenced with GlobalDefinition...
+	    my @vb = grep s/^\s+.*?\s+.*? -> .*?\@(.*)$/$1/,
+	      map{ $ct->argv('des', "hlink:$_")->qx } grep s/^\s+(.+?) <-.*/$1/,
+	      $ct->argv(qw(des -l -ahl GlobalDefinition), $eq)->qx;
+	    my ($tn, $vb) = ($1, $2) if $eq =~ /^lbtype:(.*)\@(.*)/;
+	    push @vb, $vb;
+	    my @e = map{$ct->argv('find', $_, qw(-a -ele), "lbtype_sub($tn)",
+			      qw(-nxn -print))->qx} @vb;
+	    warn Msg('W', qq(Need to move "$base" back on @e.))
+	  } else {
+	    warn Msg('E', qq(Failed to roll "$t" one step back.));
+	    $rs = 1;
+	  }
+	} else {
+	  my $t0 = "lbtype:${base}_0$vob"; # store the last eq into hidden type
+	  $ct->argv(qw(mklbtype -nc), $t0)->stdout(0)->system;
+	  $ct->argv(qw(mkhlink), $eqhl, $t0, $prev)->stdout(0)->system;
+	  $ct->argv('lock', $t0)->stdout(0)->system;
+	  push @eq, $eq;
+	}
+      }
+    }
+  }
+  push @args, @eq if @eq;
+  $rs |= $rmtype->args(@args)->system;
+  for my $l (@lck) {
+    my @out = $lct->argv('lock', $l)->stderr(1)->qx;
+    if ($fl and grep /^cleartool: Error/, @out) {
+      my ($p, $v) = ($1, $2) if $l =~ /^lbtype:(.*)\@(.*)$/;
+      flocklt($p, $v); # loaded while unlocking
+    } else {
+      print @out;
+    }
+  }
+  exit $rs;
+}
+
 =item * SETCS
 
 From the version in DSB.pm 1.14--retaining its additions:
@@ -1932,6 +2079,8 @@ inlining the contents of any include files.
 Add support for a incremental label type families, via a
 I<##:IncrementalLabels:> attribute in the config spec: generate a
 config spec fragment equivalent to the type specified, and include it.
+An optional clause of C<-nocheckout> will be propagated to the
+generated rules.
 
 =cut
 
@@ -1982,14 +2131,22 @@ sub setcs {
     exit 0;
   }
   my $setcs = ClearCase::Argv->new(@ARGV);
-  $setcs->parse(qw(default tag=s));
-  exit $setcs->system if $setcs->flag('default');
+  $setcs->parse(qw(force default|current|stream overwrite|rename
+		   ctime|ptime tag=s));
+  exit $setcs->system if $setcs->flag('force') or $setcs->flag('default')
+    or $setcs->flag('overwrite') or $setcs->flag('ctime');
   my ($cs) = $setcs->args;
-  my (@cs1, @cs2, $incfam);
+  if (!$cs) {
+    warn Msg('E', 'Configuration spec must be specified.');
+    @ARGV = qw(help setcs);
+    ClearCase::Wrapper->help();
+    return 1;
+  }
+  my (@cs1, @cs2, $incfam, $noco);
   open my $fh, '<', $cs or die Msg('E', qq(Unable to access "$cs": $!\n));
   while (<$fh>) {
-    if (/^\#\#:IncrementalLabels: *([^\s]+)/) {
-      $incfam = $1;
+    if (/^\#\#:IncrementalLabels: *([^\s]+)(\s+-nocheckout)?/) {
+      ($incfam, $noco) = ($1, $2?$2:'');
       last;
     }
     push @cs1, $_;
@@ -2012,7 +2169,8 @@ sub setcs {
   open $fh, '>', "$vws/$lbtype"
     or die Msg('E',
 	       qq(Failed to write config spec fragment "$vws/$lbtype": $!\n));
-  print $fh qq(element * "{lbtype($_)&&!attr_sub($rmat,<=,$nr)}"\n) for @eqlst;
+  print $fh qq(element * "{lbtype($_)&&!attr_sub($rmat,<=,$nr)}$noco"\n)
+    for @eqlst;
   close $fh;
   $cs .= $$;
   open $fh, '>', $cs or die Msg('E', qq(Could not write "$cs": $!\n));
