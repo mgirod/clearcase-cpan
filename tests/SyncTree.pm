@@ -13,10 +13,10 @@ use File::Copy;
 use File::Find;
 use File::Path;
 use File::Spec 0.82;
-
 use ClearCase::Argv 1.34 qw(chdir);
 
 use constant MSWIN => $^O =~ /MSWin32|Windows_NT/i ? 1 : 0;
+use constant CYGWIN => $^O =~ /cygwin/i ? 1 : 0;
 
 my $lext = '.=lnk=';	# special extension for pseudo-symlinks
 
@@ -26,17 +26,16 @@ sub new {
     if ($class = ref($proto)) {
 	# Make a (deep) clone of the invoking instance
 	require Clone;
-	Clone->VERSION(0.11);	# 0.10 has a known bug
+	Clone->VERSION(0.12);	# 0.10 has a known bug
 	return Clone::clone($proto);
     }
     $class = $proto;
-    my $self = {dbglevel => 0, @_};
+    my $self = {@_};
     bless $self, $class;
     $self->comment('By:' . __PACKAGE__);
     # Default is to sync file modes unless on ^$%#* Windows.
     $self->protect(1);
     # Set up a ClearCase::Argv instance with the appropriate attrs.
-    ClearCase::Argv->dbglevel($self->{dbglevel});
     $self->ct;
     # By default we'll call SyncTree->fail on any cleartool error.
     $self->err_handler($self, 'fail');
@@ -91,16 +90,7 @@ sub ct {
 # For internal use only.  Returns a clone of the ClearCase::Argv object.
 sub clone_ct {
     my $self = shift;
-    my $ct = $self->ct;
-    # Since the ct instance may have a ref back to its enclosing
-    # instance (i.e. the default error handler is st->ct->st->fail),
-    # we have a hack here to keep from cloning that.
-    my $r_handler = $ct->autofail;
-    $ct->autofail(0);
-    my $ctclone = $ct->clone(@_);
-    $ct->autofail($r_handler);
-    $ctclone->autofail($r_handler);
-    return $ctclone;
+    return $self->ct->clone(@_);
 }
 
 sub protect {
@@ -173,7 +163,7 @@ sub normalize {
 	    s%^[\\/]\Q$dv%%;
 	    s%\\%/%g;
 	    $_ = "$md:/$dv$_";
-	} else {
+	} elsif (!CYGWIN) {
 	    s%^/view/$dv%%;
 	    $_ =  "/view/$dv$_";
 	}
@@ -221,7 +211,7 @@ sub _lsco {
 	my $dirname = dirname($dir);
 	$co{$dirname}++;
     }
-    return sort keys %co;
+    return wantarray? sort keys %co : scalar keys %co;
 }
 
 sub mvfsdrive {
@@ -332,8 +322,10 @@ sub dstbase {
 	    $dbase =~ s%.*?$dvob%$mdrive:/$dv$dvob%i;
 	} else {
 	    $dbase = getcwd;
-	    $dbase =~ s%^/view/$dv%%;
-	    $dbase = "/view/$dv$dbase";
+	    if (!CYGWIN) {
+	        $dbase =~ s%^/view/$dv%%;
+		$dbase = "/view/$dv$dbase";
+	    }
 	}
 	$ct->_chdir($olddir) || die "$0: Error: $olddir: $!";
 	$self->{ST_DSTBASE} = $dbase;
@@ -501,14 +493,14 @@ sub dstcheck {
 sub vtcomp {
     my($self, $src, $dst) = @_;
     my $cmp = $self->cmp_func;
-    return 0 unless &$cmp($src, $dst);
+    return 0 unless $cmp->($src, $dst);
     my $vt = ClearCase::Argv->lsvtree([qw(-a -s -nco)]);
     my @vt = grep {m%[\\/]\d*$%} $vt->args($dst)->qx;
     chomp @vt;
     my $sz = -s $src;
     for (@vt) {
         next if -s $_ != $sz;
-	if (!&$cmp($src, $_)) {
+	if (!$cmp->($src, $_)) {
 	    push @{$self->{ST_LBL}}, $_;
 	    return 0;
 	}
@@ -674,14 +666,14 @@ sub branchco {
     my $dir = shift;
     my @ele = @_;
     my $ct = $self->clone_ct;
+    $ct->autochomp(0);
     my $rc;
     if ($self->{branchoffroot}) {
 	foreach my $e (@ele) {
-	    my $sel = $ct->argv('ls', '-d', "$e")->qx;
+	    my $sel = $ct->argv('ls', '-d', "$e")->autochomp(1)->qx;
 	    if ($sel =~ /^(.*?) +Rule:.*-mkbranch (.*?)\]?$/) {
 		my ($ver, $bt) = ($1, $2);
-		my $main = ($ct->argv('lsvtree', $e)->qx)[0];
-		chomp($main);
+		my $main = ($ct->argv('lsvtree', $e)->autochomp(1)->qx)[0];
 		$main =~ s%^[^@]*\@\@[\\/](.*)\r?$%$1%;
 		my $re = $self->pbrtype($bt) ?
 		  qr([\\/]${main}[\\/]$bt[\\/]\d+$) : qr([\\/]$bt[\\/]\d+$);
@@ -766,7 +758,7 @@ sub add {
 		$rm->args($dst)->system;
 	    }
 	    chomp(my @vtree = reverse $vt->args($dir)->qx);
-	    for (@vtree) {
+	    VER: for (@vtree) {
 		next unless m%[/\\][1-9]\d*$% ;	# optimization
 		my $dirext = "$_/$name@@";
 		# case-insensitive file test operator on Windows is a problem
@@ -776,8 +768,9 @@ sub add {
 		    while (-l "$_/$name") {
 		        $name = readlink "$_/$name";
 			$name =~ s/\@\@$//;
-			next if !ecs("$_/$name") || $dm->args("$_/$name")->qx
-			                                    eq 'file element';
+			# consider only relative, and local symlinks
+			next VER if !ecs("$_/$name") ||
+			          $dm->args("$_/$name")->qx eq 'file element';
 		    }
 		    $reused = 1;
 		    $self->branchco(1, $dir) unless $lsco->args($dir)->qx;
@@ -1333,7 +1326,7 @@ sub ecs {
 	$rc = -e $file;
     }
     return $rc;
-}    
+}
 
 1;
 
@@ -1397,7 +1390,7 @@ given usage may be assumed to look like:
 
     $obj->method;
 
-=over 24
+=over 2
 
 =item * -E<gt>srcbase
 
@@ -1627,7 +1620,7 @@ indirect contributors.
 
 =head1 BUGS
 
-=over 4
+=over 2
 
 =item *
 
@@ -1656,7 +1649,7 @@ possibility.
 
 Following items are from Uwe Nagler of Lucent, unverified:
 
-=over 4
+=over 2
 
 =item * Mode changes of files should be supported.
 

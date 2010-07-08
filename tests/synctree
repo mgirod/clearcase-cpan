@@ -1,11 +1,7 @@
 #!/usr/local/bin/perl
 
-package Local::Modulino; #Idea from http://www.ddj.com/184416165
-
-__PACKAGE__->run() unless caller();
-
 use Benchmark;
-use ClearCase::Argv 1.00;
+use ClearCase::Argv 1.34;
 use ClearCase::SyncTree 0.28;
 use File::Basename;
 use File::Find;
@@ -19,7 +15,6 @@ require 5.005 if MSWIN;
 
 my $prog = basename($0, qw(.pl));
 my $rc = 0;
-ClearCase::Argv->ctcmd(1) unless ClearCase::Argv->ipc(1);
 
 sub usage {
     my $msg = shift;
@@ -74,13 +69,6 @@ EOF
 
 my(%opt, %xfer);
 
-sub testrun {
-    shift; #Skip the package name
-    @ARGV = @_;
-    return run('noexit');
-}
-sub run {
-    my $noexit = shift;
 {
     my($only, $skip);
     sub wanted {
@@ -133,7 +121,7 @@ local $Getopt::Long::ignorecase = 0;  # global override for dumb default
 {
     local $Getopt::Long::autoabbrev = 0;
     local $Getopt::Long::passthrough = 1;
-    GetOptions(\%opt, qw(comment|c=s nprotect)) || ($noexit?return 1:exit 1);
+    GetOptions(\%opt, qw(comment|c=s nprotect)) || exit 1;
 }
 GetOptions(\%opt, qw(sbase=s dbase=s flist=s label|mklabel=s lbmods map
 		     Narrow=s@
@@ -141,11 +129,11 @@ GetOptions(\%opt, qw(sbase=s dbase=s flist=s label|mklabel=s lbmods map
 		     reuse vreuse ignore_co overwrite_co
 		     help no ok quiet yes
 		     summary verbose=i vp Version
-)) || ($noexit?return 1:exit 1);
+)) || exit 1;
 usage() if $opt{help};
 if ($opt{Version}) {
     print ClearCase::SyncTree->version, "\n";
-    $noexit?return 0:exit 0;
+    exit 0;
 }
 usage("-sbase is a required flag") if !$opt{sbase};
 usage("-dbase is a required flag") if !$opt{dbase};
@@ -273,7 +261,7 @@ $sync->dstcheck;
 if ($opt{force}) {
     $sync->err_handler(\$rc);
 } elsif ($opt{stop}) {
-    $sync->err_handler(sub {$noexit?return 2:exit 2;});
+    $sync->err_handler(sub {exit 2});
 }
 # Specify the comment to attach to any changes.
 if (!$opt{comment}) {
@@ -302,11 +290,11 @@ $sync->analyze;
 # If -no, give a preview and exit. Ask for OK to proceed unless -yes.
 if (!$opt{yes} || $opt{no}) {
     my $changes = $sync->preview;
-    ($noexit?return 0:exit 0) unless $changes;
-    ($noexit?return 0:exit 0) if $opt{no};
+    exit 0 unless $changes;
+    exit 0 if $opt{no};
     my $msg = "Continue with these $changes element changes?";
     $msg = qq("$msg") if MSWIN;
-    ($noexit?return 0:exit 0) if system(qw(clearprompt proceed -pro), $msg);
+    exit 0 if system(qw(clearprompt proceed -pro), $msg);
 }
 # Create new elements in the target area.
 $sync->add;
@@ -325,8 +313,8 @@ if ($opt{label}) {
 ## $sync->eltypemap('\.xml$' => 'compressed_file');
 
 # If nothing was done, exeunt stage left.
-($noexit?return $rc:exit $rc)
-    unless $sync->get_addhash || $sync->get_modhash || $sync->get_sublist;
+exit $rc unless $sync->get_addhash || $sync->get_modhash
+		                   || $sync->get_sublist || $sync->_lsco;
 
 # Prompt the user before checkin if -ci not in use.
 if (! $opt{ci}) {
@@ -347,11 +335,7 @@ $sync->err_handler(\$rc);
 $sync->no_cr unless $opt{cr};
 $sync->checkin if $opt{ci} || $opt{cr};
 
-$noexit?return $rc:exit $rc;
-
-} #sub run
-
-1;
+exit $rc;
 
 __END__
 
