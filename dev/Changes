@@ -125,3 +125,9 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- _EqLbTypeList: produce a list of equivalent fixed lbtypes
 	- setcs: support for incremental types
 	- updthltypes: tool to convert existing hltypes to -shared
+
+0.22 Sat Jun 19 17:06:43 GMTDT 2010
+        - mkxxtype -glo -rep: fix
+	- pod indentation
+	- rmtype: remove whole label family, including attribute type
+	- setcs: fix to support all default options
