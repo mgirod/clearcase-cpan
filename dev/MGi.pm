@@ -907,13 +907,22 @@ Extension: families of types, with a chain of fixed types, linked in a
 succession, and one floating type, convenient for use in config specs.
 One application is incremental types, applied only to modified versions,
 allowing however to simulate full baselines.
-This is implemented as part of UCM, for fixed types, and I<magic> config
-specs. The wrapper offers thus a similar functionality on base ClearCase.
+Such a functionality is implemented as part of UCM, for fixed types,
+and I<magic> config specs. The wrapper offers thus something similar
+on base ClearCase.
+
+This wrapper also includes a modified version of the extension for
+global types originally proposed in C<ClearCase::Wrapper::DSB>. In the
+realm of an admin vob, types are created global by default. This
+implementation makes the feature configurable, via a
+C<$ClearCase::Wrapper::MGi::global> variable set in
+C<.clearcase_profile.pl>, so that a user is not forced to obey an
+injonction from (possibly other site) administrators.
 
 The current baseline is embodied with floating labels, which are moved
-over successive versions. This floating type is however not mandatory.
-It is created with the B<-fam/ily> flag. Families with no such floating
-type are just chains, and can still be used with the B<-inc/rement> flag.
+over successive versions. The first pair of a floating and a fixed
+type is created with the B<-fam/ily> flag. Further fixed types are
+created with the B<-inc/rement> flag.
 
 Types forming a family are related with hyperlinks of two types:
 
@@ -975,9 +984,7 @@ is given for the same name.
 
 =item B<-glo/bal>
 
-Make global types of types in a vob with an admin vob, if the variable
-I<$ClearCase::Wrapper::MGi::global> is set (in .clearcase_profile.pl).
-Actually then: it is enough that one type needs to be made global.
+Support for global family types is preliminary.
 
 =back
 
@@ -1963,7 +1970,7 @@ sub rmtype {
     my @glb;
     for (@lbt) {
       push @glb, $_
-	if $ct->argv(qw(des fmt %[type_scope]p), $_)->qx eq 'global';
+	if $ct->argv(qw(des -fmt %[type_scope]p), $_)->qx eq 'global';
     }
     if (@glb) {
       warn Msg('E',
