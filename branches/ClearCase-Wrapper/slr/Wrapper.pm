@@ -666,7 +666,7 @@ B<-revert> flag and causes any inbound merge hyperlinks to an unchanged
 checked-out element to be copied to its predecessor before the unchanged
 element is unchecked-out.
 
-Since checkin is such a common operation, a special fature is supported
+Since checkin is such a common operation a special feature is supported
 to save typing: an unadorned I<ci> cmd is C<promoted> to I<ci -dir -me
 -diff -revert>. In other words typing I<ct ci> will step through each
 file checked out by you in the current directory and view,
