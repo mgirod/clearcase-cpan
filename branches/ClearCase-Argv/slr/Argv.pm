@@ -261,7 +261,7 @@ sub qx {
 		for (@data) { $_ .= "\n" }
 	    }
 	    $self->unixpath(@data) if MSWIN && $self->outpathnorm;
-	    print map {"+ <- $_"} @data if @data && $dbg >= 2;
+	    print STDERR map {"+ <- $_"} @data if @data && $dbg >= 2;
 	    if ($rc) {
 		$self->lastresults($rc, @data);
 		$self->fail($self->qxfail);
@@ -271,7 +271,7 @@ sub qx {
 	} else {
 	    chomp($data) if $self->autochomp;
 	    $self->unixpath($data) if MSWIN && $self->outpathnorm;
-	    print "+ <- $data" if $data && $dbg >= 2;
+	    print STDERR "+ <- $data" if $data && $dbg >= 2;
 	    if ($rc) {
 		$self->lastresults($rc, $data);
 		$self->fail($self->qxfail);
