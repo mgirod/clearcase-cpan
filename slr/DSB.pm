@@ -5,19 +5,19 @@ $VERSION = '1.14';
 use AutoLoader 'AUTOLOAD';
 
 use strict;
+use warnings;
 
 #############################################################################
 # Usage Message Extensions
 #############################################################################
 {
-   local $^W = 0;
    no strict 'vars';
 
    # Usage message additions for actual cleartool commands that we extend.
    $catcs	= "\n* [-cmnt|-expand|-sources|-start]";
    $describe	= "\n* [--par/ents <n>]";
    $lock	= "\n* [-allow|-deny login-name[,...]] [-iflocked]";
-   $lsregion	= "\n* [-current]";
+   $lsregion    = "\n* [-current]";
    $mklabel	= "\n* [-up]";
    $setcs	= "\n* [-clone view-tag] [-expand] [-sync|-needed]";
    $setview	= "\n* [-me] [-drive drive:] [-persistent]";
@@ -25,33 +25,28 @@ use strict;
    $winkin	= "\n* [-vp] [-tag view-tag]";
 
    # Usage messages for pseudo cleartool commands that we implement here.
-   # Note: we used to localize $0 but that turns out to trigger a bug
-   # in perl 5.6.1.
-   my $z = (($ARGV[0] eq 'help') ? $ARGV[1] : $ARGV[0]) || '';
-   $comment	= "$z [-new] [-element] object-selector ...";
-   $diffcs	= "$z view-tag-1 [view-tag-2]";
-   $eclipse	= "$z element ...";
-   $edattr	= "$z [-view [-tag view-tag]] | [-element] object-selector ...";
-   $grep	= "$z [grep-flags] pattern element";
-   $protectview	= "$z [-force] [-replace]"
-		.  "\n[-chown login-name] [-chgrp group-name] [-chmod permissions]"
-		.  "\n[-add_group group-name[,...]]"
-		.  "\n[-delete_group group-name[,...]]"
-		.  "\n{-tag view-tag | view-storage-dir-pname ...}";
-   $recheckout	= "$z [-keep|-rm] pname ...";
-   $winkout	= "$z [-dir|-rec|-all] [-f file] [-pro/mote] [-do]"
-		.  "\n[-meta file [-print] file ...";
-   $workon	= "$z [-me] [-login] [-exec command-invocation] view-tag";
+   $comment	= "[-new] [-element] object-selector ...";
+   $diffcs	= "view-tag-1 [view-tag-2]";
+   $eclipse	= "element ...";
+   $edattr	= "[-view [-tag view-tag]] | [-element] object-selector ...";
+   $grep	= "[grep-flags] pattern element";
+   $protectview	= "[-force] [-replace]"
+	       ."\n[-chown login-name] [-chgrp group-name] [-chmod permissions]"
+	       ."\n[-add_group group-name[,...]]"
+	       ."\n[-delete_group group-name[,...]]"
+	       ."\n{-tag view-tag | view-storage-dir-pname ...}";
+   $recheckout	= "[-keep|-rm] pname ...";
+   $winkout	= "[-dir|-rec|-all] [-f file] [-pro/mote] [-do]"
+	       ."\n[-meta file [-print] file ...";
+   $workon	= "[-me] [-login] [-exec command-invocation] view-tag";
 }
 
 #############################################################################
 # Command Aliases
 #############################################################################
-*des		= *describe;
-*desc		= *describe;
 *edcmnt		= *comment;
 *egrep		= *grep;
-*mkbrtype	= *mklbtype;	# not synonyms but the code's the same
+#*mkbrtype	= *mklbtype;	# not synonyms but the code's the same
 *reco		= *recheckout;
 *work		= *workon;
 
@@ -151,7 +146,7 @@ sub catcs {
 	my $tag = ViewTag(@ARGV);
 	die Msg('E', "view tag cannot be determined") if !$tag;;
 	my($vws) = reverse split '\s+', ClearCase::Argv->lsview($tag)->qx;
-	exit Burrow('CATCS_00', "$vws/config_spec", $op);
+	exit Burrow("$vws/config_spec", $op);
     }
 }
 
@@ -175,7 +170,7 @@ sub comment {
     Assert(@ARGV > 0);	# die with usage msg if untrue
     my $retstat = 0;
     my $editor = $ENV{WINEDITOR} || $ENV{VISUAL} || $ENV{EDITOR} ||
-						    (MSWIN ? 'notepad' : 'vi');
+						(MSWIN() ? 'notepad' : 'vi');
     my $ct = ClearCase::Argv->new;
     # Checksum before and after edit - only update if changed.
     my($csum_pre, $csum_post) = (0, 0);
@@ -222,25 +217,25 @@ sub describe {
     my $desc = ClearCase::Argv->new(@ARGV);
     $desc->optset(qw(CC WRAPPER));
 
-    $desc->parseCC(qw(g|graphical local l|long s|short 
-	    fmt=s alabel=s aattr=s ahlink=s ihlink=s
-	    cview version=s ancestor
-	    predecessor pname type=s cact));
+    $desc->parseCC(qw(g|graphical local l|long s|short
+            fmt=s alabel=s aattr=s ahlink=s ihlink=s
+            cview version=s ancestor
+            predecessor pname type=s cact));
     $desc->parseWRAPPER(qw(parents|par9999=s));
     my $generations = abs($desc->flagWRAPPER('parents') || 0);
     if ($generations) {
-	my $pred = ClearCase::Argv->desc([qw(-fmt %En@@%PVn)]);
-	$pred->autofail(1);
-	my @nargs;
-	my @args = $desc->args;
-	for my $arg (@args) {
-	    my $narg = $arg;
-	    for (my $i = $generations; $i; $i--) {
-		$narg = $pred->args($narg)->qx;
-	    }
-	    push(@nargs, $narg);
-	}
-	$desc->args(@nargs);
+        my $pred = ClearCase::Argv->desc([qw(-fmt %En@@%PVn)]);
+        $pred->autofail(1);
+        my @nargs;
+        my @args = $desc->args;
+        for my $arg (@args) {
+            my $narg = $arg;
+            for (my $i = $generations; $i; $i--) {
+                $narg = $pred->args($narg)->qx;
+            }
+            push(@nargs, $narg);
+        }
+        $desc->args(@nargs);
     }
     $desc->exec('CC');
 }
@@ -305,17 +300,27 @@ sub eclipse {
 	    next;
 	}
 
+        require Cwd;
+        my $nonviewelem = Cwd::abs_path($elem);
+        if (MSWIN()) {
+	    die Msg('E', "don't know how to do this on windows");
+            # fixme someday
+            $nonviewelem =~ s%/view/[^/]+%%;
+        } else {
+            $nonviewelem =~ s%/view/[^/]+%%;
+        }
+
 	# Make a config spec template that hides the to-be-eclipsed elem.
 	my $cstmp = ".$::prog.eclipse.$$";
 	open(CSTMP, ">$cstmp") || die Msg('E', "$cstmp: $!");
-	print CSTMP "element $elem -none\n";
+	print CSTMP "element $nonviewelem -none\n";
 	print CSTMP @orig;
 	close(CSTMP) || die Msg('E', "$cstmp: $!");
 
 	# Copy the element aside before it gets hidden.
 	my $eltmp = "$elem.eclipse.$$";
 	if (! File::Copy::copy($elem, $eltmp)) {
-	    warn Msg('W', "$elem: $!");
+	    warn Msg('W', "Copy failed on $elem: $!");
 	    $retstat++;
 	    next;
 	}
@@ -330,7 +335,7 @@ sub eclipse {
 	# Copy the copy back to its original place. It will become
 	# writeable as a side effect.
 	if (! File::Copy::copy($eltmp, $elem)) {
-	    warn Msg('W', "$elem: $!");
+	    warn Msg('W', "Recopy failed on $elem: $!");
 	    $retstat++;
 	}
 	unlink $eltmp;
@@ -374,7 +379,7 @@ sub edattr {
     shift @ARGV;
     my $retstat = 0;
     my $editor = $ENV{WINEDITOR} || $ENV{VISUAL} || $ENV{EDITOR} ||
-						    (MSWIN ? 'notepad' : 'vi');
+						(MSWIN() ? 'notepad' : 'vi');
     my $ct = ClearCase::Argv->new;
     my $ctq = $ct->clone({-stdout=>0, -stderr=>0});
 
@@ -474,7 +479,7 @@ sub edattr {
 		    next if $?;
 		}
 		# Deal with broken quoting on &^&@# Windows.
-		if (MSWIN && $newval =~ /^"(.*)"$/) {
+		if (MSWIN() && $newval =~ /^"(.*)"$/) {
 		    $newval = qq("\\"$1\\"");
 		}
 		# Make the new attr value.
@@ -602,7 +607,7 @@ sub lsregion {
     # -cu999 is only to enforce -cur/rent
     GetOptions(\%opt, qw(current cu999));
     return 0 unless $opt{current};
-    if (MSWIN) {
+    if (MSWIN()) {
 	use vars '%RegHash';
 	require Win32::TieRegistry;
 	Win32::TieRegistry->import('TiedHash', '%RegHash');
@@ -656,6 +661,10 @@ sub mklbtype {
     }
 }
 
+sub mkbrtype {
+    return mklbtype(@ARGV);
+}
+
 =item * MKLABEL
 
 The new B<-up> flag, when combined with B<-recurse>, also labels the parent
@@ -671,7 +680,7 @@ sub mklabel {
     my $mkl = ClearCase::Argv->new(@ARGV);
     my $dsc = ClearCase::Argv->new({-autochomp=>1});
     $mkl->parse(qw(replace|recurse|ci|cq|nc
-				version|c|cfile|select|type|name|config=s));
+                                version|c|cfile|select|type|name|config=s));
     $mkl->syfail(1)->system;
     require File::Basename;
     require File::Spec;
@@ -679,12 +688,12 @@ sub mklabel {
     my($label, @elems) = $mkl->args;
     my %ancestors;
     for my $pname (@elems) {
-	my $vobtag = $dsc->desc(['-s'], "vob:$pname")->qx;
-	for (my $dad = File::Basename::dirname(File::Spec->rel2abs($pname));
-		    length($dad) >= length($vobtag);
-			    $dad = File::Basename::dirname($dad)) {
-	    $ancestors{$dad}++;
-	}
+        my $vobtag = $dsc->desc(['-s'], "vob:$pname")->qx;
+        for (my $dad = File::Basename::dirname(File::Spec->rel2abs($pname));
+                    length($dad) >= length($vobtag);
+                            $dad = File::Basename::dirname($dad)) {
+            $ancestors{$dad}++;
+        }
     }
     exit(0) if !%ancestors;
     $mkl->opts(grep !/^-r(ec)?$/, $mkl->opts);
@@ -704,7 +713,7 @@ I<mount> command.
 =cut
 
 sub mount {
-    return 0 if !MSWIN || @ARGV < 2;
+    return 0 if !MSWIN() || @ARGV < 2;
     my %opt;
     GetOptions(\%opt, qw(all));
     my $mount = ClearCase::Argv->new(@ARGV);
@@ -754,7 +763,7 @@ specify values to B<-chmod> which will confuse the view greatly.
 =cut
 
 sub protectview {
-    die Msg('E', "not yet supported on Windows") if MSWIN;
+    die Msg('E', "not yet supported on Windows") if MSWIN();
     my %opt;
     GetOptions(\%opt, qw(force replace tag=s add_group=s delete_group=s
 				    chown=s chgrp=s chmod=s));
@@ -1027,7 +1036,7 @@ sub setview {
     delete $ENV{_CLEARCASE_PROFILE};
     for (grep /^(CLEARCASE_)?ARGV_/, keys %ENV) { delete $ENV{$_} }
 
-    if (!MSWIN) {
+    if (!MSWIN()) {
 	ClearCase::Argv->mustexec(1);	# CtCmd setview doesn't work right
 	return 0;
     }
@@ -1107,7 +1116,7 @@ sub update {
     GetOptions(\%opt, qw(quiet));
     return 0 if !$opt{quiet};
     if (!grep m%^-log%, @ARGV) {
-	splice(@ARGV, 1, 0, '-log', MSWIN ? 'NUL' : '/dev/null');
+	splice(@ARGV, 1, 0, '-log', MSWIN() ? 'NUL' : '/dev/null');
     }
     my $ct = ClearCase::Argv->find_cleartool;
     open(CMD, "$ct @ARGV |") || exit(2);
@@ -1203,7 +1212,7 @@ which may be useful in a script.
 =cut
 
 sub winkout {
-    warn Msg('E', "this may work on &%@# Windows but I haven't tried") if MSWIN;
+    warn Msg('E', "this may work on &%@# Windows but I haven't tried") if MSWIN();
     my %opt;
     GetOptions(\%opt, qw(directory recurse all avobs flist=s
 					do meta=s print promote));
@@ -1265,11 +1274,11 @@ sub winkout {
     # Convert regular view-privates into DO's by opening them
     # under clearaudit control.
     {
-	my $clearaudit = MSWIN ? 'clearaudit' : '/usr/atria/bin/clearaudit';
+	my $clearaudit = MSWIN() ? 'clearaudit' : '/usr/atria/bin/clearaudit';
 	local $ENV{CLEARAUDIT_SHELL} = $^X;
 	my $ecmd = 'chomp; open(DO, ">>$_") || warn "Error: $_: $!\n"';
 	my $cmd = qq($clearaudit -n -e '$ecmd');
-	$cmd = "set -x; $cmd" if $dbg && !MSWIN;
+	$cmd = "set -x; $cmd" if $dbg && !MSWIN();
 	open(AUDIT, "| $cmd") || die Msg('E', "$cmd: $!");
 	for (@dolist) {
 	    print AUDIT $_, "\n";
@@ -1280,9 +1289,9 @@ sub winkout {
 				"Exit status @{[$?>>8]} from clearaudit");
     }
     if ($opt{promote}) {
-	my $scrubber = MSWIN ? 'view_scrubber' : '/usr/atria/etc/view_scrubber';
+	my $scrubber = MSWIN() ? 'view_scrubber' : '/usr/atria/etc/view_scrubber';
 	my $cmd = "$scrubber -p";
-	$cmd = "set -x; $cmd" if $dbg && !MSWIN;
+	$cmd = "set -x; $cmd" if $dbg && !MSWIN();
 	open(SCRUBBER, "| $cmd") || die Msg('E', "$scrubber: $!");
 	for (@dolist) { print SCRUBBER $_, "\n" }
 	close(SCRUBBER) || die Msg('E', $! ?
@@ -1340,13 +1349,13 @@ sub workon {
     my $vwcmd = "$^X -S $0 @ARGV";
     # This next line is required because 5.004 and 5.6 do something
     # different with quoting on Windows, no idea exactly why or what.
-    $vwcmd = qq("$vwcmd") if MSWIN && $] > 5.005;
+    $vwcmd = qq("$vwcmd") if MSWIN() && $] > 5.005;
     push(@sv_argv, '-exec', $vwcmd, $tag);
     # Prevent \'s from getting lost in subsequent interpolation.
     for (@sv_argv) { s%\\%/%g }
     # Hack - assume presence of $ENV{_} means we came from a UNIX-style
     # shell (e.g. MKS on Windows) so set quoting accordingly.
-    my $cmd_exe = (MSWIN && !$ENV{_});
+    my $cmd_exe = (MSWIN() && !$ENV{_});
     Argv->new($^X, '-S', $0, 'setview', @sv_argv)->autoquote($cmd_exe)->exec;
 }
 
@@ -1399,14 +1408,14 @@ sub _inview {
     # Exec the default shell or the value of the -_exec flag.
     my $final = Argv->new;
     if (! $opt{_exec}) {
-	if (MSWIN) {
+	if (MSWIN()) {
 	    $opt{_exec} = $ENV{SHELL} || $ENV{ComSpec} || $ENV{COMSPEC}
 				|| (-x '/bin/sh.exe' ? '/bin/sh' : 'cmd');
 	} else {
 	    $opt{_exec} = $ENV{SHELL} || (-x '/bin/sh' ? '/bin/sh' : 'sh');
 	}
     }
-    #system("title workon $tag") if MSWIN;
+    #system("title workon $tag") if MSWIN();
     $final->prog($opt{_exec})->exec;
 }
 
@@ -1423,3 +1432,8 @@ and/or modify it under the same terms as Perl itself.
 perl(1), ClearCase::Wrapper
 
 =cut
+
+1; 
+__END__
+sub _AutoSplitDummy {};
+
