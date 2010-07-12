@@ -1197,12 +1197,12 @@ sub qx {
     }
     $self->unixpath(@data) if MSWIN && $self->outpathnorm;
     if (wantarray) {
-	print map {"+ <- $_"} @data if @data && $dbg >= 2;
+	print STDERR map {"+ <- $_"} @data if @data && $dbg >= 2;
 	chomp(@data) if $self->autochomp;
 	return @data;
     } else {
 	my $data = join('', @data);
-	print "+ <- $data" if @data && $dbg >= 2;
+	print STDERR "+ <- $data" if @data && $dbg >= 2;
 	chomp($data) if $self->autochomp;
 	return $data;
     }
