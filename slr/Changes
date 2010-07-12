@@ -163,3 +163,4 @@ Revision history for Perl extension ClearCase::Wrapper.
 	- Added -mkhlink option to -revert option in checkin
 	- Assert can now be called from a subfunction
 	- Tweaked indenting in show usage function
+	- Thanks to Marc Girod and Stephen Rauch for these changes
