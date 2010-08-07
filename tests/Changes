@@ -216,3 +216,4 @@ Revision history for Perl extension ClearCase::SyncTree.
 	- cygwin support
 	- clone simplified to support ipc reference counting
 	- indentation fixes in the pod parts
+	- prepend sbase to the arguments if not accessible (test first)
