@@ -236,6 +236,9 @@ if ($opt{map}) {
     my %find_cfg;
     $find_cfg{wanted} = \&wanted;
     $find_cfg{follow_fast}++ if $opt{follow};
+    if (! -r $ARGV[0]) {
+        $_ = File::Spec->catfile($opt{sbase}, $_) for @ARGV;
+    }
     for my $pname (@ARGV) {
 	find(\%find_cfg, $pname);
     }
