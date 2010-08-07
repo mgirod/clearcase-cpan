@@ -230,15 +230,18 @@ if ($opt{map}) {
 	$xfer{$from} = $to;
     }
 } elsif (!$opt{flist}) {
-    push(@ARGV, $opt{sbase}) if !@ARGV && !%xfer;
+    if (@ARGV) {
+        if (! -r $ARGV[0]) {
+	    $_ = File::Spec->catfile($opt{sbase}, $_) for @ARGV;
+	}
+    } else {
+        push(@ARGV, $opt{sbase}) unless %xfer;
+    }
     # Convert warnings from within find() into fatal errors.
     local $SIG{__WARN__} = sub { die "$prog: Error: @_" };
     my %find_cfg;
     $find_cfg{wanted} = \&wanted;
     $find_cfg{follow_fast}++ if $opt{follow};
-    if (! -r $ARGV[0]) {
-        $_ = File::Spec->catfile($opt{sbase}, $_) for @ARGV;
-    }
     for my $pname (@ARGV) {
 	find(\%find_cfg, $pname);
     }
