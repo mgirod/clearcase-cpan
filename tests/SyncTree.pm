@@ -163,7 +163,11 @@ sub normalize {
 	    s%^[\\/]\Q$dv%%;
 	    s%\\%/%g;
 	    $_ = "$md:/$dv$_";
-	} elsif (!CYGWIN) {
+	} elsif (CYGWIN) {
+	    # 4 cases: unc; /view/x user mount; view drive; mvfs drive/tag
+	    s%^/(/?view/$dv|cygdrive/\w(/$dv)?)%%;
+	    $_ = "//view/$dv$_";
+	} else {
 	    s%^/view/$dv%%;
 	    $_ =  "/view/$dv$_";
 	}
@@ -322,7 +326,10 @@ sub dstbase {
 	    $dbase =~ s%.*?$dvob%$mdrive:/$dv$dvob%i;
 	} else {
 	    $dbase = getcwd;
-	    if (!CYGWIN) {
+	    if (CYGWIN) {
+	        $dbase =~ s%^/(/?view/$dv|cygdrive/\w)%%;
+		$dbase = "//view/$dv$dbase";
+	    } else {
 	        $dbase =~ s%^/view/$dv%%;
 		$dbase = "/view/$dv$dbase";
 	    }
@@ -370,6 +377,12 @@ sub lbtype {
     my $self = shift;
     $self->{ST_LBTYPE} = shift if @_;
     return $self->{ST_LBTYPE};
+}
+
+sub inclb {
+    my $self = shift;
+    $self->{ST_INCLB} = shift if @_;
+    return $self->{ST_INCLB};
 }
 
 sub label_mods {
@@ -1121,29 +1134,34 @@ sub label {
     my $ct = $self->clone_ct;
     my $ctq = $ct->clone({-stdout=>0});
     my $ctbool = $ctq->clone({-autofail=>0, -stderr=>0});
+    my $dvob = $self->dstvob;
     my $locked;
-    if ($ctbool->lstype(['-s'], "lbtype:$lbtype\@$dbase")->system) {
-	$ct->mklbtype($self->comment, "lbtype:$lbtype\@$dbase")->system;
-    } else {
-	$locked = $self->clone_ct->lslock(['-s'], "lbtype:$lbtype\@$dbase")->qx;
-	$ct->unlock("lbtype:$lbtype\@$dbase")->system if $locked;
+    if ($ctbool->lstype(['-s'], "lbtype:$lbtype\@$dvob")->system) {
+	$ct->mklbtype($self->comment, "lbtype:$lbtype\@$dvob")->system;
+    } elsif (!$self->inclb) {
+	$locked = $ct->lslock(['-s'], "lbtype:$lbtype\@$dvob")->qx;
+	$ct->unlock("lbtype:$lbtype\@$dvob")->system if $locked;
     }
     # Allow for labelling errors, in case of hard links: only the link
     # recorded can be labelled, the other being seen as 'removed'
-    if ($self->label_mods) {
+    if ($self->label_mods || $self->inclb) {
 	my @mods = $self->_lsco;
 	push @mods, @{$self->{ST_LBL}} if $self->{ST_LBL};
-	$ctbool->mklabel([qw(-nc -rep), $lbtype], @mods)->system if @mods;
+	if (@mods) {
+	    $ctbool->mklabel([qw(-nc), $self->inclb], @mods)->system
+	                                                      if $self->inclb;
+	    $ctbool->mklabel([qw(-nc -rep), $lbtype], @mods)->system;
+	}
     } else {
 	$ctbool->mklabel([qw(-nc -rep -rec), $lbtype], $dbase)->system;
 	# Possibly move the label back to the right versions
 	$ctbool->mklabel([qw(-nc -rep), $lbtype], @{$self->{ST_LBL}})->system
 	                                                   if $self->{ST_LBL};
 	# Last, label the ancestors of the destination back to the vob tag.
-	my $dvob = $self->normalize($self->dstvob);
 	my($dad, @ancestors);
+	my $min = length($self->normalize($dvob));
 	for ($dad = dirname($dbase);
-			length($dad) >= length($dvob); $dad = dirname($dad)) {
+			         length($dad) >= $min; $dad = dirname($dad)) {
 	    push(@ancestors, $dad);
 	}
 	$ctq->mklabel([qw(-rep -nc), $lbtype], @ancestors)->system
@@ -1478,7 +1496,8 @@ vob root. Example:
 
     $obj->label('FOO');
 
-See also I<-E<gt>label_mods>.
+See also I<-E<gt>label_mods>, as well as I<Support for incremental
+label families>.
 
 =item * -E<gt>checkin
 
@@ -1614,9 +1633,35 @@ branch off the root of the version tree, copy-merging there from the
 former.
 
 This allows to avoid both merging back to /main or to a delivery
-branch, and to cascade branches indefinitely.  The logical version tree
-is restituted by navigating the merge arrows, to find all the direct or
-indirect contributors.
+branch, and cascadig branches indefinitely.  The logical version tree
+is restituted by navigating the merge arrows, to find all the direct
+or indirect contributors.
+
+See also I<ClearCase::Wrapper::MGi> on CPAN.
+
+=head2 Support for incremental label families
+
+I<ClearCase::Wrapper::MGi> supports managing families of incremental
+fixed label types, as lists, linked with hyperlinks. The top of a list
+is accessible as the equivalent fixed label type of a floating label
+type, which has a stable name.  This allows to move the floating
+labels, and keep track of their successive positions with sparse fixed
+labels.
+
+I<ClearCase::SyncTree> follows this strategy if the label type
+provided has an I<EqInc> hyperlink.
+
+Using an incremental type with the I<label> method, I<label_mods> is
+implicit (and ignored).
+
+=head2 Support for Cygwin
+
+VOB paths show under Cygwin with forward slashes as separators. UNC
+paths start with C<//>, and drives are presented with a C</cygdrive/>
+prefix. Cygwin also offers a C<mount> tool, allowing the user to mount
+her views under C</view>, to match the UNIX convention.
+
+The support for Cygwin normalizes the paths on the UNC syntax.
 
 =head1 BUGS
 
@@ -1693,14 +1738,16 @@ Rewritten for Unix/Win32 portability by David Boyce in 8/1999, then
 reorganized into a module in 1/2000. This module no longer bears the
 slightest resemblance to any version of citree.
 
-Support for branching off the root of the version tree (usually, /main/0)
-added by Marc Girod.
+Support for 2 features compatible with ClearCase::Wrapper::MGi
+(branching off the root of the version tree--usually, /main/0, and
+applying incremental labels), as well as for cygwin, added by Marc
+Girod.
 
 =head1 COPYRIGHT
 
 Copyright 1997,1998 Paul D. Smith and Bay Networks, Inc.
 
-Copyright 1999-2003 David Boyce (dsbperl AT boyski.com).
+Copyright 1999-2010 David Boyce (dsbperl AT boyski.com).
 
 This script is distributed under the terms of the GNU General Public License.
 You can get a copy via ftp://ftp.gnu.org/pub/gnu/ or its many mirrors.
@@ -1714,19 +1761,12 @@ the API incompatibly. At some point I'll bump the version suitably and
 remove this warning, which will constitute an (almost) ironclad promise
 to leave the interface alone.
 
-Actually, as (a) Rational has released clearfsimport and (b) I am not
-currently doing anything which requires SyncTree (or clearfsimport for
-that matter), there isn't much ongoing support for this module.
-However, it does seem to work fine and the interface hasn't changed in
-two years (!) so I guess we could call that stable. It's unclear
-whether this means stable as in "robust" or stable as in "dead".
-
 =head1 PORTING
 
-This module is known to work on Solaris 2.6-7 and Windows NT 4.0SP3-5,
-and with perl 5.004_04 and 5.6.  As these platforms cover a fairly wide
-range there should be no I<major> portability issues, but please send
-bug reports or patches to the address above.
+This module is known to work on Solaris 2.6-10 and Windows NT 4.0SP3-5
+to Vista SP2, and with perl 5.004_04 to 5.10.  As these platforms
+cover a fairly wide range there should be no I<major> portability
+issues, but please send bug reports or patches to the address above.
 
 =head1 SEE ALSO
 
