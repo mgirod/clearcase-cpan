@@ -303,7 +303,7 @@ sub _Ensuretypes($@) {
 }
 sub _Pfxmajminsfx($) {
   my $t = shift;
-  if ($t =~ /^(\w+[-_])(\d+)(?:\.(\d+))?(\@.*)?$/) {
+  if ($t =~ /^([\w.-]+[-_])(\d+)(?:\.(\d+))?(\@.*)?$/) {
     my $min = ($3 or '');
     my $sfx = ($4 or '');
     return ($1, $2, $min, $sfx);
@@ -1973,11 +1973,9 @@ sub rmtype {
 	if $ct->argv(qw(des -fmt %[type_scope]p), $_)->qx eq 'global';
     }
     if (@glb) {
-      warn Msg('E',
-	       "Must specify removal of all instances when removing a global "
-		 . "label type (or its local copies).");
+      warn Msg('E', "Global type: must specify removal of all instances.");
       warn Msg('E', qq(Unable to remove label type "$_"))
-	for map { s/^lbtype:(.*)(\@.*)?$/$1/ } @glb;
+	for grep { s/^lbtype:(.*)(\@.*)?$/$1/ } @glb;
       exit 1;
     }
   }
@@ -1990,7 +1988,7 @@ sub rmtype {
     if ($eq) {
       my ($base, $vob) = ($1, $2?$2:'') if $t =~ /^lbtype:(.*)(\@.*)?$/;
       if ($opt{family} or $eq =~ /_1.00(\@.*)?$/) {
-	push @eq, map($_ = "lbtype:${_}$vob", _EqLbTypeList($t)),
+	push @eq, grep(s/^(.*)/lbtype:${1}$vob/, _EqLbTypeList($t)),
 	  "attype:Rm${base}$vob";
       } else {
 	my ($prev) = grep s/^-> (lbtype:.*)/$1/,
@@ -2033,7 +2031,7 @@ sub rmtype {
 	    push @vb, $vb;
 	    my @e = map{$ct->argv('find', $_, qw(-a -ele), "lbtype_sub($tn)",
 			      qw(-nxn -print))->qx} @vb;
-	    warn Msg('W', qq(Need to move "$base" back on @e.))
+	    warn Msg('W', qq(Need to move "$base" back on @e.)) if @e;
 	  } else {
 	    warn Msg('E', qq(Failed to roll "$t" one step back.));
 	    $rs = 1;
