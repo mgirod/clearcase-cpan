@@ -1674,12 +1674,6 @@ corner case I haven't gotten to).
 
 =item *
 
-SyncTree does not transport empty directories, and added/removed
-directories aren't shown explicitly in the list of operations to be
-performed. This is a structural artifact/flaw.
-
-=item *
-
 If a file is removed via the -E<gt>subtract method and later added back
 via -E<gt>add, the result will be a new element (aka I<evil twin>).
 The -E<gt>reuse method (see) may be used to prevent evil twins.

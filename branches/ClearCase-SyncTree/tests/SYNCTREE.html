@@ -229,9 +229,10 @@ thus:</p>
 </p>
 <hr />
 <h1><a name="comparisons">COMPARISONS</a></h1>
-<p>Synctree is comparable to <em>citree</em> and <em>clearfsimport</em>. It is similar
-to citree but has more options and runs on both Windows and UNIX. It
-has the following advantages over clearfsimport:</p>
+<p>Synctree is comparable to <em>citree</em> and <em>clearfsimport</em>. It is
+similar to citree but has more options and runs on both Windows
+(including Cygwin) and UNIX. It has the following advantages over
+clearfsimport:</p>
 <ul>
 <li>
 <p>Synctree works with all ClearCase versions whereas clearfsimport is
@@ -256,6 +257,12 @@ added in one pass and removed (rmnamed) in a subsequent pass, and if a
 third pass would make another element of the same name, synctree can
 optionally (<em>-reuse</em>) make a link to the existing file instead of
 creating a new element which might be considered an &quot;evil twin&quot;.</p>
+</li>
+<li>
+<p>Synctree has support for <em>version reuse</em>. In conjonction with
+labeling the results, importing a new version may be skipped by
+labeling instead an existing suitable one, even if not currently
+selected.</p>
 </li>
 </ul>
 <p>However, unless you need one of the above features the supported,
@@ -290,6 +297,10 @@ work there without modifications.</p>
 commands to be printed as they are run (this is actually a feature of
 the Argv module on which <em>synctree</em> is built). Please run in this mode
 and include all output when reporting problems.</p>
+<p>Note also the <em>-/ipc=1</em> flag, which uses a common background
+cleartool process, for improved performance.
+In this mode, cleartool commands are prefixed with <code>=&amp;gt;</code> instead of
+the default <code>+</code>.</p>
 <p>
 </p>
 <hr />
@@ -299,7 +310,7 @@ and include all output when reporting problems.</p>
 </p>
 <hr />
 <h1><a name="copyright">COPYRIGHT</a></h1>
-<p>Copyright (c) 2000-2004 David Boyce. All rights reserved.  This Perl
+<p>Copyright (c) 2000-2010 David Boyce. All rights reserved.  This Perl
 program is free software; you may redistribute and/or modify it under
 the same terms as Perl itself.</p>
 <p>

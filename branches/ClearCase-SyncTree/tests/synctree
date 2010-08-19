@@ -96,14 +96,11 @@ my(%opt, %xfer);
 		$File::Find::prune = 1;
 		return;
 	    }
-# contribution by unagler 011212, turned off for now (breaks -rm)
-=pod
 	    # Keep directories in the list only if they're empty.
 	    opendir(DIR, $_) || warn "$prog: Error: $_: $!";
 	    my @entries = readdir DIR;
 	    closedir(DIR);
 	    $xfer{$path} = $path if @entries == 2;
-=cut
 	} elsif (! -e _) {
 	    die "$prog: Error: no such file or directory: $path\n";
 	} else {
@@ -215,8 +212,6 @@ if ($opt{flist}) {
 	die "$prog: Error: to-file '$to' not under $opt{dbase}\n"
 				if $to !~ m%^$opt{dbase}%;
 	if (-d $from) {
-	    next;	# suppress unagler's contribution (breaks -rm)
-	    # Keep directories in the list only if they're empty.
 	    opendir(DIR, $from) || warn "$prog: Error: $from: $!";
 	    my @entries = readdir DIR;
 	    closedir(DIR);

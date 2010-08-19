@@ -219,3 +219,4 @@ Revision history for Perl extension ClearCase::SyncTree.
 	- prepend sbase to the arguments if not accessible (test first)
 	- reverted test.pl to 0.47
 	- support for incremental label families: apply fixed, move floating
+	- uncommented a change by Uwe Nagler, to import empty directories
