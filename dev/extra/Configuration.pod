@@ -1,6 +1,6 @@
 =head1 NAME
 
-ClearCase::Wrapper::MGi Configuration
+Configuration.pod -- Configuration for ClearCase::Wrapper::MGi
 
 =head1 SYNOPSIS
 
