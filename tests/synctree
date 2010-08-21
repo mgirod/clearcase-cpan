@@ -178,7 +178,7 @@ ClearCase::Argv->quiet(1) if $opt{quiet};
 
 # Support incremental label families (ClearCase::Wrapper::MGi)
 if ($opt{label}) {
-    my $ct = $sync->clone_ct;
+    my $ct = $sync->clone_ct({autofail=>0, stderr=>0});
     my $dvob = $ct->desc(['-s'], "vob:$opt{dbase}")->qx;
     my $lbtype = "lbtype:$opt{label}\@$dvob";
     my ($inclb) = grep s/-> (lbtype:.*)$/$1/,

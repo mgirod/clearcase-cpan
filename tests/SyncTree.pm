@@ -268,8 +268,7 @@ sub dstbase {
     if (@_) {
 	my $dbase = shift;
 	-e $dbase || mkpath($dbase, 0, 0777) || die "$0: Error: $dbase: $!";
-	my $ct = $self->clone_ct;
-	$ct->autofail(1)->autochomp(1);
+	my $ct = $self->clone_ct({autofail=>1, autochomp=>1});
 	my $olddir = getcwd;
 	$ct->_chdir($dbase) || die "$0: Error: $dbase: $!";
 	$dbase = getcwd;
@@ -678,8 +677,7 @@ sub branchco {
     my $self = shift;
     my $dir = shift;
     my @ele = @_;
-    my $ct = $self->clone_ct;
-    $ct->autochomp(0);
+    my $ct = $self->clone_ct({autochomp=>0});
     my $rc;
     if ($self->{branchoffroot}) {
 	foreach my $e (@ele) {
@@ -879,7 +877,8 @@ sub add {
     }
     $self->branchco(1, keys %dirs) if keys %dirs;
     # Process candidate directories here, then do files below.
-    my $mkdir = $self->clone_ct->argv({-autofail=>0}, 'mkdir', $self->comment);
+    my $mkdir = $self->clone_ct->argv({autofail=>0, autochomp=>0},
+				                      'mkdir', $self->comment);
     for my $cand (@candidates) {
 	if (! -d $cand) {
 	    if ($cand =~ /$lext$/) {
@@ -1131,9 +1130,9 @@ sub label {
     my $lbtype = shift || $self->lbtype;
     return unless $lbtype;
     my $dbase = $self->dstbase;
-    my $ct = $self->clone_ct;
-    my $ctq = $ct->clone({-stdout=>0});
-    my $ctbool = $ctq->clone({-autofail=>0, -stderr=>0});
+    my $ct = $self->clone_ct({autochomp=>0});
+    my $ctq = $ct->clone({stdout=>0});
+    my $ctbool = $ctq->clone({autofail=>0, stderr=>0, autochomp=>0});
     my $dvob = $self->dstvob;
     my $locked;
     if ($ctbool->lstype(['-s'], "lbtype:$lbtype\@$dvob")->system) {
@@ -1207,7 +1206,7 @@ sub checkin {
     my $dad = dirname($mbase);
     my @ptime = qw(-pti) unless $self->ctime;
     my @cmnt = @{$self->comment};
-    my $ct = $self->clone_ct;
+    my $ct = $self->clone_ct({autochomp=>0});
     # If special eltypes are registered, chtype them here.
     if (my %emap = $self->eltypemap) {
 	for my $re (keys %emap) {
