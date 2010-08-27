@@ -38,7 +38,7 @@ require 5.006;
 # find your problems.
 #
 #
-# NOTES on function names
+# NOTES on function name conventions
 #
 # sub mysub
 #   'NORMAL' : 'op' which executes from command line, and help will work.
@@ -48,9 +48,12 @@ require 5.006;
 #       	   intended for the user.
 # sub Mysub
 #   'PUBLIC' : not an 'op', but expected to be shared with other extensions so
-#       	    is exported to submodules from WRAPPER
+#       	    is exported to submodules
 # sub _Mysub
 #   'PRIVATE': not an 'op', and not expected to be shared with other extensions.
+#
+# sub MYSUB
+#   'CONST'  : So don't do this, instead do this -> use constant MYSUB => ...
 #
 
 use AutoLoader 'AUTOLOAD';
@@ -147,37 +150,60 @@ if (-f "$libdir/exclude") {
 	    my $prefix = '-/';
 	    local $Getopt::Long::genprefix = "($prefix)";
 	    GetOptions(\%_AutoSplit, qw(autosplit autospli999));
+            # if the first GetOpts didn't remove the autosplit, assume is
+            #  autosplit=Modules
+	    GetOptions(\%_AutoSplit, qw(autosplit=s autospli999))
+                if grep m%^-/autosplit%, @ARGV;
+
+            if ($_AutoSplit{autosplit}) {
+                my %as = (all => 1);
+                if ($_AutoSplit{autosplit} ne '1') {
+                    # if particular modules specified, map them into hash
+                    %as = map { ("ClearCase::$_" , 1) } 
+                        split /,/, $_AutoSplit{autosplit};
+                }
+                $_AutoSplit{autosplit} = \%as;
+            }
 
 	    (my $autolibdir = $libdir) =~ s%/ClearCase/Wrapper%/auto%;
 	    my $ix = "$autolibdir/ClearCase/Wrapper/autosplit.ix";
 	    if (! $_AutoSplit{autosplit} && ! -e $ix) {
 		warn Msg('W', "** Missing $ix");
 		warn Msg('W', "**  Will perform -/autosplit");
-		$_AutoSplit{autosplit} = 1;
+		$_AutoSplit{autosplit}->{'ClearCase::Wrapper'} = 1;
 	    }
-	    if ($_AutoSplit{autosplit}) {
+	    if  (   $_AutoSplit{autosplit}->{all}
+                ||  $_AutoSplit{autosplit}->{'ClearCase::Wrapper'}
+                ) 
+            {
 		$_AutoSplit{dbg} = 1 if grep m%^-/dbg%, @ARGV;
 
 		require AutoSplit;
 		my @paths = AutoSplit::autosplit("$libdir.pm", $autolibdir);
 		if (@paths > 1 || $paths[0]) {
-		    # we did an autosplt, read in the newly generated index file
+		    # after autosplit, read in the newly generated index file
 		    require $ix;
 		    warn Msg('W', $@) if $@;
 
-		    my $pkg = 'ClearCase::Wrapper';
 		    # We did an autosplit, record that fact
-		    _AutoSplit($pkg, $ix);
+		    _AutoSplit('ClearCase::Wrapper', $ix);
+                }
 
-		    # We did an autosplit, let's build the Native hash and
+                if  (  @paths > 1 || $paths[0]
+                    || ! %ClearCase::Wrapper::Native
+                    || ! defined($ClearCase::Wrapper::Native)) {
+
+		    # We did an autosplit, or we don't have Native hash
+                    # let's build the Native hash and
 		    # place into the index file for later
-		    open  IX, '>>' . $_AutoSplit{$pkg};
+		    open  IX, '>>' . $ix;
 		    print IX "\n%Native = qw(\n";
 		    for (Native()) {
 			printf IX " $_ %s\n", Native($_);
 		    }
 		    print IX ");\n\n";
 		    print IX "\$Native = '$ClearCase::Wrapper::Native';\n";
+		    print IX "\n1;\n";
 		    close IX;
 		}
 	    }
@@ -230,11 +256,35 @@ sub _FindAndLoadModules {
         # if requested and needed, autosplit the file
         my $pmfile = "$pm.pm";
         my $ix = "$dir/auto/$pm/autosplit.ix";
-        if (_AutoSplit()) {
-            my @paths = AutoSplit::autosplit("$dir/$pmfile", "$dir/auto");
-            if (@paths > 1 || $paths[0]) {
-                # if we did an autosplit, record that fact for later
-                _AutoSplit($pkg, $ix);
+        my $as = _AutoSplit();
+        if  ( $as && ($as->{all} || $as->{$pkg}) ) {
+            my $msg;
+            if (! -d "$dir/auto/$pm") {
+                # autosplit dir does not exist
+                $msg = "$dir/auto/$pm does not exist";
+            } elsif (! -w "$dir/auto/$pm") {
+                if ( -e $ix && -M $ix > -M "$dir/$pmfile") {
+                    # autosplit index file exists and is out of date
+                    $msg = "$dir/auto/$pm is readonly";
+                } elsif (! -e $ix && Argv->dbglevel()) {
+                    # autosplit file  does not exist and debug is on
+                    $msg = "$dir/auto/$pm is readonly";
+                }
+            } elsif (-e $ix && ! -w "$ix" && -M $ix > -M "$dir/$pmfile") {
+                # autosplit file is out of date and not writable
+                $msg = "$ix is readonly";
+            }
+
+            if ($msg) {
+                warn Msg('W', $msg);
+                warn Msg('W', "  can not autosplit $dir/$pmfile");
+            } else {
+		require AutoSplit;
+                my @paths = AutoSplit::autosplit("$dir/$pmfile", "$dir/auto");
+                if (@paths > 1 || $paths[0]) {
+                    # if we did an autosplit, record that fact for later
+                    _AutoSplit($pkg, $ix);
+                }
             }
         }
 
@@ -275,7 +325,8 @@ sub _FindAndLoadModules {
         # might want to use. These functions all start with an Uppercase
         # character.  Make aliases for those in the overlay's symbol table.
         for (keys %ClearCase::Wrapper::) {
-            next unless /^[A-Z]/;
+            next unless /^[A-Z]/;   # Start with Caps
+            next if uc($_) eq $_;   # Don't use ALL CAPS (Constants)
 
             # Skip typeglobs that don't involve functions.
             my $tglob = "ClearCase::Wrapper::$_";
@@ -423,8 +474,11 @@ if (-r "$ENV{HOME}/.clearcase_profile.pl" && ! -e "$libdir/NO_OVERRIDES") {
         if (Extension($_)) {
             $status = 'occluded';
             # allow access to extension in Wrapper which are intentionally
-            # occluded in other packages
-            eval qq(*ClearCase::Wrapper::Occluded::$_ = *ClearCase::Wrapper::$_);
+            # occluded in other packages, this is for non-autoloaded functions
+            eval qq(
+                *ClearCase::Wrapper::Occluded::$_ = *ClearCase::Wrapper::$_
+                    if (defined &$_);
+            );
         }
 	Extension( [$_, __PACKAGE__, $exts->{$_}, $status] );
     }
@@ -439,6 +493,43 @@ if (-r "$ENV{HOME}/.clearcase_profile.pl" && ! -e "$libdir/NO_OVERRIDES") {
 	my $tglob = "$ext[0]::$ext[1]";
 	eval qq(*$_ = *$tglob);
     }
+}
+
+# Allow access to extensions which are occluded by other packages.
+# 
+# To access occluded function 'funcName' in Clearcase::Wrapper, call:
+# 
+#   ClearCase::Wrapper::Occluded::funcName()
+# 
+# Any occluded functions in other packages are called directly.  To access
+# occluded function 'funcName' in Clearcase::Wrapper::DSB, call:
+# 
+#   ClearCase::Wrapper::DSB::funcName()
+#
+# NOTE: If the occluded function is in ClearCase::Wrapper and is autoloaded,
+# this has the side effect of occluding the function that was previously
+# doing the occluding.
+# 
+# This code is for occluded functions which are autoloaded.
+#
+sub ClearCase::Wrapper::Occluded::AUTOLOAD {
+    # grab the requested sub
+    my $sub = $ClearCase::Wrapper::Occluded::AUTOLOAD;
+    (my $name = $sub) =~ s/.*:://;
+    if (Extension($name)) {
+        my $origsub = $sub;
+        $sub =~ s%::Occluded%% if (Extension($name));
+        # if the function is defined, then we have been here once, we
+        # don't need to autoload, just typeglob and goto
+        eval qq( 
+            if (defined &$sub) {
+                *$origsub = *$sub;
+                goto &$sub;
+            }
+        );
+    }
+    $AutoLoader::AUTOLOAD = $sub;
+    goto &AutoLoader::AUTOLOAD;
 }
 
 # Extension()
@@ -518,7 +609,8 @@ sub man {
     }
     my $psep = MSWIN ? ';' : ':';
     require File::Basename;
-    $ENV{PATH} = join($psep, File::Basename::dirname($^X), $ENV{PATH});
+    $ENV{PATH} = join($psep,
+	File::Basename::dirname($^X), "$libdir/../..", $ENV{PATH});
     my $module = Extension($page) || __PACKAGE__;
     Argv->perldoc($module)->exec;
     exit $?;
@@ -553,7 +645,7 @@ or entirely new commands to be synthesized.
 # null, only the names of traversed files are printed.
 sub Burrow {
     # compatibility with old call signature, throw away uneeded param
-    shift if (@_ && $_[0] eq 'CATCS_00')
+    shift if (@_ && $_[0] eq 'CATCS_00');
 
     my($filename, $action) = @_;
     print $filename, "\n" if !$action;
@@ -652,7 +744,7 @@ sub ViewRoot {
     return $ClearCase::Wrapper::ViewRoot if $ClearCase::Wrapper::ViewRoot;
 
     my $viewroot;
-    if (MSWIN()) {
+    if (MSWIN) {
         use vars '%RegHash';
         require Win32::TieRegistry;
         Win32::TieRegistry->import('TiedHash', '%RegHash');
@@ -686,7 +778,7 @@ sub _Dump {
     my ($name, $ref, $dbglevel) = @_;
     my $sysdbglevel = Argv->dbglevel() || 0;
     $dbglevel ||= 0;
-    return if ($dbglevel >= $sysdbglevel);
+    return if ($dbglevel > $sysdbglevel);
 
     require Data::Dumper;
     $Data::Dumper::Indent = 1;
@@ -953,7 +1045,11 @@ sub _MapExtensions {
 sub Native {
     my $op = shift;
     # make a version string from Wrapper & Clearcase versions
-    if ( _AutoSplit() && !$ClearCase::Wrapper::NativeVersion ) {
+    my $as = _AutoSplit();
+    if  (   $as && ( $as->{all} || $as->{'ClearCase::Wrapper'} )
+        && !$ClearCase::Wrapper::NativeVersion
+        ) 
+    {
 	require ClearCase::Argv;
 	my $ct = ClearCase::Argv->new({stderr=>0});
 	my ($ver) = grep /Product:/, $ct->hostinfo('-l')->qx;
@@ -1051,7 +1147,7 @@ sub AbsPath {
     my @notfiles = grep {! -l && ! -e} @_;
     Assert (@notfiles == 0, 
         "The following are not files or directories: @notfiles");
-    my $sep = MSWIN() ? '\\' : '/';
+    my $sep = MSWIN ? '\\' : '/';
     my $dbg = Argv->dbglevel() || 0;
 
     my $abs_path = sub {
@@ -1065,7 +1161,7 @@ sub AbsPath {
             $abs_path = Cwd::abs_path($dirname) . '/' . $basename;
             warn "abs_path2: $abs_path\n" if ($abs_path && $dbg);
         }
-        if (! MSWIN() && $_[0] =~ m%^/view/% && $abs_path !~ m%^/view/%) {
+        if (! MSWIN && $_[0] =~ m%^/view/% && $abs_path !~ m%^/view/%) {
             warn Msg('W', 
                 "absolute path symbolic link in view relative path: $_[0]");
         }
@@ -1080,13 +1176,13 @@ sub AbsPath {
 	push @result, $abs_path->($_);
         Assert ($result[$#result], "Cannot find absolute path for $_");
 	my @path = split '/', $result[$#result];
-	$result[$#result] =~ s%/%\\%g if MSWIN();
+	$result[$#result] =~ s%/%\\%g if MSWIN;
 
 	my $path = shift @path;
         while (!$path || $path !~ m%[^/]% || $path =~ m%/view$%) {
             $path .= '/' . shift @path;
         }
-	$path =~ s%/%\\%g if MSWIN();
+	$path =~ s%/%\\%g if MSWIN;
 
 	for my $pathpiece (@path) {
 	    $path .= $sep . $pathpiece;
@@ -1152,7 +1248,7 @@ sub AbsPath {
 		    #  to a pathname that begins with a VOB tag (for example,
 		    #  cleartool ln \my_vob\file my_link) does not work.
 
-		    if (MSWIN()) {
+		    if (MSWIN) {
                         # win abs symlink must be view relative, and since it
                         # is view relative we need to recurse, since the view
                         # maybe different.
@@ -1183,7 +1279,7 @@ sub AbsPath {
 		    # convert this path to absolute
                     warn "pnames[$i]: $pnames[$i]\n" if $dbg;
 		    $pnames[$i] = $abs_path->($pnames[$i]);
-		    $pnames[$i] =~ s%/%\\%g if MSWIN();
+		    $pnames[$i] =~ s%/%\\%g if MSWIN;
 		    $converted{$i} = 1;
                     warn "pnames[$i]: $pnames[$i]\n" if $dbg;
 		}
@@ -1193,7 +1289,7 @@ sub AbsPath {
 		    $result .= $sep . '.' if $opt{finddirver};
 		    $result .= $suffix;
 		}
-                if (! MSWIN() && $_ =~ m%^/view/% && $result !~ m%^/view/%) {
+                if (! MSWIN && $_ =~ m%^/view/% && $result !~ m%^/view/%) {
                     warn Msg('W', 
                         "absolute path symbolic link in view relative path: $_");
                 }
@@ -1818,12 +1914,12 @@ sub lsprivate {
 	for (sort { length($a) < length($b) } @pnames) {
             my $pname = $_;
 	    $pname =~ s%([^/])$%$1/%;   	    # end with /
-	    $pname =~ s%[/\\]%\\\\%g if MSWIN();    # \ needs to be \\ for regex
+	    $pname =~ s%[/\\]%\\\\%g if MSWIN;      # \ needs to be \\ for regex
 	    my $grep = $opt{directory}
 		? "$pname\[^\\\\/]+\$"
 		: "(?:^|\\s)$pname";
 	    for (grep {/$grep/} @privs) {$t_privs{$_} = 1};
-	    if (MSWIN() && $grep =~ s%\w:%%) {
+	    if (MSWIN && $grep =~ s%\w:%%) {
 		for (grep {/$grep/} @privs) {$t_privs{$_} = 1};
 	    }
 	}
