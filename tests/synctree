@@ -8,7 +8,6 @@ use File::Find;
 use File::Path;
 use File::Spec 0.82;
 use Getopt::Long;
-use Cwd;
 
 use constant MSWIN => $^O =~ /MSWin32|Windows_NT/i ? 1 : 0;
 
@@ -243,8 +242,7 @@ if ($opt{map}) {
 } elsif (!$opt{flist}) {
     if (@ARGV) {
         if (-r $ARGV[0]) {
-	    my $dir = getcwd;
-	    $_ = File::Spec->catfile($dir, $_) for @ARGV;
+	    $_ = File::Spec->rel2abs($_) for @ARGV;
 	} else {
 	    $_ = File::Spec->catfile($opt{sbase}, $_) for @ARGV;
 	}
