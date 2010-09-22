@@ -221,3 +221,4 @@ Revision history for Perl extension ClearCase::SyncTree.
 	- support for incremental label families: apply fixed, move floating
 	- uncommented a change by Uwe Nagler, to import empty directories
 	- chomp control, especially in fork mode
+	- fix for args relative to current dir (bug report by Achim Bursian)
