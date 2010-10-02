@@ -14,8 +14,13 @@ goto endofperl
 #---------------------------------------------------------------------------+
 
 ###########################################################################
-# sync_export_list.bat
-# usage: sync_export_list - run with "-help" for detailed usage.
+# +-------------------------------------------------------------------------+
+# Minor modifications for use with a hub.
+# The script was renamed from the original sync_export_list.bat, in order to
+# avoid its being overwritten in a ClearCase update
+#---------------------------------------------------------------------------+
+# sync_export_list_hub.bat
+# usage: sync_export_list_hub - run with "-help" for detailed usage.
 #
 # This script is intended to be run periodically by the ClearCase
 # Job Scheduler to send synchronization update packets to 
@@ -37,13 +42,13 @@ my $thisscript = $0;
 if ($thisscript =~ m/(.*)(\.bat)$/) {
     $thisscript = $1;
 }
-my $pkg_name = 'sync_export_list';
+my $pkg_name = 'sync_export_list_hub';
 $CFG::verbose = ($ENV{TRACE_SUBSYS} && ($ENV{TRACE_SUBSYS} =~ m/$pkg_name/));
 $CFG::failcount = 0;
 $CFG::quietmode = 0;
 
 # force debugging msgs by uncommenting the following.....
-#$CFG::verbose = 1;
+# $CFG::verbose = 1;
 
 # figure out which architecture we're on. The Config.pm package and $^O Perl variable
 # both have changed depending on the version of perl or ccperl that actually runs this
@@ -97,7 +102,7 @@ if ($CFG::MScommon_version ne $CFG::MS_script_version) {
     die "Version mismatch between require file 'MScommon.pl' " .
         "(version: ${CFG::MScommon_version}) and \n" .
         "the MultiSite export script which includes it, " .
-        "'sync_export_list.bat' " .
+        "'sync_export_list_hub.bat' " .
         "(version: ${CFG::MS_script_version}).\n" . 
         "Ensure that old versions of the script/require file are not in use.\n";
 }
@@ -110,7 +115,7 @@ dbgprint "running on architecture $arch\n";
 
 my $workingdir_cmd = ($CFG::NT ? 'cd' : 'pwd');
 
-###########################################################################           
+###########################################################################
 # main
 #
 # get command line options figured out...
@@ -407,9 +412,23 @@ if ($all_local) {
     my $vob;
     foreach $vob (@vobs) {
         my @siblings = GetSiblings( $vob );
+	next unless scalar @siblings;
+	my $rep =
+	    DoCmd("$CFG::ClearTool des -fmt '%[replica_name]p' vob:$vob");
+	my %locepo = GetReplicaEpochs($vob, $rep);
         my $sib;
         foreach $sib (@siblings) {
-            $PktsToSend[$NumPkts++] = CollectPacket($vob, $sib, $do_compress, 
+	    my %remepo = GetReplicaEpochs($vob, $sib);
+	    my $skip = 1;
+	    my $key;
+	    foreach $key (keys %remepo) {
+	        if ($remepo{$key} < $locepo{$key}) {
+	            $skip = 0;
+	            last;
+	        }
+	    }
+	    next if $skip;
+	    $PktsToSend[$NumPkts++] = CollectPacket($vob, $sib, $do_compress,
                 $maxpacket, $limit, $sclass, $fshipflg, $updateflg, $lockwait);
         }
     }
@@ -518,34 +537,51 @@ print STDERR "using options:\n    compress: $do_compress\n" .
     "    retries: $num_tries times, wait $sleeptime seconds\n" .
     "    script: $scriptfile\n" if ($CFG::verbose || $CFG::traceflg);
 
-while ($num_tries--) {
-    # this perl 'grep' cmd takes the list @PktsToSend and passes each element
-    # into the block as the temp variable '$_'. The grep returns a new list
-    # containing only the packets that were NOT successfully processed,
-    # which replaces the previous @PktsToSend.
-    @PktsToSend = grep {
-        ($export_vob, $rep, $do_compress, $maxpacket, $limit, $sclass, 
-            $fshipflg, $updateflg, $lockwait) = split(";", $_);
-        dbgprint "send pkt parms: $export_vob $rep $do_compress $maxpacket $limit $sclass $fshipflg $updateflg $lockwait\n";
-        my $res = SendPacket($export_vob, $rep, $do_compress, $maxpacket, 
-            $limit, $sclass, $fshipflg, $updateflg, $lockwait);
-        if ($res) {
-            $CFG::failcount++;
-        }
-        $res;
-    } @PktsToSend;    # end of the 'grep'
+dbgprint "\@PktsToSend:\n";
+dbgprint "@PktsToSend";
+dbgprint "\n";
 
-    dbgprint "packets left: " . (scalar @PktsToSend) . " tries left: $num_tries\n";
-    if ($num_tries && scalar @PktsToSend) {
-         my $num = scalar @PktsToSend;
-         qprint "$num packets not exported; waiting $sleeptime seconds to re-try.\n";
-         print STDERR "$num packets not exported; waiting $sleeptime seconds to re-try.\n";
-         sleep $sleeptime;
+my %pts = ();
+foreach (@PktsToSend) {
+  my ($vob, $rep, $opt)
+    = split(";", $_, 3);
+  push @{$pts{$opt}{$vob}}, $rep;
+}
+
+my $pkts_left = 0;
+while ($num_tries--) {
+    # this loop takes every packet for the same vob (list of replicas with
+    # a common set of options), from the %pts hash and attempts to send it.
+    # If successful, it removes the packet from the hash, which in the end,
+    # contains only the packets that were NOT successfully processed.
+    $pkts_left = 0;
+    my ($o, $v);
+    for $o (keys %pts) {
+	for $v (keys %{$pts{$o}}) {
+	    my ($do_compress, $maxpacket, $limit, $sclass, $fshipflg, $updateflg, $lockwait)
+		= split(";", $o);
+	    my @rep = @{$pts{$o}{$v}};
+	    dbgprint "send pkt parms: $v @rep $do_compress $maxpacket $limit $sclass $fshipflg $updateflg $lockwait\n";
+	    my $res = SendPacket($v, $do_compress, $maxpacket, $limit,
+				 $sclass, $fshipflg, $updateflg, $lockwait, @rep);
+	    if ($res) {
+		$CFG::failcount++;
+	    } else {
+		delete $pts{$o}{$v};
+	    }
+	}
+	$pkts_left += scalar keys %{$pts{$o}};
+    }
+    
+    dbgprint "packets left: $pkts_left; tries left: $num_tries\n";
+    if ($num_tries && $pkts_left) {
+	qprint "$pkts_left packets not exported; waiting $sleeptime seconds to re-try.\n";
+	print STDERR "$pkts_left packets not exported; waiting $sleeptime seconds to re-try.\n";
+	sleep $sleeptime;
     }
 }
 
 my ($cmd, $res);
-my $pkts_left = scalar @PktsToSend;
 if ($CFG::failcount && $pkts_left) {
     if ($CFG::NT) { # only do event log for NT
 	$cmd = "$CFG::imsglog $pkg_name evtlog \"$logname\"";
@@ -591,13 +627,13 @@ sub SendPacket {
     # Send the replica synchronization packet
     #
 
-    my ($export_vob, $replica, $do_compress, $maxpacket, $limit,
-        $sclass, $fshipflg, $updateflg, $lockwait) = @_;
+    my ($export_vob, $do_compress, $maxpacket, $limit, $sclass, $fshipflg,
+	$updateflg, $lockwait, @replicas) = @_;
 
     my $failcount = 0;
     my ($cmd, $res);
     my ($packet,$packet_qq);
-    my $rep_sel = "replica:$replica\@$export_vob";
+    my $rep_sel = join ' ', map { sprintf "replica:$_\@$export_vob", $_ } @replicas;
     if ($lockwait < 0) {  # "lockwait" value must be > 0
         qprint "ERROR: lockwait value must be > 0.\n";
         exit 1;
@@ -611,29 +647,29 @@ sub SendPacket {
     # use MS script config file setting to turn off export locking if requested.
     $CFG::disable_locking = $CFG::MScfg_disable_export_locking;
     
-    # attempt to get advisory lock based on tag/replica we're exporting to.
+    # attempt to get advisory lock based on first tag/replica we're exporting to.
     # return error if we can't get the lock.
-    my $dense_rep_oid = GetDenseOid($rep_sel);
+    my $dense_rep_oid = GetDenseOid((split / /, $rep_sel)[0]);
     if ($dense_rep_oid !~ m/([0-9][a-f])+/) {
         qprint "ERROR: unable to get replica oid from '$rep_sel'.\n" .
-        "   Export of replica '$replica' not attempted.\n";
+        "   Export of replicas '@replicas' not attempted.\n";
         return 1;
     }    
     my $fn = $CFG::tmpdir . $CFG::FS . "ms_send_${dense_rep_oid}.mslock";
     my $lockstat = GetMutexLock($fn);
     if (!$lockstat) {
         print STDERR "ERROR: unable to obtain lock '$fn'.\n" .
-        "   Export of replica '$replica' not attempted.\n";
+        "   Export of replicas '@replicas' not attempted.\n";
         return 1;
     }
     # use 'chepoch -actual' to update local replica's epoch table before
     # starting the export if requested.
     if ($updateflg) {
-        my $cmd = "$CFG::MultiTool chepoch -actual $replica\@$export_vob >&2";
+        my $cmd = "$CFG::MultiTool chepoch -actual $rep_sel >&2";
         my $res = Do_System($cmd, __FILE__, __LINE__);
         if ($res) {
             my $warn = "WARNING: error attempting to update epoch table " .
-                "from $replica\@$export_vob. Continuing.\n";
+                "from $rep_sel. Continuing.\n";
             qprint $warn;
             print STDERR $warn;
         }
@@ -672,6 +708,20 @@ sub SendPacket {
     }
 }
 
+
+sub GetReplicaEpochs {
+  my ($vob, $rep) = @_;
+  my %epochs = ();
+  my $line;
+  foreach $line
+    (grep !/\.deleted/,
+     split(/\n/, DoCmd("$CFG::MultiTool lsepoch replica:$rep\@$vob"))) {
+      if ($line =~ m/^ oid:.*=(\d+) *\((\w+)\)/) {
+	$epochs{$2} = $1;
+      }
+    }
+  return %epochs;
+}
 
 __END__
 :endofperl

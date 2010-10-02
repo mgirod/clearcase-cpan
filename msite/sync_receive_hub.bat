@@ -12,9 +12,12 @@ goto endofperl
 # with IBM Corp.
 #---------------------------------------------------------------------------+
 
+# Minor modifications for use on a hub.
+# The script was renamed from the original sync_receive.bat, in order to
+# avoid its being overwritten in a ClearCase update
 ###########################################################################
-# sync_receive.bat
-# usage: sync_receive.bat - run with "-help" for detailed usage.
+# sync_receive_hub.bat
+# usage: sync_receive_hub.bat - run with "-help" for detailed usage.
 #
 # This script is intended to be run periodically by the ClearCase
 # Job Scheduler to import packets that have been received
@@ -52,17 +55,17 @@ if ($thisscript =~ m/(.*)(\.bat)$/) {
     $thisscript = $1;
 }
 
-my $pkg_name = 'sync_receive';
+my $pkg_name = 'sync_receive_hub';
 $CFG::verbose = ($ENV{TRACE_SUBSYS} && ($ENV{TRACE_SUBSYS} =~ m/$pkg_name/));
 # force debugging msgs by uncommenting the following and setting to 1.....
-#$CFG::verbose = 1;
+# $CFG::verbose = 1;
 
 $CFG::quietmode = 0;
 
 # if 'verbose' mode is on, force the debug msgs to also print to STDERR by
 # uncommenting this line (forces debug msgs to appear in the log file,
 # useful if you're having problems with a receipt handler).
-#$CFG::stderr_msgs = 1;
+# $CFG::stderr_msgs = 1;
 
 use Config;
 my $arch = $^O ? $^O : $main::Config{archname};
@@ -103,7 +106,7 @@ if (!$CFG::MScommon_version) {
 if ($CFG::MScommon_version ne $CFG::MS_script_version) {
     die "Version mismatch between require file 'MScommon.pl' " .
         "(version: ${CFG::MScommon_version}) and \n" .
-        "the MultiSite export script which includes it, 'sync_receive.bat' " .
+        "the MultiSite export script which includes it, 'sync_receive_hub.bat' " .
         "(version: ${CFG::MS_script_version}).\n" . 
         "Ensure that old versions of the script/require file are not in use.\n";
 }
@@ -647,8 +650,14 @@ while (!$done) {
             # do the import for one target VOB if we got the lock, or all we can if in 'proactive' mode.
             # proactive mode is ONLY used when we believe that we've been invoked as a receipt handler.
             #
+	    my $skip_ship = 0;
             if ($CFG::MScfg_proactive_receipt_handler && $CFG::receipt_handler) {
                 $cmd = qq/$CFG::MultiTool syncreplica -import -receive -invob $tag/;
+		if ($actual_shiporder and ($sclass ne 'express')) {
+		  dbgprint "Do not ship this: $actual_shiporder,\nif the import is successful. ".
+		    "It would be redundant with the sync packet produced later by the hub\n";
+		  $skip_ship = 1;
+		}
             } else {
                 $cmd = qq/$CFG::MultiTool syncreplica -import -invob $tag "$importlist"/;
             }
@@ -660,6 +669,30 @@ while (!$done) {
                 }
                 $success_count++;
                 print STDERR "SUCCESSFUL MultiSite import to $rep $tag.\n";
+		if ($skip_ship) {
+		  dbgprint "About to delete $pkt and $actual_shiporder\n";
+		  if (open SHORDER, "<$actual_shiporder") {
+		    my ($line, $pkt) = ();
+		    foreach $line (<SHORDER>) {
+		      next if $line =~ /\s*\#.*/;    # skip comment lines with #
+		      if ($line =~ /^\%LOCAL-DATA-PATH \"(.*)\"/) {
+			$pkt = $1;
+			last;
+		      }
+		    }
+		    close SHORDER;
+		    if ($pkt) {
+		      unlink $pkt, $actual_shiporder;
+		      dbgprint "Deleted $pkt and $actual_shiporder\n";
+		      $actual_shiporder = 0;
+		    } else {
+		      print STDERR "Failed to match the local data path in the shipping order:" .
+			" $actual_shiporder.\n";
+		    }
+		  } else {
+		    print STDERR "Failed to open $actual_shiporder, for skipping its shipping\n";
+		  }
+		}
             } else {
                 #
                 # The sync failed.  Update the event log with a pointer to the log file
