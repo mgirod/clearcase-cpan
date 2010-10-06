@@ -1,0 +1,44 @@
+#!/usr/bin/ksh
+
+# When invoked as a receipt handler, note that only the '-o' parameter is
+# guaranteed to be passed, along with one of '-a' or '-d' (or possibly both).
+# The '-s' parameter is only passed if a specific storage-class has been
+# specified.
+
+#     -o hostname         Originating host. Only function in the script is to
+#                         force keeping the log file (so that all receipt
+#                         handler logs are kept). Specifying -o also forces the
+#                         script to run in "-quiet 1" mode to avoid writing 
+#                         excessive informational messages to the receipt
+#                         handler logfiles.
+
+#     -d {file | dir}     Data packet's full pathname. Ignored.
+
+#     -s storage-class    Storage class to use. (Default: use default sclass).
+
+#     -a shipping-order   Actual pathname of the new shipping order if this
+#                         packet is destined for another host (i.e. this
+#                         system is a 'hop host' for the packet). Ignored.
+
+while [ -n "$1" ]; do
+  case $1 in
+    -o) hostname=$2; shift; shift;;
+    -d) datapckt=$2; shift; shift;;
+    -s) stoclass=$2; shift; shift;;
+    -a) shporder=$2; shift; shift;;
+  esac
+done
+
+let pnr="$(ps -ef | grep ship | grep -Ev '(grep|tail|more|rech)' | wc -l)"
+if [ $pnr -gt 9 ]; then exit 0; fi
+
+# echo >> /tmp/rechandle.out
+# echo hostname: $hostname >> /tmp/rechandle.out
+# echo datapckt: $datapckt >> /tmp/rechandle.out
+# echo stoclass: $stoclass >> /tmp/rechandle.out
+# echo shporder: $shporder >> /tmp/rechandle.out
+
+if [ -n "$stoclass" ]; then sclass="-sclass $stoclass"; fi
+if [ -n "$shporder" ]; then
+  /opt/rational/clearcase/etc/shipping_server $sclass $shporder
+fi
