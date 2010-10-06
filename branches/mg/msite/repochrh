@@ -1,0 +1,283 @@
+#!/usr/bin/env perl
+
+use diagnostics;
+use strict;
+use vars qw(@vobs $log $pgm $lock %opts $timestamp $maxnest);
+use File::Basename;
+use Getopt::Std;
+use Sys::Hostname;
+
+$pgm = basename($0);
+$log = '/var/adm/rational/clearcase/log/repoch_log';
+$lock = '/tmp/repochrh.lock';
+%opts = ();
+$maxnest = 10;
+
+# receipt handler:
+# - overrides (removes previous)
+# - compares per vob and replica, the local exports to the remote imports
+#   - epochs
+#   - time stamps
+
+sub usage() {
+    print "\nUsage:"
+	. "\n$pgm [-h] [-l log]"
+	. " [-o hostname] [-d packet] [-s class] [-a order]"
+	. "\n"
+	. "\nThis script is meant to be used as receipt handler,"
+	. "\nfor packets sent with \"repoch\"."
+	. "\nThe options are mandated by this interface, except for -h and -l"
+	. "\n  -h: Help. Print this and exit."
+	. "\n  -l: Override the default log for debugging"
+	. "\n  -o: Originating host, from where \"repoch\" was run."
+	. "\n  -d: Data packet full pathname."
+	. "\n  -s: Storage class (ignored)."
+	. "\n  -a: Shipping Order (ignored"
+	. " -- packets will not be forwarded any further)."
+	. "\n";
+    exit 1;
+}
+
+sub logline(@) {
+    my @line = @_;
+    print LOG "$timestamp $pgm($$): @line\n";
+}
+
+sub curtime() {
+    my @tz = qw(+02 +03); # ugly hardcoding for EET, only taking care of dst...
+    my ($s, $min, $h, $d, $mon, $y, $dst) = (localtime)[0,1,2,3,4,5,8];
+    $y += 1900;
+    $mon += 1;
+    return sprintf
+	"%04d-%02d-%02dT%02d:%02d:%02d%s",
+	$y, $mon, $d, $h, $min, $s, $tz[$dst];
+}
+
+sub cleanbacklog($$) {
+    my ($body, $nr) = @_;
+    my $packet = "${body}.repoch";
+    my $pred = "${body}.pred";
+    unlink($pred);
+    if ($nr == 1) {
+	rename($packet, $pred);
+	rename("${packet}_1", $packet);
+    } else {
+	unlink($packet);
+	my $p = $nr - 1;
+	for (my $i=1; $i<$p; $i++) { unlink("${packet}_$i"); }
+	rename("${packet}_${p}", $pred);
+	rename("${packet}_${nr}", $packet);
+    }
+}
+
+sub readpacket($$) {
+    my ($pkt, $pref) = @_;
+    my ($vob, $tag, $locrep);
+    open PKT, "<$pkt" or die "Failed to open $pkt for read\n";
+    while (my $line = <PKT>) {
+	chomp($line);
+	if ($line =~ /^[\/\\](.*), (.*)$/) {
+	    $tag = $1; $tag = basename($tag);
+	    $vob = $2;
+	    next;
+	}
+	if ($line =~ /^i (.+?) (.+?)@(.+?): (.*)$/) {
+	    my ($t,$lr,$rh,$rem) = ($1,$2,$3,$4);
+	    $locrep = $lr;
+	    my @ep = split / /, $rem;
+	    foreach my $e (@ep) {
+		my ($r, $v) = split /=/, $e;
+		$$pref{$rh}{$vob}{'r'}{$r}{'it'} = $t;
+		$$pref{$rh}{$vob}{'r'}{$r}{'iv'} = $v;
+	    }
+	    $$pref{$rh}{$vob}{'tag'} = $tag;
+	    next;
+	}
+	if ($line =~ /^e (.+?) (.+?)@(.+?): (.*)$/) {
+	    if (defined($locrep)) {
+		my ($t,$lr,$rh,$rem) = ($1,$2,$3,$4);
+		my @ep = split / /, $rem;
+		foreach my $e (@ep) {
+		    my ($r, $v) = split /=/, $e;
+		    if ($r eq $locrep) {
+			$$pref{$rh}{$vob}{'r'}{$r}{'et'} = $t;
+			$$pref{$rh}{$vob}{'r'}{$r}{'ev'} = $v;
+		    }
+		}
+		$$pref{$rh}{$vob}{'tag'} = $tag;
+		next;
+	    } else {
+		logline("Error: skipping -- no import event in $pkt");
+		last;
+	    }
+	}
+	logline("Error: skipping -- unexpected data in $pkt: $line");
+	last;
+    }
+    close PKT;
+}
+
+sub readdatafile($$) {
+    # data file for one host (vob server)
+    my ($dat, $dref) = @_;
+    my $vob;
+    unless (open DATA, "<$dat") {
+	logline("Failed to open $dat for read");
+	return 0;
+    }
+    # per vob: tag, local rep, timestamp of last import
+    #   per replica: local export/remote import, with ts/epoch for each
+    while (my $line = <DATA>) {
+	if ($line =~ /^(.*),(.*),(.*),(.*)$/) {
+	    my ($v, $tag, $lrp, $its) = ($1, $2, $3, $4);
+	    $vob = $v;
+	    $$dref{$vob}{'tag'} = $tag;
+	    $$dref{$vob}{'localrep'} = $lrp;
+	    $$dref{$vob}{'importts'} = $its;
+	    next;
+	}
+	if ($line =~ /^(.*);(.*);(.*);(.*);(.*)$/) {
+	    my ($rep, $ts1, $ep1, $ts2, $ep2) = ($1, $2, $3, $4, $5);
+	    if (defined($vob)) {
+		$$dref{$vob}{'r'}{$rep}{'localexpts'} = $ts1;
+		$$dref{$vob}{'r'}{$rep}{'localexpep'} = $ep1;
+		$$dref{$vob}{'r'}{$rep}{'remotimpts'} = $ts2;
+		$$dref{$vob}{'r'}{$rep}{'remotimpep'} = $ep2;
+		next;
+	    } else {
+		logline("Error: skipping -- missing header line before $line");
+		last;
+	    }
+	}
+	logline("Error: skipping -- unexpected data in $dat: $line");
+	last;
+    }
+    close DATA;
+}
+
+sub writedatafile($$) {
+    my ($dat, $dref) = @_;
+    open DATA, ">$dat" or die "Failed to open $dat for write\n";
+    foreach my $vob (keys %$dref) {
+	if (   (!defined($$dref{$vob}{'tag'}))
+	    or (!defined($$dref{$vob}{'localrep'}))
+	    or (!defined($$dref{$vob}{'importts'}))) {
+	    logline("Error: incomplete record for vob: $vob");
+	}
+	printf DATA
+	    "%s,%s,%s,%s\n",
+	    $vob,
+	    $$dref{$vob}{'tag'},
+	    $$dref{$vob}{'localrep'},
+	    $$dref{$vob}{'importts'};
+	foreach my $rep (keys %{ $$dref{$vob}{'r'} }) {
+	    printf DATA
+		"%s;%s;%s;%s;%s\n",
+		$rep,
+		$$dref{$vob}{'r'}{$rep}{'localexpts'},
+		$$dref{$vob}{'r'}{$rep}{'localexpep'},
+		$$dref{$vob}{'r'}{$rep}{'remotimpts'},
+		$$dref{$vob}{'r'}{$rep}{'remotimpep'};
+	}
+    }
+    close DATA;
+}
+
+sub onepacket($) {
+    my $body = shift;
+    my $packet = "${body}.repoch";
+    my %p = ();
+    readpacket($packet, \%p);
+    return unless %p;
+    foreach my $h (keys %p) {
+	my $data = "${h}.data";
+	my %dat = ();
+	readdatafile($data, \%dat);
+	foreach my $v (keys %{ $p{$h} }) {
+	    my ($t1, $t2) = ($p{$h}{$v}{'tag'}, $dat{$v}{'tag'});
+	    if (defined($t2) and ($t1 ne $t2)) {
+		logline("Warning: different tags for vob: $v - $t1, $t2");
+	    }
+	    my ($pr, $dr) = ( \%{ $p{$h}{$v}{'r'} }, \%{ $dat{$v}{'r'} } );
+	    foreach my $r (keys %$pr) {
+		if ((defined($$pr{$r}{'iv'})
+		     and (!defined($$dr{$r}{'remotimpts'})
+			  or ($$dr{$r}{'remotimpts'} eq '')
+			  or ($$dr{$r}{'remotimpts'} < $$pr{$r}{'it'})))){
+		    $$dr{$r}{'remotimpep'} = $$pr{$r}{'iv'};
+		}
+		if ((defined($$pr{$r}{'ev'})
+		     and (!defined($$dr{$r}{'localexpts'})
+			  or ($$dr{$r}{'localexpts'} eq '')
+			  or ($$dr{$r}{'localexpts'} < $$pr{$r}{'et'})))){
+		    $$dr{$r}{'localexpep'} = $$pr{$r}{'ev'};
+		}
+	    }
+	}
+	writedatafile($data, \%dat);
+    }
+    unlink($packet);
+}
+
+sub processcollided($) {
+    my $dir = shift;
+    if ($maxnest == 0) {
+	logline("Error: Max nesting level exceeded");
+	return;
+    }
+    unless (opendir DIR, $dir) {
+	logline("Error: Failed to open $dir for read");
+	return;
+    }
+    my @prev = grep { s:^(.*\.repoch(_\d+)?)$:$dir/$1: } readdir(DIR);
+    closedir DIR;
+    return unless @prev;
+    my %p = ();
+    foreach (@prev) {
+	/^(.*)\.repoch(_\d+)?$/;
+	my $b = $1;
+	my $e = $2;
+	if (defined($e)) {
+	    $e =~ s/^_(\d+)$/$1/;
+	} else {
+	    $e = 0;
+	}
+	$p{$b} = $e unless defined($p{$b}) and ($e < $p{$b});
+    }
+    while (my ($k, $v) = each %p) {
+	cleanbacklog($k, $v) if $v;
+	onepacket($k);
+    }
+    $maxnest--;
+    &processcollided($dir); #recursion
+}
+
+$timestamp = curtime();
+{
+    my $res = getopts('hl:o:d:s:a:', \%opts);
+    usage() unless $res;
+    usage() if $opts{'h'};
+    $log = $opts{'l'} if $opts{'l'};
+}
+open LOG, ">>$log" or die "Failed to open $log for append\n";
+logline("o: \"", $opts{'o'}?$opts{'o'}:'', "\" ",
+	"d: \"", $opts{'d'}?$opts{'d'}:'', "\" ",
+	"s: \"", $opts{'s'}?$opts{'s'}:'', "\" ",
+	"a: \"", $opts{'a'}?$opts{'a'}:'', "\"");
+if ((defined($opts{'d'})) and ($opts{'d'} =~ /^(.*)\.repoch(_\d+)?$/)) {
+    my $body = $1;
+    my $ext = $2;
+    open(LOCK, ">$lock") or die "Cannot open $lock\n";
+    if (flock(LOCK,6)) { # exclusive(2), non-blocking(4)
+	if (defined($ext)) {
+	    $ext =~ s/^_(\d+)$/$1/;
+	    cleanbacklog($body, $ext);
+	}
+	onepacket($body);
+	processcollided(dirname($body));
+    } else {
+	logline("Error: Failed to acquire lock");
+    }
+    close(LOCK);
+}
+close(LOG);
