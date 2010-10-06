@@ -1,0 +1,125 @@
+#!/usr/bin/env perl
+
+use diagnostics;
+use strict;
+use vars qw(@vobs $log $pgm $ct $mt $mo $dest $ld %opt $host);
+use File::Basename;
+use Getopt::Long;
+use Sys::Hostname;
+
+$pgm = basename($0);
+$dest = 'destination.org';
+$host = '';
+$ld = '/tmp';
+%opt = ('dest' => \$dest, 'logdir' => \$ld, 'server' => \$host, 'oldcc' => 0);
+
+sub usage() {
+    my @cc = qw(no yes);
+    print "\nUsage:"
+	. "\n$pgm [--help] "
+	. "[--oldcc] [--logdir dir] [--dest destination] [--server host]"
+	. "\n"
+	. "\nThe options allow to override the defaults, mainly for debugging"
+	. "\nHowever, --server allows to specify an other host "
+	. "than the local one,"
+	. "\nor to restrict the processing to vobs served on one host."
+	. "\nFor multiple destinations, separate with commas."
+	. "\n"
+	. "\nDefaults:"
+	. "\n\tlog directory: $ld\n\tdestination: $dest\n\tlog: $log"
+	. "\n\told CC: $cc[$opt{'oldcc'}]\n";
+    exit 1;
+}
+
+{
+    my $res = GetOptions(\%opt,
+			 "help", "oldcc", "verbose",
+			 "logdir=s", "dest=s", "server=s");
+    $ld =~ s:^(.*)/$:$1:; #strip possible trailing '/'
+    my $cc = $opt{'oldcc'}?'/usr/atria/':'/opt/rational/clearcase/';
+    my $bin = $cc .'bin/';
+    $ct = $bin . 'cleartool';
+    $mt = $bin . 'multitool';
+    my $etc = $cc . 'etc/';
+    $mo = $etc . 'mkorder';
+    my $h = '';
+    if ($host) {
+	$h = $host;
+	$host = "-host $h";
+    } else {
+	$h = hostname();
+    }
+    $h =~ s/^([^.]+)\..*$/$1/;
+    $log = "${ld}/${h}.repoch";
+    usage() unless $res;
+    usage() if $opt{'help'};
+    @vobs = `$ct lsvob -s $host`;
+}
+
+sub rep_status($) {
+    my $v = shift;
+    chomp($v);
+    my @sib =
+	`2>/dev/null $mt lsrep -sib -fmt "%n@%[replica_host]p\n" -invob $v`;
+    return unless scalar @sib;
+    my ($locrep, $vuuid) =
+	split / /, `$ct des -fmt "%[replica_name]p %On" vob:$v`;
+    chomp($locrep);
+    my $lrh = `$ct des -fmt "%[replica_host]p" replica:$locrep\@$v`;
+    $lrh =~ s/^([^.]+)\..*$/$1/;
+    my %rseen = ();
+    my %shost = ();
+    my $reps = '';
+    my $re = "($locrep";
+    foreach my $s (@sib) {
+	chomp($s);
+	$s =~ /^(.*)@([^.]+)(\..*)?$/;
+	my ($r, $h) = ($1, $2);
+	$shost{$r} = "$r\@$h";
+	$reps .= " replica:$r\@$v";
+	$re .= "|$r";
+    }
+    $re .= ")=";
+    print LOG "$v, $vuuid:\n";
+    my @lhis =
+	split /--/, `$ct lshis -last 2 -fmt "--\%Nd \%c" replica:$locrep\@$v`;
+    foreach my $h (@lhis) {
+	my ($d, $r, $row) =
+	    ($h =~
+	     /^([^ ]+) Imported.*\"(.*)\"\.\nRow at import was: (.*)/);
+	if (defined($d) and defined($r) and defined($row)) {
+	    unless ($rseen{$locrep}++) {
+		my @ep = grep /$re/, split / /, $row;
+		print LOG "i $d $locrep\@$lrh: @ep\n";
+	    }
+	}
+    }
+    my @shis = split /--/, `$ct lshis -last 2 -fmt "--\%Nd \%c" $reps`;
+    foreach my $h (@shis) {
+	my ($d, $r, $row) =
+	    ($h =~
+	     /^([^ ]+) Exported.*\"(.*)\"\.\nRow at export was: (.*)/);
+	if (defined($d) and defined($r) and defined($row)) {
+	    unless ($rseen{$r}++) {
+		if (defined($shost{$r})) {
+		    my @ep = grep /$re/, split / /, $row;
+		    print LOG "e $d $shost{$r}: @ep\n";
+		} elsif ($opt{'verbose'}) {
+		    print STDERR "$r renamed?\n  $re\n  $row\n  $r\n  $d\n";
+		}
+	    }
+#  	} else {
+#  	    print "  $h";
+	}
+    }
+
+#    print "$v:\n@shis\n";
+}
+
+open LOG, ">$log" or die "Failed to open $log for write\n";
+foreach my $v (@vobs) { rep_status($v); }
+close(LOG);
+if ($dest) {
+    my @d = split /,/, $dest;
+    system($mo, "-data", $log, "-fship", @d);
+}
