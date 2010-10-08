@@ -1030,10 +1030,10 @@ sub modify {
 		    my $tgt = readlink $dst;
 		    my $dir = dirname $dst;
 		    if ($tgt =~ m%^[^/\\]%) {
-		        $tgt = abs_path(catfile($dir, $tgt));
+		        $tgt = abs_path(File::Spec->catfile($dir, $tgt));
 			$tgt =~ s%^$self->{DSTVBAS}$sep%%;
 		      } else {
-			$tgt = catfile($dir, $tgt);
+			$tgt = File::Spec->catfile($dir, $tgt);
 		      }
 		    $dst = $tgt;
 		}
