@@ -197,8 +197,9 @@ sub _lsprivate {
 	$_ = $self->normalize($_);
 	push(@vp, $_) if m%^\Q$base/%;
     }
-    push(@vp, @{$self->{ST_IMPLICIT_DIRS}})
-				if $self->{ST_IMPLICIT_DIRS} && $implicit_dirs;
+    push(@vp, grep {$ct->des([qw(-s)], "$_/.\@\@")->stdout(0)->system}
+	   @{$self->{ST_IMPLICIT_DIRS}})
+			         if $self->{ST_IMPLICIT_DIRS} && $implicit_dirs;
     return @vp;
 }
 
@@ -207,13 +208,13 @@ sub _lsco {
     my $base = $self->dstbase;
     my $ct = $self->clone_ct;
     my %co;
-    for ($ct->argv('lsco', [qw(-s -cvi -a)], $base)->qx) {
+    for ($ct->lsco([qw(-s -cvi -a)], $base)->qx) {
 	$_ = $self->normalize($_);
 	$co{$_}++ if m%^\Q$base/% || $_ eq $base;
     }
     for my $dir (@{$self->{ST_IMPLICIT_DIRS}}) {
-	my $dirname = dirname($dir);
-	$co{$dirname}++;
+	my $dad = dirname($dir);
+	$co{$dad}++ if !$ct->lsco([qw(-s -cvi -d)], $dad)->stdout(0)->system;
     }
     return wantarray? sort keys %co : scalar keys %co;
 }
@@ -440,7 +441,7 @@ sub srcmap {
     die "$0: Error: must specify src base before src map" if !$sbase;
     die "$0: Error: must specify dst base before src map" if !$dbase;
     for (keys %sdmap) {
-	if (m%^(?:[a-zA-Z]:)?\Q$sbase\E[/\\]*(.+)$%) {
+	if (m%^(?:[a-zA-Z]:)?\Q$sbase\E[/\\]*(.*)$%) {
 	    my $key = $1;
 	    $self->{ST_SRCMAP}->{$key}->{type} = $type;
 	    my($dst) = ($sdmap{$_} =~ m%^\Q$dbase\E[/\\]*(.+)$%);
@@ -608,7 +609,7 @@ sub analyze {
 	# Get a relative path from the absolute path.
 	(my $relpath = $path) =~ s%^\Q$dbase\E\W?%%;
 	if (-d $path) {
-	    $dirs{$path} = 1;
+	    $dirs{$path} = $relpath;
 	} elsif (-f $path) {
 	    $files{$relpath} = $path;
 	}
@@ -736,101 +737,122 @@ sub mkrellink {
     return $txt;
 }
 
+# Reuse from removed elements, or create as view private, directories
+sub reusemkdir {
+    my ($self, $dref, $rref) = @_;
+    my (%found, $reused, %dfound);
+    my $snapview = $self->snapdest;
+    my $vt = ClearCase::Argv->lsvtree([qw(-a -s -nco)]);
+    my $ds = ClearCase::Argv->desc({stderr=>1},[qw(-s)]);
+    my $dm = ClearCase::Argv->desc([qw(-fmt %m)]);
+    my $rm = ClearCase::Argv->rm;
+    my $lsco = ClearCase::Argv->lsco([qw(-s -d -cview)]);
+    my $ln = ClearCase::Argv->ln;
+    for my $dst (sort keys %{$dref}) {
+	next if $dfound{$dst};
+	my($name, $dir) = fileparse($dst);
+	if ($rref->{$dst}) {
+	    $self->branchco(1, $dir) unless $lsco->args($dir)->qx;
+	    $rm->args($dst)->system;
+	}
+	chomp(my @vtree = reverse grep { m%[/\\]\d+$% } $vt->args($dir)->qx);
+      VER: for (@vtree) {
+	    my $dirext = "$_/$name@@";
+	    # case-insensitive file test operator on Windows is a problem
+	    if ($snapview ? $ds->args($dirext)->qx !~ /Error:/ :
+		                                            ecs("$_/$name")) {
+		next if $dm->args("$_/$name")->qx eq 'file element';
+		while (-l "$_/$name") {
+		    $name = readlink "$_/$name";
+		    $name =~ s/\@\@$//;
+		    # consider only relative, and local symlinks
+		    next VER if !ecs("$_/$name") ||
+		                  $dm->args("$_/$name")->qx eq 'file element';
+		}
+		$reused = 1;
+		$self->branchco(1, $dir) unless $lsco->args($dir)->qx;
+		$ln->args("$_/$name", $dst)->system;
+		# Need to reevaluate all the files under this dir
+		# Case of the dstbase itself, reported as '.'
+		my $d = $dref->{$dst} eq '.'? '' : $dref->{$dst} . '/';
+		if ($self->remove) {
+		    my $flt = qr{^(\Q$d\E.*?)(/.*)?$}; # paths normalized
+		    opendir(DIR, $dst);
+		    my @f = grep !m%^\.\.?$%, readdir DIR;
+		    closedir DIR;
+		    my %ok = map { $_ => 1 } grep s%$flt%$1%,
+		                                   keys %{$self->{ST_SRCMAP}};
+		    for (@f) {
+			my $f = "${d}$_";
+			push @{$self->{ST_SUB}->{exfiles}},
+			                   join('/', $dst, $f) unless $ok{$f};
+		    }
+		}
+		my $cmp = $self->no_cmp ? undef : $self->cmp_func;
+		my @keys = $d? grep m%^\Q$d\E%, keys %{$self->{ST_ADD}}
+		  : keys %{$self->{ST_ADD}};
+		for my $e (@keys) {
+		    my $edst = join '/', $self->dstbase, $e;
+		    # Problem: does it match the type under srcbase?
+		    if (-d $edst) { # We know it ought to be empty
+			opendir(DIR, $edst);
+			my @f = grep !m%^\.\.?$%, readdir DIR;
+			closedir DIR;
+			if (@f) {
+			    $self->branchco(1, $edst)
+			                        unless $lsco->args($edst)->qx;
+			    $rm->args(map{join '/', $edst, $_} @f)->system;
+			}
+			$dfound{$edst}++; #Skip in this loop
+			next;
+		    }
+		    if (exists($self->{ST_ADD}->{$e}->{dst})) {
+			my $src = $self->{ST_ADD}->{$e}->{src};
+			my $dst = $self->{ST_ADD}->{$e}->{dst};
+			if (-e $dst) {
+			    $self->{ST_MOD}->{$e} = $self->{ST_ADD}->{$e}
+			            if $self->_needs_update($src, $dst, $cmp);
+			    $found{$e}++; #Remove from the add list
+			}
+		    }
+		}
+		last;
+	    }
+	}
+	if (!$reused) {
+	    mkpath($dst, 0, 0777) || die "$0: Error: $dst: $!";
+	}
+    }
+    return %found;
+}
+
+# recursively record parent directories, and clashing objects to remove
+sub recadd {
+    my ($self, $src, $dst, $dir, $rm, $seen) = @_;
+    my $dad = dirname($dst);
+    return if $seen->{$dad}++ || (-d $dad && ! -l $dad); #exists & normal
+    my $sdad = dirname($src);
+    $self->recadd($sdad, $dad, $dir, $rm, $seen);
+    $rm->{$dad}++ if -f $dad || -l $dad; #something clashing: remove
+    $dir->{$dad} = $sdad;
+}
+
 sub add {
     my $self = shift;
     my $sbase = $self->srcbase;
     my $mbase = $self->_mkbase;
     my $ct = $self->clone_ct;
     return if ! $self->{ST_ADD};
-    if ($self->reuse) { # Reuse directories
+    if ($self->reuse) { # First, reuse parent directories
 	my (%dir, %rm, %dseen);
+	# in the way if added in _mkbase as view private; ignore failures
+	rmdir($_) for reverse sort @{$self->{ST_IMPLICIT_DIRS}};
 	for my $d (sort keys %{$self->{ST_ADD}}) {
 	    my $dst = $self->{ST_ADD}->{$d}->{dst};
-	    my $dad = dirname($dst);
-	    next if $dseen{$dad}++;
-	    next if -d $dad && ! -l $dad;
-	    $rm{$dad}++ if -f $dad || -l $dad;
-	    $dir{$dad} = dirname($d);
+	    $dir{$dst} = $d if -d $d; # only empty dirs are explicitly added
+	    $self->recadd($d, $dst, \%dir, \%rm, \%dseen);
 	}
-	my (%seen, %found, $reused);
-	my $snapview = $self->snapdest;
-	my $vt = ClearCase::Argv->lsvtree([qw(-a -s -nco)]);
-	my $ds = ClearCase::Argv->desc([qw(-s)]);
-	my $dm = ClearCase::Argv->desc([qw(-fmt %m)]);
-	my $rm = ClearCase::Argv->rm();
-	$ds->stderr(1);
-	my $lsco = ClearCase::Argv->lsco([qw(-s -d)]);
-	my $ln = ClearCase::Argv->ln;
-	for my $dst (sort keys %dir) {
-	    next if $seen{$dst}++;
-	    my($name, $dir) = fileparse($dst);
-	    if ($rm{$dst}) {
-	        $self->branchco(1, $dir) unless $lsco->args($dir)->qx;
-		$rm->args($dst)->system;
-	    }
-	    chomp(my @vtree = reverse $vt->args($dir)->qx);
-	    VER: for (@vtree) {
-		next unless m%[/\\][1-9]\d*$% ;	# optimization
-		my $dirext = "$_/$name@@";
-		# case-insensitive file test operator on Windows is a problem
-		if ($snapview ? $ds->args($dirext)->qx !~ /Error:/ :
-							    ecs("$_/$name")) {
-		    next if $dm->args("$_/$name")->qx eq 'file element';
-		    while (-l "$_/$name") {
-		        $name = readlink "$_/$name";
-			$name =~ s/\@\@$//;
-			# consider only relative, and local symlinks
-			next VER if !ecs("$_/$name") ||
-			          $dm->args("$_/$name")->qx eq 'file element';
-		    }
-		    $reused = 1;
-		    $self->branchco(1, $dir) unless $lsco->args($dir)->qx;
-		    $ln->args("$_/$name", $dst)->system;
-		    # Need to reevaluate all the files under this dir
-		    my $d = $dir{$dst};
-		    my $flt = qr{^(${d}/.*?)(/.*)?$}; # paths normalized
-		    if ($self->remove) {
-		        opendir(DIR, $dst);
-			my @f = grep !m%^\.\.?$%, readdir DIR;
-			closedir DIR;
-			my %ok = map { $_ => 1 } grep s%$flt%$1%,
-			                           keys %{$self->{ST_SRCMAP}};
-			my $dbase = $self->dstbase;
-			for (@f) {
-			    my $f = "$d/$_";
-			    push @{$self->{ST_SUB}->{exfiles}},
-			         join('/', $self->dstbase, $f) unless $ok{$f};
-			}
-		    }
-		    my $cmp = $self->no_cmp ? undef : $self->cmp_func;
-		    my %dseen;
-		    for my $e (grep m%^$d%, keys %{$self->{ST_ADD}}) {
-		        if (exists($self->{ST_ADD}->{$e}->{dst})) {
-			    my $src = $self->{ST_ADD}->{$e}->{src};
-			    my $dst = $self->{ST_ADD}->{$e}->{dst};
-			    if (-e $dst) {
-			        $self->{ST_MOD}->{$e} = $self->{ST_ADD}->{$e}
-			            if $self->_needs_update($src, $dst, $cmp);
-				$found{$e}++;
-			    }
-			    my $dad = dirname($dst);
-			    # No new keys at this stage (inside the loop)!
-			    use Carp;
-			    confess "Error: assertion failure for $dad"
-			                             unless exists $dir{$dad};
-			    if (!($dseen{$dad}++ || (-d $dad && !-l $dad))) {
-			        $rm{$dad}++ if -f $dad || -l $dad;
-			    }
-			    $seen{$dst}++;
-			}
-		    }
-		    last;
-		}
-	    }
-	    if (!$reused) {
-	        mkpath($dst, 0, 0777) || die "$0: Error: $dst: $!";
-	    }
-	}
+	my %found = $self->reusemkdir(\%dir, \%rm);
 	delete $self->{ST_ADD}->{$_} for keys %found;
     }
     for (sort keys %{$self->{ST_ADD}}) {
@@ -864,8 +886,7 @@ sub add {
     # If the parent directories of any of the candidates are
     # already versioned, we'll need to check them out unless
     # it's already been done.
-    my %parents = map {dirname($_) => 1} @candidates;
-    my @dads = sort keys %parents;
+    my @dads = sort map {dirname($_)} @candidates;
     my %lsd = map {split(/\s+Rule:\s+/, $_, 2)}
 			$ct->argv('ls', [qw(-d -nxn -vis -vob)], @dads)->qx;
     for my $dad (keys %lsd) {
@@ -921,9 +942,8 @@ sub add {
     if ($self->reuse) {
 	my $snapview = $self->snapdest;
 	my $vt = ClearCase::Argv->lsvtree([qw(-a -s -nco)]);
-	my $ds = ClearCase::Argv->desc([qw(-s)]);
+	my $ds = ClearCase::Argv->desc({stderr=>1}, [qw(-s)]);
 	my $dm = ClearCase::Argv->desc([qw(-fmt %m)]);
-	$ds->stderr(1);
 	my $ln = ClearCase::Argv->ln;
 	my %reused;
 	for my $elem (keys %files) {
@@ -939,8 +959,8 @@ sub add {
 		    while (-l "$_/$name") {
 		        $name = readlink "$_/$name";
 			$name =~ s/\@\@$//;
-			next if !ecs("$_/$name") || $dm->args("$_/$name")->qx
-			                               eq 'directory element';
+			next if !ecs("$_/$name") ||
+			     $dm->args("$_/$name")->qx eq 'directory element';
 		    }
 		    $reused{$elem} = 1;
 		    delete $files{$elem};
@@ -1105,6 +1125,7 @@ sub subtract {
     my @exdirs;
     while (1) {
 	for (sort {$b cmp $a} keys %dirs) {
+	    next if $self->{ST_SRCMAP}->{$dirs{$_}};
 	    if (opendir(DIR, $_)) {
 		my @entries = readdir DIR;
 		closedir(DIR);
