@@ -336,10 +336,10 @@ sub dstbase {
 	}
 	$ct->_chdir($olddir) || die "$0: Error: $olddir: $!";
 	$self->{ST_DSTBASE} = $dbase;
-	$dbase =~ s%^.*?$dvob%$dvob%;
-	$self->{ST_DSTVBAS} = $dbase;
 	(my $dvb = $dbase) =~ s%^(.*?$dvob).*$%$1%;
 	$self->snapdest(1) unless -e "$dvb/@@";
+	$dbase =~ s%^.*?$dvob%$dvob%;
+	$self->{ST_DSTVBAS} = $dbase;
     }
     return $self->{ST_DSTBASE};
 }
