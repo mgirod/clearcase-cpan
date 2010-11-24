@@ -338,6 +338,8 @@ sub dstbase {
 	$self->{ST_DSTBASE} = $dbase;
 	$dbase =~ s%^.*?$dvob%$dvob%;
 	$self->{ST_DSTVBAS} = $dbase;
+	(my $dvb = $dbase) =~ s%^(.*?$dvob).*$%$1%;
+	$self->snapdest(1) unless -e "$dvb/@@";
     }
     return $self->{ST_DSTBASE};
 }
@@ -568,7 +570,6 @@ sub analyze {
     my $dbase = $self->dstbase;
     die "$0: Error: must specify dest base before analyzing" if !$dbase;
     die "$0: Error: must specify dest vob before analyzing" if !$self->dstvob;
-    $self->snapdest(1) if ! -e "$dbase@@" && ! -e "$dbase/@@";
     $self->_mkbase;
     $self->{branchoffroot} = $self->checkcs($dbase);
     # Derive the add and modify lists by traversing the src map and
@@ -737,12 +738,26 @@ sub mkrellink {
     return $txt;
 }
 
+# Remove spurious names from restored directory
+sub skimdir {
+    my ($self, $dst, $pfx) = @_;
+    my $flt = qr{^(\Q$pfx\E.*?)(?:/.*)?$}; # paths normalized
+    opendir(DIR, $dst);
+    my @f = grep !m%^\.\.?$%, readdir DIR;
+    closedir DIR;
+    my %ok = map {$_ => 1} grep s%$flt%$1%, keys %{$self->{ST_SRCMAP}};
+    for (@f) {
+	my $f = $pfx . $_;
+	push @{$self->{ST_SUB}->{exfiles}}, join('/', $dst, $_) unless $ok{$f};
+    }
+}
+
 # Reuse from removed elements, or create as view private, directories
 sub reusemkdir {
     my ($self, $dref, $rref) = @_;
     my (%found, $reused, %dfound);
     my $snapview = $self->snapdest;
-    my $vt = ClearCase::Argv->lsvtree([qw(-a -s -nco)]);
+    my $vt = ClearCase::Argv->lsvtree({autochomp=>1}, [qw(-a -s -nco)]);
     my $ds = ClearCase::Argv->desc({stderr=>1},[qw(-s)]);
     my $dm = ClearCase::Argv->desc([qw(-fmt %m)]);
     my $rm = ClearCase::Argv->rm;
@@ -755,44 +770,42 @@ sub reusemkdir {
 	    $self->branchco(1, $dir) unless $lsco->args($dir)->qx;
 	    $rm->args($dst)->system;
 	}
-	chomp(my @vtree = reverse grep { m%[/\\]\d+$% } $vt->args($dir)->qx);
+	my @vtree = reverse grep { m%[/\\]\d+$% } $vt->args($dir)->qx;
       VER: for (@vtree) {
-	    my $dirext = "$_/$name@@";
+	    my $dirext = "$_/$name";
 	    # case-insensitive file test operator on Windows is a problem
-	    if ($snapview ? $ds->args($dirext)->qx !~ /Error:/ :
-		                                            ecs("$_/$name")) {
-		next if $dm->args("$_/$name")->qx eq 'file element';
-		while (-l "$_/$name") {
-		    $name = readlink "$_/$name";
+	    if ($snapview ? $ds->args($dirext)->qx !~ /Error:/ : ecs($dirext)) {
+		next if $dm->args($dirext)->qx eq 'file element';
+		while (-l $dirext) {
+		    $name = readlink $dirext;
 		    $name =~ s/\@\@$//;
 		    # consider only relative, and local symlinks
-		    next VER if !ecs("$_/$name") ||
-		                  $dm->args("$_/$name")->qx eq 'file element';
+		    next VER if !ecs($dirext) ||
+		                       $dm->args($dirext)->qx eq 'file element';
 		}
 		$reused = 1;
 		$self->branchco(1, $dir) unless $lsco->args($dir)->qx;
-		$ln->args("$_/$name", $dst)->system;
-		# Need to reevaluate all the files under this dir
-		# Case of the dstbase itself, reported as '.'
+		$ln->args($dirext, $dst)->system;
+	        # Need to reevaluate all the files under this dir
+	        # The case of implicit dirs, is recorded as '.'
 		my $d = $dref->{$dst} eq '.'? '' : $dref->{$dst} . '/';
-		if ($self->remove) {
-		    my $flt = qr{^(\Q$d\E.*?)(/.*)?$}; # paths normalized
-		    opendir(DIR, $dst);
-		    my @f = grep !m%^\.\.?$%, readdir DIR;
-		    closedir DIR;
-		    my %ok = map { $_ => 1 } grep s%$flt%$1%,
-		                                   keys %{$self->{ST_SRCMAP}};
-		    for (@f) {
-			my $f = "${d}$_";
-			push @{$self->{ST_SUB}->{exfiles}},
-			                   join('/', $dst, $f) unless $ok{$f};
-		    }
-		}
+		$self->skimdir($dst, $d) if $self->remove;
 		my $cmp = $self->no_cmp ? undef : $self->cmp_func;
 		my @keys = $d? grep m%^\Q$d\E%, keys %{$self->{ST_ADD}}
-		  : keys %{$self->{ST_ADD}};
+		                                      : keys %{$self->{ST_ADD}};
 		for my $e (@keys) {
 		    my $edst = join '/', $self->dstbase, $e;
+		    my @intdir = split m%/%, $e;
+		    pop @intdir;
+		    if (@intdir) {
+			my $dd = $self->dstbase;
+			my $pf = $d;
+			while (my $id = shift @intdir) {
+			    $dd = join '/', $dd, $id;
+			    $pf = $pf . $id . '/';
+			    $self->skimdir($dd, $pf) unless $dfound{$dd}++;
+			}
+		    }
 		    # Problem: does it match the type under srcbase?
 		    if (-d $edst) { # We know it ought to be empty
 			opendir(DIR, $edst);
@@ -800,7 +813,7 @@ sub reusemkdir {
 			closedir DIR;
 			if (@f) {
 			    $self->branchco(1, $edst)
-			                        unless $lsco->args($edst)->qx;
+			                          unless $lsco->args($edst)->qx;
 			    $rm->args(map{join '/', $edst, $_} @f)->system;
 			}
 			$dfound{$edst}++; #Skip in this loop
@@ -811,7 +824,7 @@ sub reusemkdir {
 			my $dst = $self->{ST_ADD}->{$e}->{dst};
 			if (-e $dst) {
 			    $self->{ST_MOD}->{$e} = $self->{ST_ADD}->{$e}
-			            if $self->_needs_update($src, $dst, $cmp);
+			              if $self->_needs_update($src, $dst, $cmp);
 			    $found{$e}++; #Remove from the add list
 			}
 		    }
@@ -1354,10 +1367,11 @@ sub version {
 sub ecs {
     my $file = shift;
     my $rc = 0;
-    if (MSWIN) {
+    if (MSWIN || CYGWIN) {
 	if (opendir DIR, dirname($file)) {
 	    my $match = basename($file);
-	    $rc = 1 if grep m%^$match$%, readdir DIR;
+	    # Faster than for/last when not found!
+	    $rc = 1 if grep {$_ eq $match} readdir DIR;
 	    closedir DIR;
 	}
     } else {
