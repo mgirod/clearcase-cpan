@@ -206,7 +206,7 @@ Revision history for Perl extension ClearCase::SyncTree.
 	- internal _chdir hides the difference introduced with the ipc mode
 	- internal ct shares the ST_CT object as much as possible
 
-0.54 Thu Nov 18 14:44:35 GMTST 2010
+0.54 Wed Nov 24 15:16:13 GMTST 2010
 	- Using Argv 1.34 - removed _chdir
 	- reuse: branch names ending in numbers
 	- reuse: symlinks or dirs with same name in lsvtree of directory
@@ -224,3 +224,5 @@ Revision history for Perl extension ClearCase::SyncTree.
 	- fix for args relative to current dir (bug report by Achim Bursian)
 	- do not remove empty directories
 	- reuse also attempts to reuse 'implicit dirs'
+	- snapview check the path to the vob root, in case dbase didn't exist
+	- process whole paths brought in while reusing directory elements
