@@ -1064,7 +1064,7 @@ sub modify {
 		    my $dir = dirname $dst;
 		    if ($tgt =~ m%^[^/\\]%) {
 		        $tgt = abs_path(File::Spec->catfile($dir, $tgt));
-			$tgt =~ s%^$self->{DSTVBAS}$sep%%;
+			$tgt =~ s%^$self->{ST_DSTVBAS}$sep%%;
 		      } else {
 			$tgt = File::Spec->catfile($dir, $tgt);
 		      }
