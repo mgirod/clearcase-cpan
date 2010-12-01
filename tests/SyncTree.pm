@@ -338,8 +338,6 @@ sub dstbase {
 	$self->{ST_DSTBASE} = $dbase;
 	(my $dvb = $dbase) =~ s%^(.*?$dvob).*$%$1%;
 	$self->snapdest(1) unless -e "$dvb/@@";
-	$dbase =~ s%^.*?$dvob%$dvob%;
-	$self->{ST_DSTVBAS} = $dbase;
     }
     return $self->{ST_DSTBASE};
 }
@@ -523,14 +521,32 @@ sub vtcomp {
     return 1;
 }
 
+sub ccsymlink {
+    my $dst = shift;
+    return 1 if -l $dst;
+    return 0 unless MSWIN || CYGWIN;
+    my $ct = new ClearCase::Argv({autochomp=>1});
+    return $ct->des([qw(-fmt %m)], $dst)->qx eq 'symbolic link';
+}
+
+# readlink might work under some conditions (CC version, mount options, ...)
+sub readcclink {
+    my $dst = shift;
+    return $_ if $_ = readlink $dst;
+    return '' unless MSWIN || CYGWIN;
+    my $ct = new ClearCase::Argv({autochomp=>1});
+    my $ret = $ct->ls($dst)->qx;
+    return (($ret =~ s/^.*? --> (.*)$/$1/)? $ret : '');
+}
+
 sub _needs_update {
     my($self, $src, $dst, $comparator) = @_;
     my $update = 0;
-    if (-l $src && -l $dst) {
+    if (-l $src && ccsymlink($dst)) {
 	my $srctext = readlink $src;
-	my $desttext = readlink $dst;
+	my $desttext = readcclink $dst;
 	$update = !defined($comparator) || ($srctext ne $desttext);
-    } elsif (! -l $src && ! -l $dst) {
+    } elsif (! -l $src && ! ccsymlink($dst)) {
 	if (!defined($comparator)) {
 	    $update = 1;
 	} elsif ($self->vreuse) {
@@ -586,7 +602,7 @@ sub analyze {
 	# It's possible for a symlink to not satisfy -e if it's dangling.
 	# Case-insensitive file test operators are a problem on Windows.
 	# You cannot modify files when they don't exist under the proper name.
-	if (! ecs($dst) && ! -l $dst) {
+	if (! ecs($dst) && ! ccsymlink($dst)) {
 	    $self->{ST_ADD}->{$_}->{src} = $src;
 	    $self->{ST_ADD}->{$_}->{dst} = $dst;
 	} elsif (! -d $src) {
@@ -776,8 +792,8 @@ sub reusemkdir {
 	    # case-insensitive file test operator on Windows is a problem
 	    if ($snapview ? $ds->args($dirext)->qx !~ /Error:/ : ecs($dirext)) {
 		next if $dm->args($dirext)->qx eq 'file element';
-		while (-l $dirext) {
-		    $name = readlink $dirext;
+		while (ccsymlink($dirext)) {
+		    $name = readcclink $dirext;
 		    $name =~ s/\@\@$//;
 		    # consider only relative, and local symlinks
 		    next VER if !ecs($dirext) ||
@@ -843,10 +859,10 @@ sub reusemkdir {
 sub recadd {
     my ($self, $src, $dst, $dir, $rm, $seen) = @_;
     my $dad = dirname($dst);
-    return if $seen->{$dad}++ || (-d $dad && ! -l $dad); #exists & normal
+    return if $seen->{$dad}++ || (-d $dad && !ccsymlink($dad)); #exists, normal
     my $sdad = dirname($src);
     $self->recadd($sdad, $dad, $dir, $rm, $seen);
-    $rm->{$dad}++ if -f $dad || -l $dad; #something clashing: remove
+    $rm->{$dad}++ if -f $dad || ccsymlink($dad); #something clashing: remove
     $dir->{$dad} = $sdad;
 }
 
@@ -969,8 +985,8 @@ sub add {
 		if ($snapview ? $ds->args($dirext)->qx !~ /Error:/ :
 							    ecs("$_/$name")) {
 		    next if $dm->args("$_/$name")->qx eq 'directory element';
-		    while (-l "$_/$name") {
-		        $name = readlink "$_/$name";
+		    while (ccsymlink("$_/$name")) {
+		        $name = readcclink "$_/$name";
 			$name =~ s/\@\@$//;
 			next if !ecs("$_/$name") ||
 			     $dm->args("$_/$name")->qx eq 'directory element';
@@ -1016,7 +1032,7 @@ sub add {
     }
 
     # Now do the files in one fell swoop.
-    $ct->argv('mkelem', $self->comment, sort keys %files)->system if %files;
+    $ct->mkelem($self->comment, sort keys %files)->system if %files;
 
     # Deal with symlinks.
     for my $symlink (@symlinks) {
@@ -1035,67 +1051,90 @@ sub add {
 sub modify {
     my $self = shift;
     return if !keys %{$self->{ST_MOD}};
-    my(@files, @symlinks);
+    my(%files, %symlinks);
     for (sort keys %{$self->{ST_MOD}}) {
 	if (-l $self->{ST_MOD}->{$_}->{src}) {
-	    push(@symlinks, $_)
+	    $symlinks{$_}++;
 	} else {
-	    push(@files, $_)
+	    $files{$_}++;
 	}
     }
-    my $co = $self->clone_ct('co', $self->comment);
-    if (@files) {
-	my @toco;
-	for (@files) {
-	    my $dst = $self->{ST_MOD}->{$_}->{dst};
-	    if (-l $dst) {
+    my $rm = $self->clone_ct('rmname');
+    my $ln = $rm->clone->prog('ln');
+    $ln->opts('-s', $ln->opts);
+    my $lsco = ClearCase::Argv->lsco([qw(-s -d -cview)]);
+    my $comparator = $self->no_cmp ? undef : $self->cmp_func;
+    if (keys %files) {
+	my (@toco, @del);
+	for my $key (keys %files) {
+	    my $src = $self->{ST_MOD}->{$key}->{src};
+	    my $dst = $self->{ST_MOD}->{$key}->{dst};
+	    if (ccsymlink($dst)) {
 	        # The source is a file, but the destination is a symlink: look
 	        # (recursively) at what this one points to, and link in this
 	        # file.
-	        # Remember the symlinks on the way. Build up the path of the
-	        # destination, in such a way that it may be found, or not, in
-	        # the hash.
+	        # Build up the path of the destination, in such a way that it
+	        # may be found, or not, in the hash.
 	        use Cwd 'abs_path';
-		my @sl;
+		my $dangling;
 		my $sep = qr%[/\\]%;
-	        while (-l $dst) {
-		    push @sl, $dst;
-		    my $tgt = readlink $dst;
-		    my $dir = dirname $dst;
-		    if ($tgt =~ m%^[^/\\]%) {
-		        $tgt = abs_path(File::Spec->catfile($dir, $tgt));
-			$tgt =~ s%^$self->{ST_DSTVBAS}$sep%%;
-		      } else {
-			$tgt = File::Spec->catfile($dir, $tgt);
-		      }
-		    $dst = $tgt;
-		}
-		if (exists $self->{ST_MOD}->{$dst}) {
-		    if (grep {$_ eq $dst} @symlinks) {
-			# Remove $dst for the list of symlinks
-			my $i = 0;
-			for (@symlinks) {
-			    last if $_ eq $dst;
-			    $i++;
-			}
-			splice @symlinks, $i, 1;
+		my $dst1 = $dst;
+	        while (ccsymlink($dst1)) {
+		    my $tgt = readcclink $dst1;
+		    my $dir = dirname $dst1;
+		    $tgt = abs_path(File::Spec->catfile($dir, $tgt))
+		                                         if $tgt =~ m%^[^/\\]%;
+		    if (-e $tgt) {
+			$dst1 = $tgt;
 		    } else {
-			die "Two sources for the same destination: $_ and $dst";
+			$dangling = 1;
+			last;
 		    }
-		} else {
-		    # ???
 		}
-		# Process symlinks
+		my $dir = dirname($dst);
+		$self->branchco(1, $dir) unless $lsco->args($dir)->qx;
+		$self->clone_ct->rm($dst)->system; #remove the first symlink
+		if ($dangling) {
+		    if ($self->no_cr) {
+			if (!copy($src, $dst)) {
+			    warn "$0: Error: $dst: $!\n";
+			    $rm->fail;
+			}
+			utime(time(), (stat $src)[9], $dst) ||
+			                    warn "Warning: $dst: touch failed";
+			$self->clone_ct->mkelem($self->comment, $dst)->system;
+		    } else {
+			my @ptime = qw(-pti) unless $self->ctime;
+			$self->clone_ct->ci([@ptime, @{$self->comment},
+				      qw(-ide -rm -from), $src], $dst)->system;
+		    }
+		    delete $self->{ST_MOD}->{$key};
+		    push @del, $key;
+		} else {
+		    my $dir1 = dirname($dst1);
+		    $self->branchco(1, $dir1)
+		              unless ($dir eq $dir1) || $lsco->args($dir1)->qx;
+		    $self->clone_ct->mv($dst1, $dst)->system;
+		    delete $self->{ST_MOD}->{$key}
+		          unless $self->_needs_update($src, $dst, $comparator);
+		    (my $k = $dst1) =~ s%^$self->{ST_DSTBASE}$sep%%;
+		    if ($symlinks{$k}) {
+			my $d = $self->mkrellink($self->{ST_MOD}->{$k}->{src});
+			$ln->args($d, $dst1)->system;
+			delete $symlinks{$k};
+		    }
+		}
 	    }
 	    push(@toco, $dst) if !exists($self->{ST_PRE}->{$dst});
 	}
 	$self->branchco(0, @toco) if @toco;
-	for (@files) {
+	delete $files{$_} for @del;
+	for (keys %files) {
 	    my $src = $self->{ST_MOD}->{$_}->{src};
 	    my $dst = $self->{ST_MOD}->{$_}->{dst};
 	    if (!copy($src, $dst)) {
 		warn "$0: Error: $dst: $!\n";
-		$co->fail;
+		$rm->fail;
 		next;
 	    }
 	    utime(time(), (stat $src)[9], $dst) ||
@@ -1104,12 +1143,9 @@ sub modify {
 			if !$self->no_cr && !exists($self->{ST_PRE}->{$dst});
 	}
     }
-    if (@symlinks) {
+    if (keys %symlinks) {
 	my %checkedout = map {$_ => 1} $self->_lsco;
-	my $ln = $co->clone->prog('ln');
-	$ln->opts('-s', $ln->opts);
-	my $rm = $co->clone->prog('rmname');
-	for (@symlinks) {
+	for (keys %symlinks) {
 	    my $txt = $self->mkrellink($self->{ST_MOD}->{$_}->{src});
 	    my $lnk = $self->{ST_MOD}->{$_}->{dst};
 	    my $dad = dirname($lnk);
@@ -1263,8 +1299,9 @@ sub checkin {
     # in case of hardlinks, since checking the other link first
     # in a pair would fail.
     my @mods;
-    push @mods, $self->{ST_MOD}->{$_}->{dst} for keys %{$self->{ST_MOD}};
-    $ct->argv('ci', [@cmnt, '-ide', @ptime], sort @mods)->system if @mods;
+    push @mods, $self->{ST_MOD}->{$_}->{dst} for
+       grep {!ccsymlink($self->{ST_MOD}->{$_}->{dst})} keys %{$self->{ST_MOD}};
+    $ct->ci([@cmnt, '-ide', @ptime], sort @mods)->system if @mods;
     # Check in anything not handled above.
     my %checkedout = map {$_ => 1} $self->_lsco;
     my @todo = grep {m%^\Q$mbase%} keys %checkedout;
