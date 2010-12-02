@@ -1052,7 +1052,7 @@ sub modify {
     my $self = shift;
     return if !keys %{$self->{ST_MOD}};
     my(%files, %symlinks);
-    for (sort keys %{$self->{ST_MOD}}) {
+    for (keys %{$self->{ST_MOD}}) {
 	if (-l $self->{ST_MOD}->{$_}->{src}) {
 	    $symlinks{$_}++;
 	} else {
@@ -1066,7 +1066,7 @@ sub modify {
     my $comparator = $self->no_cmp ? undef : $self->cmp_func;
     if (keys %files) {
 	my (@toco, @del);
-	for my $key (keys %files) {
+	for my $key (sort keys %files) {
 	    my $src = $self->{ST_MOD}->{$key}->{src};
 	    my $dst = $self->{ST_MOD}->{$key}->{dst};
 	    if (ccsymlink($dst)) {
@@ -1115,8 +1115,10 @@ sub modify {
 		    $self->branchco(1, $dir1)
 		              unless ($dir eq $dir1) || $lsco->args($dir1)->qx;
 		    $self->clone_ct->mv($dst1, $dst)->system;
-		    delete $self->{ST_MOD}->{$key}
-		          unless $self->_needs_update($src, $dst, $comparator);
+		    if (!$self->_needs_update($src, $dst, $comparator)) {
+			delete $self->{ST_MOD}->{$key};
+			push @del, $key;
+		    }
 		    (my $k = $dst1) =~ s%^$self->{ST_DSTBASE}$sep%%;
 		    if ($symlinks{$k}) {
 			my $d = $self->mkrellink($self->{ST_MOD}->{$k}->{src});
@@ -1128,8 +1130,8 @@ sub modify {
 	    push(@toco, $dst) if !exists($self->{ST_PRE}->{$dst});
 	}
 	$self->branchco(0, @toco) if @toco;
-	delete $files{$_} for @del;
-	for (keys %files) {
+	delete @files{@del};
+	for (sort keys %files) {
 	    my $src = $self->{ST_MOD}->{$_}->{src};
 	    my $dst = $self->{ST_MOD}->{$_}->{dst};
 	    if (!copy($src, $dst)) {
@@ -1143,7 +1145,7 @@ sub modify {
 			if !$self->no_cr && !exists($self->{ST_PRE}->{$dst});
 	}
     }
-    if (keys %symlinks) {
+    if (sort keys %symlinks) {
 	my %checkedout = map {$_ => 1} $self->_lsco;
 	for (keys %symlinks) {
 	    my $txt = $self->mkrellink($self->{ST_MOD}->{$_}->{src});
