@@ -13,7 +13,7 @@ and using his framework.
 
   * Argv
   * [ClearCaseArgv ClearCase::Argv]
-  * !ClearCase::!SyncTree
+  * [synctree ClearCase::SyncTree]
   * !ClearCase::Wrapper
   * !ClearCase::Wrapper::DSB
   * [CcWrapMgi ClearCase::Wrapper::MGI]
