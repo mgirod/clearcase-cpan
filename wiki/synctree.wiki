@@ -2,7 +2,7 @@
 
 = !ClearCase::!SyncTree =
 
-Some recent significant novelties, with some remaining issues
+Some recent significant novelties, with some remaining issues (r563)
 
 = Reuse, and Version Reuse =
 
