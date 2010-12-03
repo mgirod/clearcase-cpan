@@ -1,6 +1,6 @@
 #summary ClearCase::SyncTree
 
-= \ClearCase::\SyncTree =
+= !ClearCase::!SyncTree =
 
 Some recent significant novelties, with some remaining issues
 
@@ -12,7 +12,7 @@ Use of -/ipc=1 flag: benefit for {{{checkin -from}}} commands, which must be run
 
 = Issues =
 
-  * \ClearCase symbolic links are not recognized as such on Windows and Cygwin, by perl -l operator and readlink function: support missing for the source base, which may be needed if using synctree for staging purposes
+  * !ClearCase symbolic links are not recognized as such on Windows and Cygwin, by perl -l operator and readlink function: support missing for the source base, which may be needed if using synctree for staging purposes
   * The source files are copied too early, so that they are overwritten or thrown away in several cases ({{{checkin -from}}}, version reuse, resolving symlinks in the vob)
   * The {{{checkin -from}}} option is maybe not respected in all scenarios
   * In the cleanup process, the {{{fail}}} command may result in an attempt to modify read-only data (case not precisely understood).
