@@ -2,8 +2,8 @@
 
 = !ClearCase::Wrapper =
 
-I am still having problems (time and resources...) validating the changes contributed last.
-It is still on my agenda, and I have no show stopper issue with them (r563)
+I am still having problems (time and resources...) validating the changes contributed last (r546).
+It is still on my agenda, and I have no show stopper issue with them (at r571)
 
 = Details =
 
