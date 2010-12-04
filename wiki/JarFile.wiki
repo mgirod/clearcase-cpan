@@ -3,7 +3,7 @@
 = Introduction =
 
 Jars, like tars, wars, and all kinds of zip archives are seen to !ClearCase as binary files.
-They are stored in whole versions (compressing them makes little sense, since it is likely to only add a header, and thus produce a file larger than the original, with the added costs of maintaining a cleartext container, and requiring cpu cycles and temp space for the copression/decompression), even when in fact the differences from one version to the next, as can be seen with tools like [http://www.osjava.org/jardiff jardiff], can be minimal.
+They are stored in whole versions (compressing them makes little sense, since it is likely to only add a header, and thus produce a file larger than the original, with the added costs of maintaining a cleartext container, and requiring cpu cycles and temp space for the compression/decompression), even when in fact the differences from one version to the next, as can be seen with tools like [http://www.osjava.org/jardiff jardiff], can be minimal.
 
 What could be an intelligent !ClearCase element type manager for jars?
 
