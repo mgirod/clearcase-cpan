@@ -8,4 +8,4 @@ It is still on my agenda, and I have no show stopper issue with them (r563)
 = Details =
 
 The changes concern the control of auto splitting the functions.
-The main advantage I can see is an option to disable autosplit during the development, so as the restore the effect of _warnings_ and _strict_.
+The main advantage I can see is an option to disable autosplit during the development, so as to restore the effect of _warnings_ and _strict_.
