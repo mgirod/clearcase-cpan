@@ -90,7 +90,10 @@ sub ct {
 # For internal use only.  Returns a clone of the ClearCase::Argv object.
 sub clone_ct {
     my $self = shift;
-    return $self->ct->clone(@_);
+    my $ct = $self->ct->clone(@_);
+    my $af = $self->ct->autofail;
+    $ct->autofail($af) if $af && ref($af); #Cloning doesn't share the value
+    return $ct;
 }
 
 sub protect {
@@ -1145,9 +1148,9 @@ sub modify {
 			if !$self->no_cr && !exists($self->{ST_PRE}->{$dst});
 	}
     }
-    if (sort keys %symlinks) {
+    if (keys %symlinks) {
 	my %checkedout = map {$_ => 1} $self->_lsco;
-	for (keys %symlinks) {
+	for (sort keys %symlinks) {
 	    my $txt = $self->mkrellink($self->{ST_MOD}->{$_}->{src});
 	    my $lnk = $self->{ST_MOD}->{$_}->{dst};
 	    my $dad = dirname($lnk);
