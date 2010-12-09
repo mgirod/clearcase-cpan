@@ -4,7 +4,7 @@
 <head>
 <title>synctree - Normalize a tree of flat files with a tree of ClearCase elements</title>
 <meta http-equiv="content-type" content="text/html; charset=utf-8" />
-<link rev="made" href="mailto:rurban@x-ray.at" />
+<link rev="made" href="mailto:root@localhost" />
 </head>
 
 <body style="background-color: white">
@@ -163,14 +163,13 @@ one. They could conceivably even be of different element types.</p>
 </li>
 <li><strong><a name="vreuse" class="item"><em>-vreuse</em></a></strong>
 
-<p>If two alternative releases of the same tree are imported in alternance,
+<p>If two alternative releases of the same tree are imported in alternation,
 new versions are created at every step, as the result of even imports is
 systematically hidden by odd ones.</p>
 <p>This flag will check for suitable versions of the elements in their
 version tree, and apply there the label provided with the <em>-label</em>
-option. This will considerably slow down the processing, but win back on
-avoiding to check in duplicates of large binaries. And avoiding to unduly
-grow the vob size if imports are run for instance from crontabs.</p>
+option. This will considerably slow down the processing, but will avoid
+data duplication.</p>
 <p>Consider forcing the ipc mode of <em>ClearCase::Argv</em>, with <em>-/ipc=1</em>, and
 using the BranchOff feature, both of which are relevant to this kind of
 situation.</p>
@@ -259,7 +258,7 @@ optionally (<em>-reuse</em>) make a link to the existing file instead of
 creating a new element which might be considered an &quot;evil twin&quot;.</p>
 </li>
 <li>
-<p>Synctree has support for <em>version reuse</em>. In conjonction with
+<p>Synctree has support for <em>version reuse</em>. In conjunction with
 labeling the results, importing a new version may be skipped by
 labeling instead an existing suitable one, even if not currently
 selected.</p>

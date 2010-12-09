@@ -495,15 +495,14 @@ B<experimental>.>
 
 =item * I<-vreuse>
 
-If two alternative releases of the same tree are imported in alternance,
+If two alternative releases of the same tree are imported in alternation,
 new versions are created at every step, as the result of even imports is
 systematically hidden by odd ones.
 
 This flag will check for suitable versions of the elements in their
 version tree, and apply there the label provided with the I<-label>
-option. This will considerably slow down the processing, but win back on
-avoiding to check in duplicates of large binaries. And avoiding to unduly
-grow the vob size if imports are run for instance from crontabs.
+option. This will considerably slow down the processing, but will avoid
+data duplication.
 
 Consider forcing the ipc mode of I<ClearCase::Argv>, with I<-/ipc=1>, and
 using the BranchOff feature, both of which are relevant to this kind of
@@ -606,7 +605,7 @@ creating a new element which might be considered an "evil twin".
 
 =item *
 
-Synctree has support for I<version reuse>. In conjonction with
+Synctree has support for I<version reuse>. In conjunction with
 labeling the results, importing a new version may be skipped by
 labeling instead an existing suitable one, even if not currently
 selected.

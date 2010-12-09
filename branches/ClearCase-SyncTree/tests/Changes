@@ -228,3 +228,4 @@ Revision history for Perl extension ClearCase::SyncTree.
 	- process whole paths brought in while reusing directory elements
 	- file/symlink clashes handled
 	- clone preserves the value of autofail
+	- NOTE: all work from 0.48 to here courtesy of Marc Girod.
