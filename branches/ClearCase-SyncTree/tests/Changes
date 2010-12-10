@@ -235,3 +235,6 @@ Revision history for Perl extension ClearCase::SyncTree.
 
 0.56 Fri Dec 10 11:49:19 GMTST 2010
         - removed spurious cleartool errors, mostly under Windows/Cygwin
+	- fixed various internal bugs: readcclink was altering its call context
+	- Cwd::abs_path on UNIX strips the view extended prefix
+	- use of ClearCase::Argv::clone disturbs the ipc reference count
