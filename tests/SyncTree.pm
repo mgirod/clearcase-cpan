@@ -536,10 +536,11 @@ sub ccsymlink {
 # readlink might work under some conditions (CC version, mount options, ...)
 sub readcclink {
     my $dst = shift;
-    return $_ if $_ = readlink $dst;
+    my $ret = readlink $dst;
+    return $ret if $ret;
     return '' unless MSWIN || CYGWIN;
     my $ct = new ClearCase::Argv({autochomp=>1});
-    my $ret = $ct->ls($dst)->qx;
+    $ret = $ct->ls($dst)->qx;
     return (($ret =~ s/^.*? --> (.*)$/$1/)? $ret : '');
 }
 
@@ -1053,6 +1054,14 @@ sub add {
     }
 }
 
+# On UNIX, Cwd::abs_path strips the /view/$dstview prefix
+sub absdst {
+    my ($self, $dir, $f) = @_;
+    use Cwd 'abs_path';
+    $f = abs_path(File::Spec->catfile($dir, $f));
+    return MSWIN||CYGWIN? $f : File::Spec->catfile('/view', $self->dstview.$f);
+}
+
 sub modify {
     my $self = shift;
     return if !keys %{$self->{ST_MOD}};
@@ -1065,7 +1074,7 @@ sub modify {
 	}
     }
     my $rm = $self->clone_ct('rmname');
-    my $ln = $rm->clone->prog('ln');
+    my $ln = $self->clone_ct('ln');
     $ln->opts('-s', $ln->opts);
     my $lsco = ClearCase::Argv->lsco([qw(-s -d -cview)]);
     my $comparator = $self->no_cmp ? undef : $self->cmp_func;
@@ -1080,15 +1089,13 @@ sub modify {
 	        # file.
 	        # Build up the path of the destination, in such a way that it
 	        # may be found, or not, in the hash.
-	        use Cwd 'abs_path';
 		my $dangling;
 		my $sep = qr%[/\\]%;
 		my $dst1 = $dst;
 	        while (ccsymlink($dst1)) {
 		    my $tgt = readcclink $dst1;
 		    my $dir = dirname $dst1;
-		    $tgt = abs_path(File::Spec->catfile($dir, $tgt))
-		                                         if $tgt =~ m%^[^/\\]%;
+		    $tgt = $self->absdst($dir, $tgt) if $tgt =~ m%^[^/\\]%;
 		    if (-e $tgt) {
 			$dst1 = $tgt;
 		    } else {
