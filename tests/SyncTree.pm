@@ -1,6 +1,6 @@
 package ClearCase::SyncTree;
 
-$VERSION = '0.55';
+$VERSION = '0.56';
 
 require 5.004;
 
@@ -80,7 +80,7 @@ sub ct {
     my $self = shift;
     return $self->{ST_CT} if $self->{ST_CT};
     if (!defined(wantarray)) {
-	my $ct = ClearCase::Argv->new({-autochomp=>1, -outpathnorm=>1});
+	my $ct = ClearCase::Argv->new({autochomp=>1, outpathnorm=>1});
 	$ct->syxargs($ct->qxargs);
 	$self->{ST_CT} = $ct;
     }
@@ -354,7 +354,7 @@ sub _mkbase {
 	my $mbase = $self->dstbase;
 	my $dvob = $self->dstvob;
 	(my $dext = $mbase) =~ s%(.*?$dvob)/.*%$1%;
-	my $ct = $self->clone_ct({-stdout=>0, -stderr=>0});
+	my $ct = $self->clone_ct({stdout=>0, stderr=>0});
 	$ct->autofail(0);	# can't be done above, will be lost.
 	while (1) {
 	    last if length($mbase) <= length($dext);
@@ -529,7 +529,7 @@ sub ccsymlink {
     my $dst = shift;
     return 1 if -l $dst;
     return 0 unless MSWIN || CYGWIN;
-    my $ct = new ClearCase::Argv({autochomp=>1});
+    my $ct = new ClearCase::Argv({autochomp=>1, stderr=>0});
     return $ct->des([qw(-fmt %m)], $dst)->qx eq 'symbolic link';
 }
 
@@ -574,7 +574,7 @@ sub _needs_update {
 sub checkcs {
     my $self = shift;
     my($dest) = @_;
-    my $ct = ClearCase::Argv->new({-autofail=>1, -autochomp=>1});
+    my $ct = ClearCase::Argv->new({autofail=>1, autochomp=>1});
     my $pwd = getcwd;
     $ct->_chdir($dest) || die "$0: Error: $dest: $!";
     $dest = getcwd;
@@ -777,7 +777,8 @@ sub reusemkdir {
     my ($self, $dref, $rref) = @_;
     my (%found, $reused, %dfound);
     my $snapview = $self->snapdest;
-    my $vt = ClearCase::Argv->lsvtree({autochomp=>1}, [qw(-a -s -nco)]);
+    my $vt = ClearCase::Argv->lsvtree({autochomp=>1, stderr=>0},
+				                             [qw(-a -s -nco)]);
     my $ds = ClearCase::Argv->desc({stderr=>1},[qw(-s)]);
     my $dm = ClearCase::Argv->desc([qw(-fmt %m)]);
     my $rm = ClearCase::Argv->rm;
@@ -1364,7 +1365,7 @@ sub cleanup {
     my $self = shift;
     my $mbase = $self->_mkbase;
     my $dad = dirname($mbase);
-    my $ct = $self->clone_ct({-autofail=>0});
+    my $ct = $self->clone_ct({autofail=>0});
     my @vp = $self->_lsprivate(1);
     for (sort {$b cmp $a} @vp) {
 	if (-d $_) {

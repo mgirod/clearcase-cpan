@@ -231,4 +231,7 @@ Revision history for Perl extension ClearCase::SyncTree.
 	- NOTE: all work from 0.48 to here courtesy of Marc Girod.
 
 0.55 Thu Dec  9 14:37:57 GMTST 2010
-        - fix to autofail cloning, especiallay in _lsprivate
+        - fix to autofail cloning, especially in _lsprivate
+
+0.56 Fri Dec 10 11:49:19 GMTST 2010
+        - removed spurious cleartool errors, mostly under Windows/Cygwin
