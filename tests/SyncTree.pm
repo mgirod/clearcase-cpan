@@ -537,8 +537,7 @@ sub ccsymlink {
 sub readcclink {
     my $dst = shift;
     my $ret = readlink $dst;
-    return $ret if $ret;
-    return '' unless MSWIN || CYGWIN;
+    return $ret if $ret || !(MSWIN || CYGWIN);
     my $ct = new ClearCase::Argv({autochomp=>1});
     $ret = $ct->ls($dst)->qx;
     return (($ret =~ s/^.*? --> (.*)$/$1/)? $ret : '');
@@ -1054,12 +1053,18 @@ sub add {
     }
 }
 
-# On UNIX, Cwd::abs_path strips the /view/$dstview prefix
+# Tried to use Cwd::abs_path, but it behaves differently on Cygwin and UNIX
 sub absdst {
     my ($self, $dir, $f) = @_;
-    use Cwd 'abs_path';
-    $f = abs_path(File::Spec->catfile($dir, $f));
-    return MSWIN||CYGWIN? $f : File::Spec->catfile('/view', $self->dstview.$f);
+    if ($f =~ /^\./) {
+	my $sep = qr{[/\\]};
+	my @d = split $sep, $dir;
+	while ($f =~ s/^(\.\.?$sep)//) {
+	    pop @d if $1 =~ /^\.{2}/;
+	}
+	$dir = join '/', @d;
+    }
+    return File::Spec->catfile($dir, $f);
 }
 
 sub modify {
@@ -1095,7 +1100,7 @@ sub modify {
 	        while (ccsymlink($dst1)) {
 		    my $tgt = readcclink $dst1;
 		    my $dir = dirname $dst1;
-		    $tgt = $self->absdst($dir, $tgt) if $tgt =~ m%^[^/\\]%;
+		    $tgt = $self->absdst($dir, $tgt) unless $tgt =~ m%^[/\\]%;
 		    if (-e $tgt) {
 			$dst1 = $tgt;
 		    } else {
@@ -1215,8 +1220,8 @@ sub label {
     return unless $lbtype;
     my $dbase = $self->dstbase;
     my $ct = $self->clone_ct({autochomp=>0});
-    my $ctq = $ct->clone({stdout=>0});
-    my $ctbool = $ctq->clone({autofail=>0, stderr=>0, autochomp=>0});
+    my $ctq = $self->clone_ct({stdout=>0});
+    my $ctbool = $self->clone_ct({autofail=>0, stderr=>0, autochomp=>0});
     my $dvob = $self->dstvob;
     my $locked;
     if ($ctbool->lstype(['-s'], "lbtype:$lbtype\@$dvob")->system) {
