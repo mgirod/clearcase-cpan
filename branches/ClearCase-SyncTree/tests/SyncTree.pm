@@ -812,7 +812,7 @@ sub reusemkdir {
 		my $d = $dref->{$dst} eq '.'? '' : $dref->{$dst} . '/';
 		$self->skimdir($dst, $d) if $self->remove;
 		my $cmp = $self->no_cmp ? undef : $self->cmp_func;
-		my @keys = $d? grep m%^\Q$d\E%, keys %{$self->{ST_ADD}}
+		my @keys = sort $d? grep m%^\Q$d\E%, keys %{$self->{ST_ADD}}
 		                                      : keys %{$self->{ST_ADD}};
 		for my $e (@keys) {
 		    my $edst = join '/', $self->dstbase, $e;
@@ -820,7 +820,7 @@ sub reusemkdir {
 		    pop @intdir;
 		    if (@intdir) {
 			my $dd = $self->dstbase;
-			my $pf = $d;
+			my $pf = '';
 			while (my $id = shift @intdir) {
 			    $dd = join '/', $dd, $id;
 			    $pf = $pf . $id . '/';
@@ -1183,13 +1183,12 @@ sub subtract {
     my $ct = $self->clone_ct;
     my %checkedout = map {$_ => 1} $self->_lsco;
     my @exfiles = @{$self->{ST_SUB}->{exfiles}};
-    my %dirs = %{$self->{ST_SUB}->{dirs}};
+    my %dirs = %{$self->{ST_SUB}->{dirs}}; # Dirs which existed originally
     for my $dad (map {dirname($_)} @exfiles) {
-	$self->branchco(1, $dad) if !$checkedout{$dad}++;
+	$self->branchco(1, $dad) unless $checkedout{$dad}++;
     }
-    my $r_cmnt = $self->comment;
-    # -force for checkedouts, in case reuse brought some hardlinks back
-    $ct->argv(qw(rmname -f), @{$r_cmnt}, @exfiles)->system if @exfiles;
+    # Will fail for checkedouts (all created in this session!) or unreachable
+    $ct->rm($self->comment, @exfiles)->system if @exfiles;
     my @exdirs;
     while (1) {
 	for (sort {$b cmp $a} keys %dirs) {
@@ -1207,9 +1206,9 @@ sub subtract {
 	    $self->branchco(1, $dad) if !$checkedout{$dad}++;
 	}
 	if (my @co = $ct->argv('lsco', [qw(-s -cvi -d)], @exdirs)->qx) {
-	    $ct->argv('ci', $r_cmnt, @co)->system;
+	    $ct->ci($self->comment, @co)->system;
 	}
-	$ct->argv('rmname', $r_cmnt, @exdirs)->system;
+	$ct->rmname($self->comment, @exdirs)->system;
 	@exdirs = ();
     }
 }
