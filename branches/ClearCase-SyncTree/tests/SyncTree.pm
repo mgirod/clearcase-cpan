@@ -1182,13 +1182,18 @@ sub subtract {
     return unless $self->{ST_SUB};
     my $ct = $self->clone_ct;
     my %checkedout = map {$_ => 1} $self->_lsco;
-    my @exfiles = @{$self->{ST_SUB}->{exfiles}};
-    my %dirs = %{$self->{ST_SUB}->{dirs}}; # Dirs which existed originally
+    my (@exfiles, $flt, %seen);
+    for (sort @{$self->{ST_SUB}->{exfiles}}) {
+	next if $flt && /^$flt/; # ignore entries under removed dirs
+	push @exfiles, $_ unless $seen{$_}++;
+	$flt = $_ if -d $_;
+    }
     for my $dad (map {dirname($_)} @exfiles) {
 	$self->branchco(1, $dad) unless $checkedout{$dad}++;
     }
     # Will fail for checkedouts (all created in this session!) or unreachable
     $ct->rm($self->comment, @exfiles)->system if @exfiles;
+    my %dirs = %{$self->{ST_SUB}->{dirs}}; # Dirs which existed originally
     my @exdirs;
     while (1) {
 	for (sort {$b cmp $a} keys %dirs) {
