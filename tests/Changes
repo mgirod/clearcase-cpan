@@ -239,3 +239,4 @@ Revision history for Perl extension ClearCase::SyncTree.
 	- absdst doesn't use Cwd::abs_path: behaves differently on UNIX and Cygwin
 	- use of ClearCase::Argv::clone disturbs the ipc reference count
 	- fixed bug in reusemkdir, which resulted in wrong removals
+	- skip attempting to remove entries below removed dirs, or the same twice
