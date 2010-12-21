@@ -1330,7 +1330,9 @@ sub checkin {
     my @todo = grep {m%^\Q$mbase%} keys %checkedout;
     @todo = grep {!exists($self->{ST_PRE}->{$_})} @todo if $self->ignore_co;
     unshift(@todo, $dad) if $checkedout{$dad};
-    $ct->argv('ci', [@cmnt, '-ide', @ptime], sort @todo)->system if @todo;
+    # Sort reverse in case the checked in versions are not selected by the view
+    $ct->argv('ci', [@cmnt, '-ide', @ptime], sort {$b cmp $a} @todo)->system
+                                                                      if @todo;
     # Fix the protections of the target files if requested. Unix files
     # get careful consideration of bitmasks etc; Windows files just get
     # promoted to a+x if their extension looks executable.

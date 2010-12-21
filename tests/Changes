@@ -233,10 +233,11 @@ Revision history for Perl extension ClearCase::SyncTree.
 0.55 Thu Dec  9 14:37:57 GMTST 2010
         - fix to autofail cloning, especially in _lsprivate
 
-0.56 Wed Dec 15 12:43:38 GMT 2010
+0.56 Tue Dec 21 17:53:06 GMTST 2010
         - removed spurious cleartool errors, mostly under Windows/Cygwin
 	- fixed various internal bugs: readcclink was altering its call context
 	- absdst doesn't use Cwd::abs_path: behaves differently on UNIX and Cygwin
 	- use of ClearCase::Argv::clone disturbs the ipc reference count
 	- fixed bug in reusemkdir, which resulted in wrong removals
 	- skip attempting to remove entries below removed dirs, or the same twice
+	- checkin in reverse sort order, to cope with 'not selected by view'
