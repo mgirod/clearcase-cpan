@@ -619,7 +619,7 @@ sub analyze {
     # Last, check for subtractions but only if asked - it's potentially
     # expensive and error-prone.
     return unless $self->remove;
-    my(%dirs, %files, @xfiles);
+    my(%dirs, %files, %xfiles);
     my $wanted = sub {
 	my $path = $File::Find::name;
 	return if $path eq $dbase;
@@ -643,9 +643,9 @@ sub analyze {
     }
     for (sort keys %files) {
 	next if $self->{ST_SRCMAP}->{$_} && !$self->{ST_SRCMAP}->{$_}->{dst};
-	push(@xfiles, $files{$_}) if !$dst2src{$_};
+	$xfiles{$files{$_}}++ if !$dst2src{$_};
     }
-    $self->{ST_SUB}->{exfiles} = \@xfiles;
+    $self->{ST_SUB}->{exfiles} = \%xfiles;
     $self->{ST_SUB}->{dirs} = \%dirs;
 }
 
@@ -670,7 +670,7 @@ sub preview {
 	}
     }
     if ($self->remove && $self->{ST_SUB}) {
-	my @exfiles = @{$self->{ST_SUB}->{exfiles}};
+	my @exfiles = sort keys %{$self->{ST_SUB}->{exfiles}};
 	$subs = @exfiles;
 	print "Subtracting $subs elements:\n" if $subs;
 	for (@exfiles) {
@@ -768,7 +768,7 @@ sub skimdir {
     my %ok = map {$_ => 1} grep s%$flt%$1%, keys %{$self->{ST_SRCMAP}};
     for (@f) {
 	my $f = $pfx . $_;
-	push @{$self->{ST_SUB}->{exfiles}}, join('/', $dst, $_) unless $ok{$f};
+	$self->{ST_SUB}->{exfiles}->{join('/', $dst, $_)}++ unless $ok{$f};
     }
 }
 
@@ -1132,6 +1132,7 @@ sub modify {
 		    $self->branchco(1, $dir1)
 		              unless ($dir eq $dir1) || $lsco->args($dir1)->qx;
 		    $self->clone_ct->mv($dst1, $dst)->system;
+		    delete $self->{ST_SUB}->{exfiles}->{$dst1}; #done already
 		    if (!$self->_needs_update($src, $dst, $comparator)) {
 			delete $self->{ST_MOD}->{$key};
 			push @del, $key;
@@ -1183,7 +1184,7 @@ sub subtract {
     my $ct = $self->clone_ct;
     my %checkedout = map {$_ => 1} $self->_lsco;
     my (@exfiles, $flt, %seen);
-    for (sort @{$self->{ST_SUB}->{exfiles}}) {
+    for (sort keys %{$self->{ST_SUB}->{exfiles}}) {
 	next if $flt && /^$flt/; # ignore entries under removed dirs
 	push @exfiles, $_ unless $seen{$_}++;
 	$flt = $_ if -d $_;
@@ -1287,7 +1288,7 @@ sub get_modhash {
 sub get_sublist {
     my $self = shift;
     if ($self->{ST_SUB}) {
-	return @{$self->{ST_SUB}->{exfiles}};
+	return sort keys %{$self->{ST_SUB}->{exfiles}};
     } else {
 	return ();
     }
