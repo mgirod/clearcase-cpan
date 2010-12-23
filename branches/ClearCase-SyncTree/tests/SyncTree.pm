@@ -1228,7 +1228,7 @@ sub label {
     my $dbase = $self->dstbase;
     my $ct = $self->clone_ct({autochomp=>0});
     my $ctq = $self->clone_ct({stdout=>0});
-    my $ctbool = $self->clone_ct({autofail=>0, stderr=>0, autochomp=>0});
+    my $ctbool = $self->clone_ct({autofail=>0, stdout=>0, stderr=>0});
     my $dvob = $self->dstvob;
     my $locked;
     if ($ctbool->lstype(['-s'], "lbtype:$lbtype\@$dvob")->system) {
