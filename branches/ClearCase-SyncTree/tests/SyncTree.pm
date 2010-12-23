@@ -540,6 +540,7 @@ sub readcclink {
     return $ret if $ret || !(MSWIN || CYGWIN);
     my $ct = new ClearCase::Argv({autochomp=>1});
     $ret = $ct->ls($dst)->qx;
+    $ret =~ s%\\%/%g if MSWIN;
     return (($ret =~ s/^.*? --> (.*)$/$1/)? $ret : '');
 }
 
@@ -1101,6 +1102,7 @@ sub modify {
 		    my $tgt = readcclink $dst1;
 		    my $dir = dirname $dst1;
 		    $tgt = $self->absdst($dir, $tgt) unless $tgt =~ m%^[/\\]%;
+		    $tgt =~ s%\\%/%g if MSWIN;
 		    if (-e $tgt) {
 			$dst1 = $tgt;
 		    } else {
