@@ -2,9 +2,9 @@ package ClearCase::Argv;
 
 $VERSION = '1.50';
 
-use Argv 1.23;
+use Argv 1.26;
 
-use constant MSWIN	=> $^O =~ /MSWin32|Windows_NT/i ? 1 : 0;
+use constant MSWIN	=> $^O =~ /MSWin|Windows_NT/i ? 1 : 0;
 use constant CYGWIN	=> $^O =~ /cygwin/i ? 1 : 0;
 
 my $NUL = MSWIN ? 'NUL' : '/dev/null';
@@ -1176,7 +1176,7 @@ on Windows yet (where the output prior to the last change seemed ok...)
 
 Argv uses the first-found of three different modules for cloning, and
 Marc Girod suspects that only the first one (Clone, in recent versions)
-performs correctly with GLOB objects... Work-around in place.
+performs correctly with GLOB objects... work-around in place.
 
 The string 'cleartool' is hard-coded in many places, making it hard to
 implement additional support for multitool commands.
@@ -1199,12 +1199,11 @@ Some multiline commands work in the fork mode, but not in the ipc one.
 
 E.g. S<C<< $ct->des(['-fmt', "%[owner]p\n"], 'vob:.')->system >>>
 
-This example is easily re-rewritten to work in both modes as either
-of:
+This example is easily rewritten to work in both modes as either:
 
-S<C<< $ct->des(['-fmt', '%[owner]p\n'], 'vob:.')->system >>>
+    S<C<< $ct->des(['-fmt', '%[owner]p\n'], 'vob:.')->system >>>
 
-S<C<< $ct->des([qw(-fmt %[owner]p\n)], 'vob:.')->system >>>
+    S<C<< $ct->des([qw(-fmt %[owner]p\n)], 'vob:.')->system >>>
 
 =head1 PORTABILITY
 
