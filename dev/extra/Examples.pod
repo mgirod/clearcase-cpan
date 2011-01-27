@@ -1,0 +1,179 @@
+=head1 NAME
+
+Examples
+
+=head2 APPLYING INCREMENTAL LABELS
+
+=head3 Create a family label type
+
+ $ ct mklbtype -nc -fam TTT
+ Created label type "TTT_1.00".
+ Created label type "TTT".
+ Created attribute type "RmTTT".
+
+Note that this creates:
+
+=over 2
+
+=item a I<floating> type: TTT
+
+=item an equivalent I<fixed> type: TTT_1.00
+
+=item an attribute type dedicated to the family (see: rmlabel below)
+
+=back
+
+=head3 Apply the base labels
+
+ $ ct mklabel -rec TTT .
+ Created label "TTT_1.00" on "." version "/main/1".
+ Created label "TTT" on "." version "/main/1".
+ ...
+
+The labels are applied in pairs: fixed, and floating.
+The first application is thus significantly slower than usual (~4 times)
+
+=head3 Lock the label types
+
+ $ ct lock lbtype:TTT
+ Locked label type "TTT".
+ Locked label type "TTT_1.00".
+
+This is not mandatory of course, but it is a good idea, and it is supported.
+The fixed type should not be moved anymore, so why not locking it?
+
+The floating label will get unlocked as needed, but locking it
+communicates its status to others, and leaves a timestamp (the latest
+one is not scrubbed).
+
+=head3 Increment the label type
+
+ $ ct mklbtype -nc -inc TTT
+ Created label type "TTT_1.01".
+ Locked label type "TTT_1.00".
+
+A new incremental fixed label is created.
+It gets linked to the previous, which is thus unlocked, and locked back.
+
+=head3 Make a change, and label incrementally
+
+ $ ct co -nc a/foo
+ Created branch "mg" from "a/foo" version "/main/0".
+ Checked out "a/foo" from version "/main/mg/0".
+ $ ct ci -nc -ide a/foo
+ Checked in "a/foo" version "/main/mg/1".
+ $ ct mklabel -over mg TTT .
+ Created label "TTT_1.01" on "a/foo" version "/main/mg/1".
+ Moved label "TTT" on "a/foo" from version "/main/1" to "/main/mg/1".
+
+We use a I<BranchOff> setting in our config spec, which results in the
+new version being created in a new I<mg> branch, spawn from /main/0
+(but the continuity of the genealogy is preserved, see later).
+
+We use the I<-over mg> option as a way to optimize the labeling speed.
+Note that it also restricts the application to checked-in versions.
+
+Labeling recursively would display the same incremental behaviour,
+possibly applying labels to checked-out versions.
+
+=head3 Check the results so far
+
+ $ ct lsgen a/foo a
+ a/foo@@/main/mg/1 (TTT, TTT_1.01)
+   a/foo@@/main/1 (TTT_1.00)
+ a@@/main/1 (TTT, TTT_1.00)
+
+We examine two objects, with the I<lsgenealogy> command.
+
+This one navigates I<Merge> hyperlink to present the recent history of
+contribution to the selected versions.
+
+We note that the floating label designates a (full) baseline, whereas
+the fixed labels are I<sparse> and designate thus the successive
+change sets.
+
+=head3 Increment again, to remove a label
+
+ $ ct mklbtype -nc inc TTT
+ Unlocked label type "TTT".
+ Unlocked label type "TTT_1.01".
+ Created label type "TTT_1.02".
+ Locked label type "TTT_1.01".
+ $ ct rmlabel TTT a/foo
+ Removed label "TTT" from "a/foo" version "/main/mg/1".
+
+What we want to demonstrate now is a way to restore a past
+configuration.  For this we shall still create one version and apply
+one more increment, in order to build up enough of history.
+
+ $ ct lock lbtype:TTT
+ Locked label type "TTT".
+ Locked label type "TTT_1.02".
+ $ ct co -nc a/foo
+ Checked out "a/foo" from version "/main/mg/1".
+ $ ct ci -nc -ide a/foo
+ Checked in "a/foo" version "/main/mg/2".
+ $ ct mklbtype -nc inc TTT
+ Unlocked label type "TTT".
+ Unlocked label type "TTT_1.02".
+ Created label type "TTT_1.03".
+ Locked label type "TTT_1.02".
+ $ ct mklabel -over mg TTT .
+ Created label "TTT_1.03" on "a/foo" version "/main/mg/2".
+ Moved label "TTT" on "a/foo" from version "/main/mg/1" to "/main/mg/2".
+
+Note that we didn't need to create a new branch this time.
+
+=head3 Set a view equivalent to TTT at 1.01
+
+ $ ct mkview -tag mgTTT -stg -auto
+ ...
+ $ ct catcs > /tmp/cs
+ $ perl -pi -le 'print q(##:IncrementalLabels: TTT_1.01@/vob/test) if $i++' /tmp/cs
+ $ ct setcs -tag mgTTT /tmp/cs
+ $ ct setview mgTTT
+ $ ct ls -d a/foo a
+ a/foo@@/main/mg/1                Rule: {lbtype(TTT_1.01)&&!attr_sub(RmTTT,<=,1.01)}
+ a                                Rule: {lbtype(TTT_1.00)&&!attr_sub(RmTTT,<=,1.01)}
+
+We added to the config spec before setting it a directive instructing
+to compute from the label type family a set of rules equivalent to the
+I<TTT> floating label, as its equivalent fixed type was TTT_1.01.
+
+We checked that these rules selected the correct versions of our two
+reference elements (the I<foo> file, and the I<a> directory).
+
+The directive was actually converted as a inclusion of a new file:
+
+ $ ct catcs | head -1
+ include /cc/views/mg/mgTTT.vws/TTT_1.01
+ $ cat /cc/views/mg/mgTTT.vws/TTT_1.01
+ element * "{lbtype(TTT_1.01)&&!attr_sub(RmTTT,<=,1.01)}"
+ element * "{lbtype(TTT_1.00)&&!attr_sub(RmTTT,<=,1.01)}"
+
+=head3 Set views equivalent to 1.02 and 1.03 stages of TTT
+
+ $ perl -pi -le 'print q(##:IncrementalLabels: TTT_1.02@/vob/test) if $i++' /tmp/cs
+ $ ct setcs -tag mgTTT /tmp/cs
+ $ ct setview mgTTT
+ $ ct ls -d a/foo a
+ a/foo@@/main/0                   Rule: /main/0
+ a                                Rule: {lbtype(TTT_1.00)&&!attr_sub(RmTTT,<=,1.02)}
+ $ perl -pi -le 'print q(##:IncrementalLabels: TTT_1.03@/vob/test) if $i++' /tmp/cs
+ $ ct setcs -tag mgTTT /tmp/cs
+ $ ct setview mgTTT
+ $ ct ls -d a/foo a
+ a/foo@@/main/mg/2                Rule: {lbtype(TTT_1.03)&&!attr_sub(RmTTT,<=,1.03)}
+ a                                Rule: {lbtype(TTT_1.00)&&!attr_sub(RmTTT,<=,1.03)}
+
+We can now see the meaning of I<RmTTT>, and see how attributes of this
+type were added to the different versions of the tree:
+
+ $ ct lsvtree -s a/foo | perl -ple 's/(.*)/des -fmt "\%Vn \%Nl \%Na\\n" $1/' | cleartool
+ /main
+ /main/0
+ /main/1 TTT_1.00 RmTTT=1.02
+ /main/mg/1 TTT_1.01 RmTTT=1.02
+ /main/mg/2 TTT TTT_1.03
+
+This command shows the versions, with the labels, and the attributes they bear.
