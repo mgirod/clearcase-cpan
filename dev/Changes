@@ -131,3 +131,9 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- pod indentation
 	- rmtype: remove whole label family, including attribute type
 	- setcs: fix to support all default options
+
+0.23 Thu Jan 27 14:17:36 GMTST 2011
+        - bugfix: ensure ordinary types
+	- bugfix: mklbtype -rep -fam creates a Rm attype
+	- fixed missing feature: mklbtype -fam after archiving, creates an EcInc
+	- rmlabel adds the attribute on all versions labelled with fixed labels

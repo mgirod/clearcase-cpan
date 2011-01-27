@@ -1,6 +1,6 @@
 package ClearCase::Wrapper::MGi;
 
-$VERSION = '0.22';
+$VERSION = '0.23';
 
 use warnings;
 use strict;
@@ -287,17 +287,14 @@ sub _Ensuretypes($@) {
   my ($glb, @vob) = @_;
   my %cmt = ($eqhl => q(Equivalent increment),
 	     $prhl => q(Previous increment in a type chain));
-  my $silent = $ct->clone;
-  $silent->stdout(0);
-  $silent->stderr(0);
-  my $gflg = $glb? '-glo' : '';
+  my $silent = $ct->clone({stdout=>0, stderr=>0});
+  my $die = $ct->clone({autofail=>1});
+  my $gflg = $glb? '-glo' : '-ord';
   for my $t ($eqhl, $prhl) {
     for my $v (@vob) {
       my $t2 = "$t\@$v";
-      if ($silent->argv(qw(des -s), "hltype:$t2")->system) {
-	$ct->argv(qw(mkhltype -shared -c), $cmt{$t}, $gflg, $t2)->system
-	  and die;
-      }
+      $die->mkhltype([qw(-shared -c), $cmt{$t}, $gflg], $t2)->system
+	if $silent->des(['-s'], "hltype:$t2")->system;
     }
   }
 }
@@ -997,11 +994,10 @@ sub _GenMkTypeSub {
   return sub {
     my ($ntype, @cmt) = @_;
     my $rep = $ntype->{rep};
-    $ct = ClearCase::Argv->new({autochomp=>1});
+    $ct = new ClearCase::Argv({autochomp=>1});
     my @args = $ntype->args;
     my %opt = %{$ntype->{fopts}};
-    my $silent = $ct->clone;
-    $silent->stdout(0);
+    my $silent = $ct->clone({stdout=>0});
     if ((grep /^-glo/, $ntype->opts) or ($ntype->flag('global') and !%opt)) {
       push @cmt, '-rep' if $rep;
       $ntype->opts(@cmt, $ntype->opts);
@@ -1042,9 +1038,15 @@ sub _GenMkTypeSub {
 	exit 1 unless @args;
 	if ($opt{family}) {
 	  @a = ();
+	  my $gflg = (grep /^-glo/, $ntype->opts)? '-glo' : '-ord';
 	  foreach my $t (@args) {
 	    if ($ct->argv(qw(des -s -ahl), $eqhl, $t)->stderr(0)->qx) {
 	      warn Msg('E', "$t is already a family type\n");
+	      if ($t =~ s/^lbtype:(.*)$/$1/) {
+		my $att = "Rm$t";
+		$ct->argv(qw(mkattype -vtype real -c), q(Deleted in increment),
+			  $gflg, "$att")->stderr(0)->system;
+	      }
 	    } else {
 	      push @a, $t;
 	    }
@@ -1064,6 +1066,11 @@ sub _GenMkTypeSub {
 	    if (defined($pair{$_})) {
 	      my $inc = "$type:$pair{$_}";
 	      $silent->argv('mkhlink', $eqhl, "$type:$_", $inc)->system;
+	      if ($type eq 'lbtype') {
+		my $att = "Rm$_";
+		$ct->argv(qw(mkattype -vtype real -c), q(Deleted in increment),
+			  $gflg, "$att")->stderr(0)->system;
+	      }
 	    }
 	  } keys %pair;
 	} elsif ($opt{archive}) {
@@ -1125,6 +1132,13 @@ sub _GenMkTypeSub {
 		  $ct->argv('rename', $t0, "lbtype:$t")->stderr(0)->system
 		    and die Msg('E', qq(Failed to restore "$t0" into "$t".));
 		  push @skip, $t;
+		  if (my ($p) = grep s/^-> (.*)$/$1/,
+		      $ct->des([qw(-s -ahl), $prhl], "lbtype:$t")->qx) {
+		    ($pair{$t}) = grep s/^-> lbtype:(.*)$/$1/,
+		      $ct->des([qw(-s -ahl), $eqhl], $p)->qx;
+		  } else {
+		    $pair{$t} = "${pfx}_1.00$sfx";
+		  }
 		} else {
 		  $pair{$t} = "${pfx}_1.00$sfx";
 		}
@@ -1156,7 +1170,7 @@ sub _GenMkTypeSub {
 	    if (defined($pair{$_})) {
 	      my $inc = "$type:$pair{$_}";
 	      $silent->argv('mkhlink', $eqhl, "$type:$_", $inc)->system;
-	      next if $ntype eq 'mkbrtype';
+	      next if $type eq 'brtype';
 	      my $att = "Rm$_";
 	      $ct->argv(qw(mkattype -vtype real -c), q(Deleted in increment),
 			$gflg, "$att")->stderr(0)->system;
@@ -1890,18 +1904,26 @@ sub rmlabel {
     push @opcm, @cmt;
     my $rc = 0;
     for (@elems) {
+      my $e = $ct->des([qw(-s)], $_)->qx; #in case passed by the label: f@@/L
       $rml->opts(@opcm);
-      $rml->args($lbtype, $_);
+      $rml->args($lbtype, $e);
       my $r1 = $rml->system;
       if ($et) {
 	my $att = "Rm$lbtype";
 	my $val = $et;
 	$val =~ s/^.*_//;
-	$ct->argv('mkattr', $att, $val, $_)->system
-	  unless $r1 or $ct->argv(qw(des -fmt), qq(\%\[$att\]NSa), $_)->qx;
+	if (!$r1) { #floating successfully removed
+	  my ($f) = ($e =~ /(.*)@@.*$/);
+	  my @eqlst = grep s/(.*)/lbtype($1)/, _EqLbTypeList($lbtype);
+	  next unless @eqlst;
+	  my $query = (@eqlst==1? $eqlst[0] : '(' . join('||', @eqlst) . ')')
+	    . "&&!attype($att)";
+	  my @v = $ct->find($f, qw(-d -ver), $query, '-print')->qx;
+	  $ct->mkattr([$att, $val], @v)->stdout(0)->system if @v;
+	}
 	$rml->opts(@opts);
-	$rml->args($et, $_);
-	$r1 |= $rml->system;
+	$rml->args($et, $e);
+	$r1 |= $rml->stderr(0)->system;
       }
       $rc |= $r1;
     }
@@ -2160,7 +2182,7 @@ sub setcs {
   close $fh;
   exit $setcs->system unless $incfam;
   my ($lbtype, $vob) = $incfam =~ /^(?:lbtype:)?(.*?)\@(.*)$/;
-  die Msg('E', qq(Failed to parse the vob from "incfam\n")) unless $vob;
+  die Msg('E', qq(Failed to parse the vob from "$incfam"\n)) unless $vob;
   my $rmat = 'Rm' . ($lbtype =~ /^(.*)_/ ? $1 : $lbtype);
   my @eqlst = _EqLbTypeList($lbtype);
   my $nr = $1 if $eqlst[0] =~ /^.*_(\d+\.\d+)$/;
