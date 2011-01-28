@@ -137,3 +137,4 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- bugfix: mklbtype -rep -fam creates a Rm attype
 	- fixed missing feature: mklbtype -fam after archiving, creates an EcInc
 	- rmlabel adds the attribute on all versions labelled with fixed labels
+	- added extra/Examples.pod
