@@ -138,3 +138,10 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- fixed missing feature: mklbtype -fam after archiving, creates an EcInc
 	- rmlabel adds the attribute on all versions labelled with fixed labels
 	- added extra/Examples.pod
+
+0.24 Wed Feb  2 18:34:46 GMTST 2011
+        - extra/Examples.pod: fixes and additions
+	- des: added from DSB.pm, adapted to genealogy (possibly multiple parents)
+	- des -family lbtype:XXX
+	- rmtype: fix for family types
+	- mklbtype -arc locks the types archived
