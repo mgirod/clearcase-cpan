@@ -14,7 +14,7 @@ Examples
  element * BL
  element /main/0
 
-Most of this is standard. Let's read it bottom up:
+Most of this is standard. Let's read it from the bottom up:
 
 =over
 
@@ -34,18 +34,37 @@ Most of this is standard. Let's read it bottom up:
 
 =back
 
+What these rules describe is a process by which the user:
+
+=over 2
+
+=item * Always and exclusively edits files in her own branches
+
+=item * Applies labels as she pleases, either to communicate of her
+progress to others while offering consistent change sets, or just to
+keep save points for herself
+
+=item * Delivers by moving a baseline label which she uses herself
+(we'll see later how she ensures that she doesn't let her previous
+deliveries hide common changes)
+
+=item * May at any time merge I<home>, i.e. I<rebase> the versions she
+is actively working on in her branches.
+
+=back
+
 One of our goals will be to make this config spec as stable as
 possible, i.e. to manage changes by means not requiring us to modify
 it.
-A good reason for that is that it is not versioned.
+A good reason for that is that config specs are not versioned.
 
 A second goal is to systematically branch out for making new versions
 (unless already on a I<tt> branch). The rationale is that this is
-always possible, independent from mastership or checkout state.
+always possible, independent from mastership or checked out state.
 
 A third goal is to avoid cascading, thus to always branch from the
-root branch (usually I<main>. This must be explicitly enabled, and is
-thus governed by our strange setting on line 1.
+root branch (usually I<main>). This must be explicitly enabled, and is
+thus governed by our special setting on line 1.
 
 =head3 First Use: Nothing Special
 
@@ -69,20 +88,20 @@ thus governed by our strange setting on line 1.
 
 =head3 Create a family label type
 
- $ ct mklbtype -nc -fam TTT
+ $ ct mklbtype -c 'Family demo' -fam TTT
  Created label type "TTT_1.00".
  Created label type "TTT".
  Created attribute type "RmTTT".
 
 Note that this creates:
 
-=over 2
+=over
 
-=item a I<floating> type: TTT
+=item A I<floating> type: TTT
 
-=item an equivalent I<fixed> type: TTT_1.00
+=item An equivalent I<fixed> type: TTT_1.00
 
-=item an attribute type dedicated to the family (see: rmlabel below)
+=item An attribute type dedicated to the family (see: I<rmlabel> below).
 
 =back
 
@@ -97,7 +116,9 @@ Note that this creates:
  Created label "TTT" on "a/foo" version "/main/tt/1".
 
 The labels are applied in pairs: fixed, and floating.
-The first application is thus significantly slower than usual (~4 times)
+The first application is thus significantly slower than usual (~4 times),
+but this impact is typically negligible, on an initial tree with only
+few elements.
 
 =head3 Lock the label types
 
@@ -110,18 +131,19 @@ The fixed type should not be moved anymore, so why not locking it?
 
 The floating label will get unlocked as needed, but locking it
 communicates its state to others, and leaves a timestamp (the latest
-one is not scrubbed).
+one does not get scrubbed).
 
 =head3 Increment the label type
 
- $ ct mklbtype -nc -inc TTT
+ $ ct mklbtype -c 'Increment demo' -inc TTT
  Unlocked label type "TTT".
  Unlocked label type "TTT_1.00".
  Created label type "TTT_1.01".
  Locked label type "TTT_1.00".
 
 A new incremental fixed label is created.
-It gets linked to the previous, which is thus unlocked, and locked back.
+It gets linked to the previous one, which is thus unlocked,
+and locked back.
 
 =head3 Make a change, and label incrementally
 
@@ -148,8 +170,8 @@ possibly applying labels to checked-out versions.
 
 We examine two objects, with the I<lsgenealogy> command.
 
-This one navigates I<Merge> hyperlink to present the recent history of
-contribution to the selected versions.
+This one navigates I<Merge> hyperlinks to present the recent history
+of contribution to the selected versions.
 
 We note that the floating label designates a (full) baseline, whereas
 the fixed labels are I<sparse> and designate thus the successive
@@ -157,7 +179,7 @@ change sets.
 
 =head3 Increment again, to remove a label
 
- $ ct mklbtype -nc -inc TTT
+ $ ct mklbtype -c 'Remove label' -inc TTT
  Created label type "TTT_1.02".
  $ ct rmlabel TTT a/foo
  Removed label "TTT" from "a/foo" version "/main/tt/2".
@@ -170,17 +192,18 @@ one more increment, in order to build up enough of history.
  Checked out "a/foo" from version "/main/tt/2".
  $ ct ci -nc -ide a/foo
  Checked in "a/foo" version "/main/tt/3".
- $ ct mklbtype -nc -inc TTT
+ $ ct mklbtype -c 'Restore old config' -inc TTT
  Created label type "TTT_1.03".
  $ ct mklabel -over tt TTT .
  Created label "TTT_1.03" on "a/foo" version "/main/tt/3".
  Created label "TTT" on "./a/foo" version "/main/tt/3".
 
-Note that the floating label was created, not moved, since we had removed it.
+Note that the floating label was created, not moved, since we had
+removed it previously.
 
-=head2 ARCHIVING BRANCHES AFTER LABELING
+=head2 ARCHIVING BRANCHES AND LABELS
 
-=head3 Archive to deliver
+=head3 Archive to label
 
 Currently, our config spec selects the version of I<foo> with our
 I<tt> branch, i.e. doesn't use our labels.
@@ -196,13 +219,18 @@ Let's change this:
 
 Now we are using our label, placing ourselves in the same situation as
 anybody else who would want to share our code in a collaborative
-manner. Only now did we perform a (still only intermediate) delivery!
+manner.
+
+This step has admittedly only a temporary effect, and thus doesn't
+change much: it is only a publication but not yet a delivery. It may
+help us to narrow down the change set on which we are actively working
+without losing sight that we did not yet deliver our prior results.
 
 Note how we didn't need to change our config spec, but only to reinterpret it.
 
 Note finally how our config spec preserved the continuity of the selection.
 
-=head3 Checking out after delivery
+=head3 Checking out after archiving
 
  $ ct co -nc a/foo
  Created branch "tt" from "a/foo" version "/main/0".
@@ -217,7 +245,72 @@ Note finally how our config spec preserved the continuity of the selection.
 
 Now, we really experimented our cascade prevention, i.e. branching off
 root.  The continuity of the data is preserved, as well, using the
-I<lsgenealogy> tool, this of the version history.
+I<lsgenealogy> tool, as this of the version history.
+
+=head3 Delivery
+
+We could deliver directly from branches, assuming all the changes
+would still be in branches of the same type. If this is not the case,
+we'd rather consolidate our results first, using labels.
+We may start with a I<home merge> (aka I<rebase>):
+
+ $ ct findmerge . -fve BL -merge
+
+Assuming this confirmed that no delivery had taken place which we
+wouldn't have already taken into consideration, we can now label and
+archive the branches, skipping for now the outputs of the commands:
+
+ $ ct mklbtype -c Consolidation -inc TTT
+ $ ct mklabel -over tt TTT
+ $ ct mkbrtype -nc -arc tt
+
+Now the delivery, from the TTT labels:
+
+ $ ct mklbtype -nc -inc BL
+ $ ct mklabel -over TTT BL
+ $ ct mklbtype -nc -arc TTT
+ Renamed label type from "TTT" to "TTT-001".
+ Created label type "TTT".
+ Renamed label type from "TTT" to "TTT_0".
+ Locked label type "TTT_0".
+ Locked label type "TTT-001".
+ Locked label type "TTT_1.00".
+ $ ct lock lbtype:BL
+
+Two interesting points here (beyond the process itself):
+
+=over 2
+
+=item * The fact that we could unlock, and lock back the I<BL> type,
+although we do not own it: this is an extension of the wrapper (the
+events are duly logged) to allow group members (configurable) to
+lock/unlock each other's types
+
+=item * The way archiving label types differed from archiving branch types:
+
+=over 2
+
+=item * As for branch types, the label type is renamed I<away> from
+matching anything via the config spec
+
+=item * Again similarily, a new type is created but contrarily to the
+case of branch types, this one is not left in the open, but I<hidden>
+away.
+
+=back
+
+=back
+
+The new hidden type keeps track of the state of the family (what would
+the next increment be), and it would be resurrected by a next
+I<mklbtype -fam> command.
+
+One only creates a label type when one intends to use it
+I<explicitly>, whereas a brtype is there just in case, to be used
+I<implicitly> in a I<checkout>.
+
+Anyway, the result of the delivery is that we are using everything by
+the I<BL> labels.
 
 =head2 REPRODUCING A PAST CONFIGURATION
 
@@ -226,16 +319,31 @@ I<lsgenealogy> tool, this of the version history.
  $ ct mkview -tag ttTTT -stg -auto
  ...
  $ ct catcs > /tmp/cs
- $ perl -pi -le 'print q(##:IncrementalLabels: TTT_1.01@/vob/test) if $.==1' /tmp/cs
+ $ perl -pi -le 's%^el.* TTT$%##:IncrementalLabels: TTT_1.01@/vob/test%' /tmp/cs
+ $ perl -ni -le 'print unless m%^el.*/tt/LATEST$%' /tmp/cs
  $ ct setcs -tag ttTTT /tmp/cs
  $ ct setview ttTTT
  $ ct ls -d a/foo a
  a/foo@@/main/tt-001/2            Rule: {lbtype(TTT_1.01)&&!attr_sub(RmTTT,<=,1.01)}
  a@@/main/tt-001/1                Rule: {lbtype(TTT_1.00)&&!attr_sub(RmTTT,<=,1.01)}
 
-We added to the config spec before setting it a directive instructing
-to compute from the label type family a set of rules equivalent to the
-I<TTT> floating label, as its equivalent fixed type was TTT_1.01.
+We modified the config spec, by saving it to a file, editing this one,
+and setting the config spec back from the modified file.
+
+We made two modifications:
+
+=over 2
+
+=item * We replaced the I<TTT> rule (hence preserving the order of the
+rules) a directive instructing to compute, from the label type family,
+a set of rules equivalent to the I<TTT> floating label, as it was when
+its equivalent fixed type was TTT_1.01
+
+=item * We removed the rule based on I<tt> branches, as this would
+conflict with the intention of selected only versions labeled at the
+time.
+
+=back
 
 We checked that these rules selected the correct versions of our two
 reference elements (the I<foo> file, and the I<a> directory).
@@ -253,16 +361,6 @@ The directive was actually converted as a inclusion of a new file:
  $ perl -pi -e 's/TTT_1.01/TTT_1.02/ if $.==1' /tmp/cs
  $ ct setcs -tag ttTTT /tmp/cs
  $ ct setview ttTTT
- $ ct ls -d a/foo a
- a/foo@@/main/tt/1                Rule: .../tt/LATEST
- a@@/main/tt-001/1                Rule: {lbtype(TTT_1.00)&&!attr_sub(RmTTT,<=,1.02)}
-
-The first selection is unfortunate and reminds us that we must remove
-the rules based on I<tt> branches and I<TTT> labels from config specs
-equivalent to fixed baselines!
-
- $ perl -ni -e 'print unless m%(/tt/LATEST|TTT)$%' /tmp/cs
- $ ct setcs /tmp/cs
  $ ct ls -d a/foo a
  a/foo@@/main/0                   Rule: /main/0 [-mkbranch tt]
  a@@/main/tt-001/1                Rule: {lbtype(TTT_1.00)&&!attr_sub(RmTTT,<=,1.02)}
@@ -282,7 +380,28 @@ type were added to the different versions of the tree:
  /main/tt-001/1 TTT_1.00 RmTTT=1.02
  /main/tt-001/2 TTT_1.01 RmTTT=1.02
  /main/tt-001/3 TTT TTT_1.03
- /main/tt
- /main/tt/1
+ /main/tt-002
+ /main/tt-002/1 BL BL_2.13 TTT-001 TTT_1.04
 
 This command shows the versions, with the labels, and the attributes they bear.
+And of course (but not showing the attributes):
+
+ $ ct lsgen foo
+ foo@@/main/tt-002/1 (BL, BL_2.13, TTT-001, TTT_1.04)
+  foo@@/main/tt-001/3 (TTT_1.03)
+   foo@@/main/tt-001/2 (TTT_1.01)
+    foo@@/main/tt-001/1 (TTT_1.00)
+
+=head3 Choose the suitable increment
+
+One needs a convenient way to figure which increment to feed to this
+equivalent old config spec. Fortunately, the I<-family> extension of
+I<describe> allows you to apply the formats of your choice to each an
+every element of the type family:
+
+ $ ct des -fmt "%n %d %Nc\n" -fam lbtype:TTT-001
+ TTT_1.04 2011-01-31T16:30:41Z Consolidation
+ TTT_1.03 2011-01-28T19:51:17Z Restore old config
+ TTT_1.02 2011-01-28T19:49:35Z Remove label
+ TTT_1.01 2011-01-28T19:41:55Z Increment demo
+ TTT_1.00 2011-01-26T17:35:39Z Family demo

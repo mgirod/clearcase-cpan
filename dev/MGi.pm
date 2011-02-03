@@ -1,6 +1,6 @@
 package ClearCase::Wrapper::MGi;
 
-$VERSION = '0.23';
+$VERSION = '0.24';
 
 use warnings;
 use strict;
@@ -42,6 +42,8 @@ use AutoLoader 'AUTOLOAD';
 #############################################################################
 *co             = *checkout;
 *ci		= *checkin;
+*des            = *describe;
+*desc            = *describe;
 *lsgen		= *lsgenealogy;
 *unco           = *uncheckout;
 
@@ -584,6 +586,23 @@ sub _EqLbTypeList {
   return @list;
 }
 
+sub _FltType {
+  use strict;
+  use warnings;
+  my $lbt = shift;
+  return unless $lbt;
+  $lbt = "lbtype:$lbt" unless $lbt =~ /^lbtype:/;
+  my $ct = ClearCase::Argv->new({autochomp=>1});
+  while (($_) = grep s/^<- (.*)$/$1/,
+	 $ct->argv(qw(des -s -ahl), $prhl, $lbt)->qx) {
+    $lbt = $_;
+  }
+  my ($eq) = grep s/^<- (.*)$/$1/, $ct->argv(qw(des -s -ahl), $eqhl, $lbt)->qx;
+  return '' unless $eq;
+  $eq =~ s/^lbtype:(.*)\@.*$/$1/;
+  return $eq;
+}
+
 =head1 NAME
 
 ClearCase::Wrapper::MGi - Support for an alternative to UCM.
@@ -1033,19 +1052,18 @@ sub _GenMkTypeSub {
       my @a = @args;
       _Ensuretypes((grep /^-glo/, $ntype->opts), @vob);
       if ($rep) {
-	@args =
-	  grep { $_ = $ct->argv(qw(des -fmt), '%Xn', "$type:$_")->qx } @args;
+	@args = grep { $_ = $ct->des([qw(-fmt %Xn)], "$type:$_")->qx } @args;
 	exit 1 unless @args;
 	if ($opt{family}) {
 	  @a = ();
 	  my $gflg = (grep /^-glo/, $ntype->opts)? '-glo' : '-ord';
 	  foreach my $t (@args) {
-	    if ($ct->argv(qw(des -s -ahl), $eqhl, $t)->stderr(0)->qx) {
+	    if ($ct->des([qw(-s -ahl), $eqhl], $t)->stderr(0)->qx) {
 	      warn Msg('E', "$t is already a family type\n");
 	      if ($t =~ s/^lbtype:(.*)$/$1/) {
 		my $att = "Rm$t";
-		$ct->argv(qw(mkattype -vtype real -c), q(Deleted in increment),
-			  $gflg, "$att")->stderr(0)->system;
+		$ct->mkattype([qw(-vtype real -c), q(Deleted in increment),
+			       $gflg], "$att")->stderr(0)->system;
 	      }
 	    } else {
 	      push @a, $t;
@@ -1054,9 +1072,7 @@ sub _GenMkTypeSub {
 	  exit 1 unless @a;
 	  my %pair = ();
 	  foreach (@a) {
-	    if (/^$type:(.*)(@.*)$/) {
-	      $pair{"$1$2"} = "${1}_1.00$2";
-	    }
+	    $pair{"$1$2"} = "${1}_1.00$2" if /^$type:(.*?)(@.*)$/;
 	  }
 	  _Findfreeinc(\%pair);
 	  $ntype->args(values %pair);
@@ -1065,20 +1081,20 @@ sub _GenMkTypeSub {
 	  map {
 	    if (defined($pair{$_})) {
 	      my $inc = "$type:$pair{$_}";
-	      $silent->argv('mkhlink', $eqhl, "$type:$_", $inc)->system;
+	      $silent->mkhlink([$eqhl], "$type:$_", $inc)->system;
 	      if ($type eq 'lbtype') {
 		my $att = "Rm$_";
-		$ct->argv(qw(mkattype -vtype real -c), q(Deleted in increment),
-			  $gflg, "$att")->stderr(0)->system;
+		$ct->mkattype([qw(-vtype real -c), q(Deleted in increment),
+			       $gflg], "$att")->stderr(0)->system;
 	      }
 	    }
 	  } keys %pair;
 	} elsif ($opt{archive}) {
 	  my $rc = 0;
 	  foreach my $t (@args) {
-	    my ($pfx, $vob) = $t =~ /^$type:(.*)(@.*)$/;
-	    my ($prev) = grep s/^-> $type:(.*)@.*/$1/,
-	      $ct->argv(qw(des -s -ahl), $prhl, $t)->stderr(0)->qx;
+	    my ($pfx, $vob) = $t =~ /^$type:(.*?)(@.*)$/;
+	    my ($prev) = grep s/^-> $type:(.*?)@.*/$1/,
+	      $ct->des([qw(-s -ahl), $prhl], $t)->stderr(0)->qx;
 	    my $arc;
 	    if ($prev) {
 	      if (my ($pfx, $nr) = $prev =~ /^(.*-)(\d+)$/) {
@@ -1090,10 +1106,10 @@ sub _GenMkTypeSub {
 	      $arc = $pfx . '-001';
 	    }
 	    ($pfx, my $nr) = $arc =~ /^(.*-)(\d+)$/;
-	    while ($ct->argv(qw(des -s), "$type:${arc}$vob")->stderr(0)->qx) {
+	    while ($ct->des(['-s'], "$type:${arc}$vob")->stderr(0)->qx) {
 	      $arc = $pfx . $nr++;
 	    }
-	    if ($ct->argv('rename', $t, $arc)->system) {
+	    if ($ct->rename($t, $arc)->system) {
 	      $rc = 1;
 	      next;
 	    }
@@ -1101,12 +1117,17 @@ sub _GenMkTypeSub {
 	    $ntype->opts('-nc', $ntype->opts);
 	    $ntype->system;
 	    my $at = "$type:${arc}$vob";
-	    $silent->argv('mkhlink', $prhl, $t, $at)->system;
+	    $silent->mkhlink([$prhl], $t, $at)->system;
 	    if ($type eq 'lbtype') {
 	      my $t0 = $t;
-	      $t0 =~ s/^lbtype:(.*)(@.*)$/lbtype:$ {1}_0$2/;
-	      $ct->argv('rename', $t, $t0)->system;
-	      $ct->argv('lock', $t0)->system;
+	      $t0 =~ s/^lbtype:(.*?)(@.*)$/lbtype:${1}_0$2/;
+	      $ct->rename($t, $t0)->system;
+	      $arc = "lbtype:$arc$vob";
+	      my ($eq) = grep s/^-> (.*)/$1/,
+		$ct->des([qw(-s -ahl), $eqhl], $arc)->stderr(0)->qx;
+	      my @arg = ($t0, $arc);
+	      push @arg, $eq if $eq;
+	      $ct->lock(@arg)->system;
 	    }
 	    $ct->argv('chevent', @cmt, $at)->stdout(0)->system
 	      unless $cmt[0] and $cmt[0] =~ /^-nc/;
@@ -2002,13 +2023,13 @@ sub rmtype {
     }
   }
   my (@args, @eq, @lck) = @lbt;
-  my $lct = ClearCase::Argv->new(); #Not autochomp
+  my $lct = new ClearCase::Argv; #Not autochomp
   my ($fl, $loaded) = $ENV{FORCELOCK};
  LBT:for my $t (@lbt) {
     my ($eq) = grep s/^-> (lbtype:.*)/$1/,
-      $ct->argv(qw(des -s -ahl), $eqhl, $t)->qx;
+      $ct->des([qw(-s -ahl), $eqhl], $t)->qx;
     if ($eq) {
-      my ($base, $vob) = ($1, $2?$2:'') if $t =~ /^lbtype:(.*)(\@.*)?$/;
+      my ($base, $vob) = ($1, $2?$2:'') if $t =~ /^lbtype:(.*?)(\@.*)?$/;
       if ($opt{family} or $eq =~ /_1.00(\@.*)?$/) {
 	push @eq, grep(s/^(.*)/lbtype:${1}$vob/, _EqLbTypeList($t)),
 	  "attype:Rm${base}$vob";
@@ -2208,6 +2229,93 @@ sub setcs {
   my $rc = $setcs->args($cs)->system;
   unlink $cs;
   exit $rc;
+}
+
+=item * DESCRIBE
+
+From DSB.pm
+
+Enhancement. Adds the B<-parents> flag, which takes an integer argument
+I<N> and runs the I<describe> command on the version I<N> predecessors
+deep instead of the currently-selected version.
+into temp files and diffs them. If only one view is specified, compares
+against the current working view's config spec.
+
+The parents take the genealogy of contributions into account.
+
+Every version may thus have several parents. In fact, at a given
+generation level, the same contributors might occur several times: the
+command will show them only once.
+
+=cut
+
+sub describe {
+  my $desc = ClearCase::Argv->new(@ARGV);
+  $desc->optset(qw(CC WRAPPER));
+  $desc->parseCC(qw(g|graphical local l|long s|short
+		    fmt=s alabel=s aattr=s ahlink=s ihlink=s
+		    cview version=s ancestor
+		    predecessor pname type=s cact));
+  $desc->parseWRAPPER(qw(parents|par9999=s family));
+  my $generations = abs($desc->flagWRAPPER('parents') || 0);
+  my $rc = 0;
+  if ($generations) {
+    die Msg('E', 'incompatible flags: "parents" and "family"')
+      if abs($desc->flagWRAPPER('family') || 0);
+    $ct = new ClearCase::Argv({autochomp=>1});
+    my @nargs;
+    my @args = $desc->args;
+    for my $arg (@args) {
+      my $i = $generations;
+      my ($ele, $ver, $type) =
+	$ct->des([qw(-fmt %En\n%En@@%Vn\n%m)], $arg)->qx;
+      if (!defined($type) or ($type !~ /version$/)) {
+	warn Msg('W', "Not a version: $arg");
+	next;
+      }
+      $ele =~ s%\\%/%g;
+      $ver =~ s%\\%/%g;
+      my $bra = $1 if $ver =~ m%^(.*?)/(?:\d+|CHECKEDOUT)$%;
+      my %gen = _Parsevtree($ele, 1, $ver);
+      my @p = @{$gen{$ver}{'parents'}};
+      while (@p and --$i) {
+	my %q;
+	for (@p) {
+	  $q{$_}++ for @{$gen{$_}{'parents'}};
+	}
+	@p = keys %q;
+      }
+      push(@nargs, @p) if @p;
+    }
+    scalar @nargs? $desc->args(@nargs) : exit 0;
+  } elsif (abs($desc->flagWRAPPER('family') || 0)) {
+    my @args = $desc->args;
+    my @nargs;
+    for my $t (@args) {
+      if ($t =~ /^lbtype:.*?(@.*)?$/) {
+	my $v = $1? $1 : '';
+	push @nargs, "lbtype:$_$v" for _EqLbTypeList($t);
+      } else {
+	warn Msg('E', "Unable to access '$t': 'lbtype:' prefix required");
+	$rc = 1;
+      }
+    }
+    scalar @nargs? $desc->args(@nargs) : exit $rc;
+  }
+  $rc |= $desc->system('CC');
+  exit $rc;
+}
+
+# Look for the 'element * TTT' line and replace *it* with the include
+# Although... the original idea was that the ##IncrementalTypes would be there!
+# So... _FltType is useless!
+sub foo {
+  use strict;
+  use warnings;
+  my $lbtype = _FltType($ARGV[1]);
+  print "$lbtype\n" if $lbtype;
+  # print "$_\n" for _EqLbTypeList($ARGV[1]);
+  exit 0;
 }
 
 =back
