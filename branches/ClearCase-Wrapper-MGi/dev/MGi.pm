@@ -2306,18 +2306,6 @@ sub describe {
   exit $rc;
 }
 
-# Look for the 'element * TTT' line and replace *it* with the include
-# Although... the original idea was that the ##IncrementalTypes would be there!
-# So... _FltType is useless!
-sub foo {
-  use strict;
-  use warnings;
-  my $lbtype = _FltType($ARGV[1]);
-  print "$lbtype\n" if $lbtype;
-  # print "$_\n" for _EqLbTypeList($ARGV[1]);
-  exit 0;
-}
-
 =back
 
 =head1 COPYRIGHT AND LICENSE
