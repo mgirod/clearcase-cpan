@@ -181,6 +181,7 @@ if ($opt{label}) {
     my $ct = $sync->clone_ct({autofail=>0, stderr=>0});
     my $dvob = $ct->desc(['-s'], "vob:$opt{dbase}")->qx;
     my $lbtype = "lbtype:$opt{label}\@$dvob";
+    $sync->lblver($opt{label}) if $opt{vreuse} && $ct->des(['-s'], $lbtype)->qx;
     my ($inclb) = grep s/-> (lbtype:.*)$/$1/,
                                $ct->desc([qw(-s -ahl EqInc)], $lbtype)->qx;
     if ($inclb) {
