@@ -298,6 +298,8 @@ $sync->srcmap(%xfer);
 $sync->remove(1) if $opt{rmname};
 # Remember to fix absolute symlinks
 $sync->rellinks(1) if $opt{rellinks};
+# Check in: one at a time if -cr, otherwise all at once (ipc mode relevant!)
+$sync->no_cr unless $opt{cr};
 
 #########################################################################
 # Now the object knows what it needs to do. Begin the 'action' methods
@@ -349,9 +351,7 @@ if (! $opt{ci}) {
 # process, as once a checkin succeeds there's no going back.
 # Instead, count subsequent errors in a scalar.
 $sync->err_handler(\$rc);
-# Now check in the changes: one at a time if -cr, otherwise
-# all at once.
-$sync->no_cr unless $opt{cr};
+# Now check in the changes
 $sync->checkin if $opt{ci} || $opt{cr};
 
 exit $rc;
