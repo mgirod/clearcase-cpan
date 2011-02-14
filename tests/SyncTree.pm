@@ -111,7 +111,21 @@ sub gen_accessors {
     }
 }
 gen_accessors(qw(protect remove reuse vreuse lblver ignore_co overwrite_co
-		 snapdest ctime));
+		 snapdest ctime lbtype inclb cmp_func rellinks dstview));
+sub gen_flags {
+    my @key = map {uc} @_;
+    no strict 'refs';
+    for (@key) {
+	my $var = "ST_$_";
+	my $meth = lc;
+	*$meth = sub {
+	    my $self = shift;
+	    $self->{$var} = 1 if $_[0] || !defined(wantarray);
+	    return $self->{$var};
+	}
+    }
+}
+gen_flags(qw(label_mods no_cr no_cmp));
 
 sub comment {
     my $self = shift;
@@ -215,12 +229,6 @@ sub mvfsdrive {
 	die "$0: Error: unable to find MVFS drive" unless $self->{ST_MVFSDRIVE};
     }
     return $self->{ST_MVFSDRIVE};
-}
-
-sub dstview {
-    my $self = shift;
-    $self->{ST_DSTVIEW} = shift if @_;
-    return $self->{ST_DSTVIEW};
 }
 
 sub ccsymlink {
@@ -374,48 +382,6 @@ sub dstvob {
 	$self->{ST_DSTVOB} =~ s%\\%/%g;
     }
     return $self->{ST_DSTVOB};
-}
-
-sub lbtype {
-    my $self = shift;
-    $self->{ST_LBTYPE} = shift if @_;
-    return $self->{ST_LBTYPE};
-}
-
-sub inclb {
-    my $self = shift;
-    $self->{ST_INCLB} = shift if @_;
-    return $self->{ST_INCLB};
-}
-
-sub label_mods {
-    my $self = shift;
-    $self->{ST_LABEL_MODS} = 1 if $_[0] || !defined(wantarray);
-    return $self->{ST_LABEL_MODS};
-}
-
-sub no_cr {
-    my $self = shift;
-    $self->{ST_NO_CR} = 1 if $_[0] || !defined(wantarray);
-    return $self->{ST_NO_CR};
-}
-
-sub no_cmp {
-    my $self = shift;
-    $self->{ST_NO_CMP} = 1 if $_[0] || !defined(wantarray);
-    return $self->{ST_NO_CMP} || 0;
-}
-
-sub cmp_func {
-    my $self = shift;
-    $self->{ST_CMP_FUNC} = shift if @_;
-    return $self->{ST_CMP_FUNC};
-}
-
-sub rellinks {
-    my $self = shift;
-    $self->{ST_RELLINKS} = shift if @_;
-    return $self->{ST_RELLINKS};
 }
 
 sub srclist {
@@ -1172,15 +1138,18 @@ sub modify {
 	for (sort keys %files) {
 	    my $src = $self->{ST_MOD}->{$_}->{src};
 	    my $dst = $self->{ST_MOD}->{$_}->{dst};
-	    if (!copy($src, $dst)) {
-		warn "$0: Error: $dst: $!\n";
-		$rm->fail;
-		next;
+	    next if exists($self->{ST_PRE}->{$dst});
+	    if ($self->no_cr) {
+		if (!copy($src, $dst)) {
+		    warn "$0: Error: $dst: $!\n";
+		    $rm->fail;
+		    next;
+		}
+		utime(time(), (stat $src)[9], $dst) ||
+				            warn "Warning: $dst: touch failed";
+	    } else {
+		$self->{ST_CI_FROM}->{$_} = $self->{ST_MOD}->{$_};
 	    }
-	    utime(time(), (stat $src)[9], $dst) ||
-				    warn "Warning: $dst: touch failed";
-	    $self->{ST_CI_FROM}->{$_} = $self->{ST_MOD}->{$_}
-			if !$self->no_cr && !exists($self->{ST_PRE}->{$dst});
 	}
     }
     if (keys %symlinks) {
@@ -1268,8 +1237,8 @@ sub label {
 	my $lbl = $self->lblver;
         if ($lbl) {
 	    my $ct = $self->clone_ct({autochomp=>1, autofail=>0, stderr=>0});
-	    my @rv = grep { ! -r "$_\@\@/$lbl" }
-	      grep s%^(.*?)(?:@.*|$)%$1%, $ct->ls([qw(-r -vob -s)], $dbase)->qx;
+	    my @rv = grep { s/^(.*?)(?:@@(.*))/$1/ && ($2 || -r "$1\@\@/$lbl") }
+	                                  $ct->ls([qw(-r -vob -s)], $dbase)->qx;
 	    $ctbool->mklabel([qw(-nc -rep), $lbtype], $dbase, @rv)->system;
         } else {
 	    $ctbool->mklabel([qw(-nc -rep -rec), $lbtype], $dbase)->system;
@@ -1345,6 +1314,7 @@ sub checkin {
 	    my $dst = $self->{ST_CI_FROM}->{$_}->{dst};
 	    $ct->ci([@ptime, @cmnt, qw(-ide -rm -from), $src], $dst)->system;
 	}
+	delete @{$self->{ST_MOD}}{keys %{$self->{ST_CI_FROM}}};
     }
     # Check-in first the files modified under the recorded names,
     # in case of hardlinks, since checking the other link first
