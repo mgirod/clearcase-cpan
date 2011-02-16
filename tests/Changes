@@ -252,3 +252,5 @@ Revision history for Perl extension ClearCase::SyncTree.
 	- import and remove dangling links
 	- skip symlink to directory in file reuse
 	- check in from source: do not attempt to check in again
+	- cleanup if branchoff root, remove orphaned branches at uncheckout
+	- file in source, dangling link in dest (maybe second to same): mkelem
