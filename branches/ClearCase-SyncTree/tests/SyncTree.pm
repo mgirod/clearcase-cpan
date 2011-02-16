@@ -1012,15 +1012,6 @@ sub add {
 	    }
 	}
     }
-    for (sort keys %{$self->{ST_CI_FROM}}) {
-	my $src = $self->{ST_CI_FROM}->{$_}->{src};
-	my $dst = $self->{ST_CI_FROM}->{$_}->{dst};
-	if ($self->no_cr || $files{$dst}) {
-	    copy($src, $dst) || die "$0: Error: $_: $!";
-	    utime(time(), (stat $src)[9], $dst) ||
-	      warn "Warning: $dst: touch failed";
-	}
-    }
     # Now do the files in one fell swoop.
     $ct->mkelem($self->comment, sort keys %files)->system if %files;
 
@@ -1073,6 +1064,7 @@ sub modify {
 	for my $key (sort keys %files) {
 	    my $src = $self->{ST_MOD}->{$key}->{src};
 	    my $dst = $self->{ST_MOD}->{$key}->{dst};
+	    my $new;
 	    if (ccsymlink($dst)) {
 	        # The source is a file, but the destination is a symlink: look
 	        # (recursively) at what this one points to, and link in this
@@ -1098,19 +1090,14 @@ sub modify {
 		$self->branchco(1, $dir) unless $lsco->args($dir)->qx;
 		$self->clone_ct->rm($dst)->system; #remove the first symlink
 		if ($dangling) {
-		    if ($self->no_cr) {
-			if (!copy($src, $dst)) {
-			    warn "$0: Error: $dst: $!\n";
-			    $rm->fail;
-			}
-			utime(time(), (stat $src)[9], $dst) ||
-			                    warn "Warning: $dst: touch failed";
-			$self->clone_ct->mkelem($self->comment, $dst)->system;
-		    } else {
-			my @ptime = qw(-pti) unless $self->ctime;
-			$self->clone_ct->ci([@ptime, @{$self->comment},
-				      qw(-ide -rm -from), $src], $dst)->system;
+		    if (!copy($src, $dst)) {
+			warn "$0: Error: $dst: $!\n";
+			$rm->fail;
 		    }
+		    utime(time(), (stat $src)[9], $dst) ||
+		      warn "Warning: $dst: touch failed";
+		    $self->clone_ct->mkelem($self->comment, $dst)->system;
+		    $new = 1;
 		    delete $self->{ST_MOD}->{$key};
 		    push @del, $key;
 		} else {
@@ -1131,7 +1118,7 @@ sub modify {
 		    }
 		}
 	    }
-	    push(@toco, $dst) if !exists($self->{ST_PRE}->{$dst});
+	    push(@toco, $dst) unless exists($self->{ST_PRE}->{$dst}) || $new;
 	}
 	$self->branchco(0, @toco) if @toco;
 	delete @files{@del};
@@ -1395,7 +1382,22 @@ sub cleanup {
     @todo = grep {!exists($self->{ST_PRE}->{$_})} @todo
 				    if $self->ignore_co || $self->overwrite_co;
     unshift(@todo, $dad) if $checkedout{$dad};
-    $ct->argv('unco', [qw(-rm)], sort {$b cmp $a} @todo)->system if @todo;
+    if ($self->{branchoffroot}) {
+	my $rc = 0;
+	for (sort {$b cmp $a} @todo) {
+	    my $b = $ct->ls([qw(-s -d)], $_)->qx;
+	    $rc |= $ct->unco([qw(-rm)], $_)->system;
+	    if ($b =~ s%^(.*)[\\/]CHECKEDOUT$%$1%) {
+		opendir BR, $b or next;
+		my @f = grep !/^\.\.?$/, readdir BR;
+		closedir BR;
+		$ct->rmbranch([qw(-f)], $b)->system if @f == 2;
+	    }
+	    return $rc;
+	}
+    } else {
+	$ct->unco([qw(-rm)], sort {$b cmp $a} @todo)->system if @todo;
+    }
 }
 
 # Undo current work and exit. May be called from an exception handler.
