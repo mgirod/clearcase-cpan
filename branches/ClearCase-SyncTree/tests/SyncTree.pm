@@ -909,7 +909,7 @@ sub add {
     $self->branchco(1, keys %dirs) if keys %dirs;
     # Process candidate directories here, then do files below.
     my $mkdir = $self->clone_ct->mkdir({autofail=>0, autochomp=>0},
-				                             [$self->comment]);
+				                               $self->comment);
     for my $cand (@candidates) {
 	if (! -d $cand) {
 	    if ($cand =~ /$lext$/) {
