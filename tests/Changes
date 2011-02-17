@@ -254,3 +254,4 @@ Revision history for Perl extension ClearCase::SyncTree.
 	- check in from source: do not attempt to check in again
 	- cleanup if branchoff root, remove orphaned branches at uncheckout
 	- file in source, dangling link in dest (maybe second to same): mkelem
+	- fail instead of die in a few more cases (cleanup)

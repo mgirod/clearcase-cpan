@@ -512,7 +512,7 @@ sub _needs_update {
 	} else {
 	    $update = &$comparator($src, $dst);
 	}
-	die "$0: Error: failed comparing $src vs $dst: $!" if $update < 0;
+	$self->failm("failed comparing $src vs $dst: $!") if $update < 0;
     } else {
 	$update = 1;
     }
@@ -828,7 +828,7 @@ sub reusemkdir {
 	    }
 	}
 	if (!$reused) {
-	    mkpath($dst, 0, 0777) || die "$0: Error: $dst: $!";
+	    mkpath($dst, 0, 0777) || $self->failm("$dst: $!");
 	}
     }
     return %found;
@@ -867,12 +867,12 @@ sub add {
 	my $src = $self->{ST_ADD}->{$_}->{src};
 	my $dst = $self->{ST_ADD}->{$_}->{dst};
 	if (-d $src && ! src_slink($src)) { # Already checked in the reuse case
-	    -e $dst || mkpath($dst, 0, 0777) || die "$0: Error: $dst: $!";
+	    -e $dst || mkpath($dst, 0, 0777) || $self->failm("$dst: $!");
 	} elsif (-e $src) {
 	    my $dad = dirname($dst);
-	    -d $dad || mkpath($dad, 0, 0777) || die "$0: Error: $dad: $!";
+	    -d $dad || mkpath($dad, 0, 0777) || $self->failm("$dad: $!");
 	    if (src_slink($src)) {
-		open(SLINK, ">$dst$lext") || die "$0: Error: $dst$lext: $!";
+		open(SLINK, ">$dst$lext") || $self->failm("$dst$lext: $!");
 		print SLINK $self->mkrellink($src), "\n";;
 		close(SLINK);
 	    } else {
@@ -880,7 +880,7 @@ sub add {
 					   if !exists($self->{ST_PRE}->{$dst});
 	    }
 	} elsif (src_slink($src)) { #Dangling symlink: import
-	    open(SLINK, ">$dst$lext") || die "$0: Error: $dst$lext: $!";
+	    open(SLINK, ">$dst$lext") || $self->failm("$dst$lext: $!");
 	    print SLINK $self->mkrellink($src), "\n";;
 	    close(SLINK);
 	} else {
@@ -942,7 +942,7 @@ sub add {
 	}
 	while (defined(my $i = readdir(DIR))) {
 	    next if $i eq '.' || $i eq '..';
-	    rename("$tmpdir/$i", "$cand/$i") || die "$0: Error: $cand/$i: $!";
+	    rename("$tmpdir/$i", "$cand/$i") || $self->failm("$cand/$i: $!");
 	}
 	closedir DIR;
 	rmdir $tmpdir || warn "$0: Error: $tmpdir: $!";
@@ -1383,17 +1383,15 @@ sub cleanup {
 				    if $self->ignore_co || $self->overwrite_co;
     unshift(@todo, $dad) if $checkedout{$dad};
     if ($self->{branchoffroot}) {
-	my $rc = 0;
 	for (sort {$b cmp $a} @todo) {
 	    my $b = $ct->ls([qw(-s -d)], $_)->qx;
-	    $rc |= $ct->unco([qw(-rm)], $_)->system;
+	    $ct->unco([qw(-rm)], $_)->system;
 	    if ($b =~ s%^(.*)[\\/]CHECKEDOUT$%$1%) {
 		opendir BR, $b or next;
-		my @f = grep !/^\.\.?$/, readdir BR;
+		my @f = grep !/^(\.\.?|0|LATEST)$/, readdir BR;
 		closedir BR;
-		$ct->rmbranch([qw(-f)], $b)->system if @f == 2;
+		$ct->rmbranch([qw(-f)], $b)->system unless @f;
 	    }
-	    return $rc;
 	}
     } else {
 	$ct->unco([qw(-rm)], sort {$b cmp $a} @todo)->system if @todo;
@@ -1407,6 +1405,12 @@ sub fail {
     $self->ct->autofail(0);	# avoid exception-handler loop
     $self->cleanup;
     exit(defined($rc) ? $rc : 2);
+}
+
+sub failm {
+    my ($self, $msg, $rc) = @_;
+    warn "$0: Error: $msg\n";
+    $self->fail($rc);
 }
 
 sub version {
