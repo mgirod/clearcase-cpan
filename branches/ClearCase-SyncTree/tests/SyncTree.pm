@@ -828,7 +828,9 @@ sub reusemkdir {
 	    }
 	}
 	if (!$reused) {
-	    mkpath($dst, 0, 0777) || $self->failm("$dst: $!");
+	    my $err;
+	    mkpath($dst, 0, 0777, {error => \$err});
+	    $self->failm(join(': ', %{$err->[0]})) if $err;
 	}
     }
     return %found;
@@ -866,11 +868,14 @@ sub add {
     for (sort keys %{$self->{ST_ADD}}) {
 	my $src = $self->{ST_ADD}->{$_}->{src};
 	my $dst = $self->{ST_ADD}->{$_}->{dst};
+	my $err;
 	if (-d $src && ! src_slink($src)) { # Already checked in the reuse case
-	    -e $dst || mkpath($dst, 0, 0777) || $self->failm("$dst: $!");
+	    -e $dst || mkpath($dst, 0, 0777, {error => \$err});
+	    $self->failm(join(': ', %{$err->[0]})) if $err;
 	} elsif (-e $src) {
 	    my $dad = dirname($dst);
-	    -d $dad || mkpath($dad, 0, 0777) || $self->failm("$dad: $!");
+	    -d $dad || mkpath($dad, 0, 0777, {error => \$err});
+	    $self->failm(join(': ', %{$err->[0]})) if $err;
 	    if (src_slink($src)) {
 		open(SLINK, ">$dst$lext") || $self->failm("$dst$lext: $!");
 		print SLINK $self->mkrellink($src), "\n";;
@@ -884,8 +889,7 @@ sub add {
 	    print SLINK $self->mkrellink($src), "\n";;
 	    close(SLINK);
 	} else {
-	    warn "$0: Error: $src: no such file or directory\n";
-	    $ct->fail;
+	    $ct->failm("$src: no such file or directory");
 	}
     }
     my @candidates = sort ($self->_lsprivate(1),
@@ -1224,7 +1228,7 @@ sub label {
 	my $lbl = $self->lblver;
         if ($lbl) {
 	    my $ct = $self->clone_ct({autochomp=>1, autofail=>0, stderr=>0});
-	    my @rv = grep { s/^(.*?)(?:@@(.*))/$1/ && ($2 || -r "$1\@\@/$lbl") }
+	    my @rv = grep{ s/^(.*?)(?:@@(.*))/$1/ && !($2 && -r "$1\@\@/$lbl") }
 	                                  $ct->ls([qw(-r -vob -s)], $dbase)->qx;
 	    $ctbool->mklabel([qw(-nc -rep), $lbtype], $dbase, @rv)->system;
         } else {
