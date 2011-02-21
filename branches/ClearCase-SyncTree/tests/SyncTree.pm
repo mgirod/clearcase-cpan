@@ -1016,6 +1016,15 @@ sub add {
 	    }
 	}
     }
+    for (sort keys %{$self->{ST_CI_FROM}}) {
+	my $dst = $self->{ST_CI_FROM}->{$_}->{dst};
+	if ($files{$dst}) {
+	    my $src = $self->{ST_CI_FROM}->{$_}->{src};
+	    copy($src, $dst) || $ct->failm("$_: $!");
+	    utime(time(), (stat $src)[9], $dst) ||
+	                                    warn "Warning: $dst: touch failed";
+	}
+    }
     # Now do the files in one fell swoop.
     $ct->mkelem($self->comment, sort keys %files)->system if %files;
 
