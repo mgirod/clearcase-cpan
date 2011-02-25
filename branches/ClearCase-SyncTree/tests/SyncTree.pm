@@ -749,7 +749,7 @@ sub raise_dver {
 # Reuse from removed elements, or create as view private, directories
 sub reusemkdir {
     my ($self, $dref, $rref) = @_;
-    my (%found, $reused, %dfound);
+    my (%found, %dfound, %priv);
     my $snapview = $self->snapdest;
     my $ds = ClearCase::Argv->desc({stderr=>1},[qw(-s)]);
     my $dm = ClearCase::Argv->desc([qw(-fmt %m)]);
@@ -758,79 +758,83 @@ sub reusemkdir {
     my $ln = ClearCase::Argv->ln;
     for my $dst (sort keys %{$dref}) {
 	next if $dfound{$dst};
+	my $reused;
 	my($name, $dir) = fileparse($dst);
-	if ($rref->{$dst}) {
+	if (!$priv{$dir}) {
+	  if ($rref->{$dst}) {
 	    $self->branchco(1, $dir) unless $lsco->args($dir)->qx;
 	    $rm->args($dst)->system;
-	}
-	my $i = -1; #index in the vtree list
-      VER: for (@{$self->vtree($dir)}) {
+	  }
+	  my $i = -1; #index in the vtree list
+	VER: for (@{$self->vtree($dir)}) {
 	    $i++;
 	    my $dirext = "$_/$name";
 	    # case-insensitive file test operator on Windows is a problem
 	    if ($snapview ? $ds->args($dirext)->qx !~ /Error:/ : ecs($dirext)) {
-		next if $dm->args($dirext)->qx eq 'file element';
-		while (ccsymlink($dirext)) {
-		    $name = readcclink $dirext;
-		    $name =~ s/\@\@$//;
-		    # consider only relative, and local symlinks
-		    next VER if !ecs($dirext) ||
-		                       $dm->args($dirext)->qx eq 'file element';
+	      next if $dm->args($dirext)->qx eq 'file element';
+	      while (ccsymlink($dirext)) {
+		$name = readcclink $dirext;
+		$name =~ s/\@\@$//;
+		# consider only relative, and local symlinks
+		next VER if !ecs($dirext) ||
+		  $dm->args($dirext)->qx eq 'file element';
+	      }
+	      $reused = 1;
+	      $self->raise_dver($i, $dir);
+	      $self->branchco(1, $dir) unless $lsco->args($dir)->qx;
+	      $ln->args($dirext, $dst)->system;
+	      # Need to reevaluate all the files under this dir
+	      # The case of implicit dirs, is recorded as '.'
+	      my $d = $dref->{$dst} eq '.'? '' : $dref->{$dst} . '/';
+	      $self->skimdir($dst, $d) if $self->remove;
+	      my $cmp = $self->no_cmp ? undef : $self->cmp_func;
+	      my @keys = sort $d? grep m%^\Q$d\E%, keys %{$self->{ST_ADD}}
+		: keys %{$self->{ST_ADD}};
+	      for my $e (@keys) {
+		my $edst = join '/', $self->dstbase, $e;
+		my @intdir = split m%/%, $e;
+		pop @intdir;
+		if (@intdir) {
+		  my $dd = $self->dstbase;
+		  my $pf = '';
+		  while (my $id = shift @intdir) {
+		    $dd = join '/', $dd, $id;
+		    $pf = $pf . $id . '/';
+		    $self->skimdir($dd, $pf) unless $dfound{$dd}++;
+		  }
 		}
-		$reused = 1;
-		$self->raise_dver($i, $dir);
-		$self->branchco(1, $dir) unless $lsco->args($dir)->qx;
-		$ln->args($dirext, $dst)->system;
-	        # Need to reevaluate all the files under this dir
-	        # The case of implicit dirs, is recorded as '.'
-		my $d = $dref->{$dst} eq '.'? '' : $dref->{$dst} . '/';
-		$self->skimdir($dst, $d) if $self->remove;
-		my $cmp = $self->no_cmp ? undef : $self->cmp_func;
-		my @keys = sort $d? grep m%^\Q$d\E%, keys %{$self->{ST_ADD}}
-		                                      : keys %{$self->{ST_ADD}};
-		for my $e (@keys) {
-		    my $edst = join '/', $self->dstbase, $e;
-		    my @intdir = split m%/%, $e;
-		    pop @intdir;
-		    if (@intdir) {
-			my $dd = $self->dstbase;
-			my $pf = '';
-			while (my $id = shift @intdir) {
-			    $dd = join '/', $dd, $id;
-			    $pf = $pf . $id . '/';
-			    $self->skimdir($dd, $pf) unless $dfound{$dd}++;
-			}
-		    }
-		    # Problem: does it match the type under srcbase?
-		    if (-d $edst) { # We know it ought to be empty
-			opendir(DIR, $edst);
-			my @f = grep !m%^\.\.?$%, readdir DIR;
-			closedir DIR;
-			if (@f) {
-			    $self->branchco(1, $edst)
-			                          unless $lsco->args($edst)->qx;
-			    $rm->args(map{join '/', $edst, $_} @f)->system;
-			}
-			$dfound{$edst}++; #Skip in this loop
-			next;
-		    }
-		    if (exists($self->{ST_ADD}->{$e}->{dst})) {
-			my $src = $self->{ST_ADD}->{$e}->{src};
-			my $dst = $self->{ST_ADD}->{$e}->{dst};
-			if (-e $dst) {
-			    $self->{ST_MOD}->{$e} = $self->{ST_ADD}->{$e}
-			              if $self->_needs_update($src, $dst, $cmp);
-			    $found{$e}++; #Remove from the add list
-			}
-		    }
+		# Problem: does it match the type under srcbase?
+		if (-d $edst) { # We know it ought to be empty
+		  opendir(DIR, $edst);
+		  my @f = grep !m%^\.\.?$%, readdir DIR;
+		  closedir DIR;
+		  if (@f) {
+		    $self->branchco(1, $edst)
+		      unless $lsco->args($edst)->qx;
+		    $rm->args(map{join '/', $edst, $_} @f)->system;
+		  }
+		  $dfound{$edst}++; #Skip in this loop
+		  next;
 		}
-		last;
+		if (exists($self->{ST_ADD}->{$e}->{dst})) {
+		  my $src = $self->{ST_ADD}->{$e}->{src};
+		  my $dst = $self->{ST_ADD}->{$e}->{dst};
+		  if (-e $dst) {
+		    $self->{ST_MOD}->{$e} = $self->{ST_ADD}->{$e}
+		      if $self->_needs_update($src, $dst, $cmp);
+		    $found{$e}++; #Remove from the add list
+		  }
+		}
+	      }
+	      last;
 	    }
+	  }
 	}
 	if (!$reused) {
 	    my $err;
 	    mkpath($dst, 0, 0777, {error => \$err});
-	    $self->failm(join(': ', %{$err->[0]})) if $err;
+	    $self->failm(join(': ', %{$err->[0]})) if $err and @{$err};
+	    $priv{"${dst}/"}++;
 	}
     }
     return %found;
@@ -871,11 +875,11 @@ sub add {
 	my $err;
 	if (-d $src && ! src_slink($src)) { # Already checked in the reuse case
 	    -e $dst || mkpath($dst, 0, 0777, {error => \$err});
-	    $self->failm(join(': ', %{$err->[0]})) if $err;
+	    $self->failm(join(': ', %{$err->[0]})) if $err and @{$err};
 	} elsif (-e $src) {
 	    my $dad = dirname($dst);
 	    -d $dad || mkpath($dad, 0, 0777, {error => \$err});
-	    $self->failm(join(': ', %{$err->[0]})) if $err;
+	    $self->failm(join(': ', %{$err->[0]})) if $err and @{$err};
 	    if (src_slink($src)) {
 		open(SLINK, ">$dst$lext") || $self->failm("$dst$lext: $!");
 		print SLINK $self->mkrellink($src), "\n";;
