@@ -1,6 +1,6 @@
 =head1 NAME
 
-Configuration.pod -- Configuration for ClearCase::Wrapper::MGi
+Configuration -- Configuration for ClearCase::Wrapper::MGi
 
 =head1 SYNOPSIS
 
@@ -45,6 +45,10 @@ The lack of such an ability is considered a bug in ClearCase, and is the
 object of an RFE (currently rejected...). It defeats the use of locking in
 general.
 
+The installer must select the solution best adapted to her case,
+possibly edit a few fields appropriate to her environment, and copy
+the suitable file by hand to the parl lib/site_perl directory.
+
 I<ForceLockSudo.pm> implements the simplest, safest and most efficient
 solution, from unix. As its alternatives, dealing with cases in which
 this superior solution could not be used, it is meant to be installed
@@ -86,12 +90,17 @@ to the locklbtype utility.
 
 In a Windows environment, the related module fills the same role, but
 invokes the suid script on a unix host, via ssh.
+As perl is found in a vob on my unix environment, I need to customize
+a view tag in addition to the host name and the path to the script.
+
+Ssh is accessed with the Net::SSH::Perl module.
 
 It depends on a long list of modules, which I could successfully
-install on: I<cygwin 1.7 / perl 5.10 / libgmp-devel 4.3.1-1, libssh2>
-and which I don't desperate yet (failing for now on I<Math::GMP>) to
-install on: I<Windows Vista / Active perl 5.10 / GMP-4.1.2>
+install on:
+I<cygwin 1.7 / perl 5.10 / libgmp-devel 4.3.1-1, libssh2, pari-gp 2.3.5>
+and on I<Windows Vista / Strawberry perl 5.12 / GMP-4.1.2>:
 
+  Digest-SHA1-2.1
   Digest-HMAC-1.01
   Class-ErrorHandler-0.01
   Convert-ASN1-0.22
@@ -100,7 +109,6 @@ install on: I<Windows Vista / Active perl 5.10 / GMP-4.1.2>
   Crypt-Blowfish-2.10
   Crypt-DES_EDE3-0.01
   Convert-PEM-0.07
-  Digest-SHA1-2.1
   Data-Buffer-0.04
   Class-Loader-2.03
   Convert-ASCII-Armour-1.4
@@ -113,6 +121,16 @@ install on: I<Windows Vista / Active perl 5.10 / GMP-4.1.2>
   Math::BigInt::GMP-1.24
   Math::BigInt-1.89
   Net::SSH::Perl-1.34
+
+On cygwin, I had in addition to install:
+
+  Crypt-DH-0.06
+  Crypt-DSA-0.14
+  Crypt-IDEA-1.08
+  Math-Pari-2.01080604
+  Crypt-Random-1.25
+  Crypt-Primes-0.50
+  Crypt-RSA-1.98
 
 Note that these are just the versions I use, and which work for me.
 I cannot claim that this list is a minimal requirement.

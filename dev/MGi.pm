@@ -1,6 +1,6 @@
 package ClearCase::Wrapper::MGi;
 
-$VERSION = '0.24';
+$VERSION = '0.25';
 
 use warnings;
 use strict;
@@ -35,6 +35,7 @@ use AutoLoader 'AUTOLOAD';
   $mklbtype = "\n* [-family] [-increment] [-archive]";
   $rmtype = "\n* [-family] [-increment]";
   $setcs = "\n* [-clone view-tag] [-expand] [-sync|-needed]";
+  $mkview = "\n* [-clone view-tag [-equiv lbtype,timestamp]]";
 }
 
 #############################################################################
@@ -2250,18 +2251,20 @@ command will show them only once.
 =cut
 
 sub describe {
+  use strict;
+  use warnings;
   my $desc = ClearCase::Argv->new(@ARGV);
   $desc->optset(qw(CC WRAPPER));
   $desc->parseCC(qw(g|graphical local l|long s|short
 		    fmt=s alabel=s aattr=s ahlink=s ihlink=s
 		    cview version=s ancestor
 		    predecessor pname type=s cact));
-  $desc->parseWRAPPER(qw(parents|par9999=s family));
+  $desc->parseWRAPPER(qw(parents|par9999=s family=s));
   my $generations = abs($desc->flagWRAPPER('parents') || 0);
   my $rc = 0;
   if ($generations) {
     die Msg('E', 'incompatible flags: "parents" and "family"')
-      if abs($desc->flagWRAPPER('family') || 0);
+      if $desc->flagWRAPPER('family');
     $ct = new ClearCase::Argv({autochomp=>1});
     my @nargs;
     my @args = $desc->args;
@@ -2288,13 +2291,15 @@ sub describe {
       push(@nargs, @p) if @p;
     }
     scalar @nargs? $desc->args(@nargs) : exit 0;
-  } elsif (abs($desc->flagWRAPPER('family') || 0)) {
+  } elsif (my $nr = abs($desc->flagWRAPPER('family') || 0)) {
     my @args = $desc->args;
     my @nargs;
     for my $t (@args) {
       if ($t =~ /^lbtype:.*?(@.*)?$/) {
 	my $v = $1? $1 : '';
-	push @nargs, "lbtype:$_$v" for _EqLbTypeList($t);
+	my @l = _EqLbTypeList($t);
+	$nr = $#l if $nr and $nr > $#l;
+	push @nargs, "lbtype:$_$v" for $nr?(@l)[0..$nr-1]:@l;
       } else {
 	warn Msg('E', "Unable to access '$t': 'lbtype:' prefix required");
 	$rc = 1;
@@ -2306,18 +2311,166 @@ sub describe {
   exit $rc;
 }
 
+=item * MKVIEW
+
+Enhancement. Clone, equivalent fixed config spec.
+Works only for dynamic views, as I don't know how to get the snapshot
+view directory
+
+=cut
+
+sub mkview {
+  use strict;
+  use warnings;
+  use File::Basename;
+  use File::Spec;
+  use File::Temp qw(tempfile);
+  use Sys::Hostname;
+  use Date::Format;
+  use Date::Parse;
+  my $mkv = ClearCase::Argv->new(@ARGV);
+  $mkv->optset(qw(CC WRAPPER));
+  $mkv->parseCC(qw(snapshot tag=s tcomment=s tmode=s region=s stream=s
+		   shareable_dos|nshareable_dos cachesize=s
+		   stgloc=s host=s hpath=s gpath=s
+		   colocated_server vws=s));
+  $mkv->parseWRAPPER(qw(clone=s equiv=s));
+  return 0 unless $mkv->flagWRAPPER('clone');
+  my $tag = $mkv->flagCC('tag');
+  if (!$tag) {
+    warn Msg('E', 'View tag must be specified.');
+    @ARGV = qw(help mkview);
+    ClearCase::Wrapper->help();
+    return 1;
+  }
+  $ct = ClearCase::Argv->new({autochomp=>0});
+  my $lsv = $ct->lsview([qw(-l -prop -full)], $mkv->flagWRAPPER('clone'))->qx;
+  return 1 unless $lsv;
+  my %tm = (unix=>'transparent', msdos=>'insert_cr', strip_cr=>'strip_cr');
+  my ($tmo, @prop) = ($tm{$1}, split /\s+/, $2)
+    if $lsv =~ /Text mode: (.*?)\n.*Properties: (.*?)\n/s;
+  die Msg('E', 'Snapshot views not supported for cloning!')
+    if grep /^snapshot$/, @prop or $mkv->flagCC('snapshot');
+  my @nsup = grep !/(dynamic|shareable_dos|readwrite|readonly)$/, @prop;
+  die Msg('E', "Non supported for cloning: @nsup") if @nsup;
+  $tmo = $mkv->flagCC('tmode') if $mkv->flagCC('tmode');
+  my $shdo = $mkv->flagCC('shareable_dos');
+  ($shdo) = grep /shareable_dos$/, @prop unless $shdo;
+  my @k = grep !/(stgloc|host|hpath|gpath|tmode|shareable_dos)/,
+    keys %{$mkv->{AV_LKG}{'CC'}};
+  my @opts = (map(("-$_", $mkv->flagCC($_)), @k), '-tmo', $tmo, "-$shdo");
+  my ($host, $ogpa, $hpa) = ($2, $1, $3) if $lsv =~
+    /Global path: (.*?)\n.*Server host: (.*?)\n.*access path: (.*?)\n/s;
+  if ($mkv->flagCC('stgloc')) {
+    push @opts, '-stg', $mkv->flagCC('stgloc');
+  } else {
+    $hpa = $mkv->flagCC('hpath')?
+      $mkv->flagCC('hpath') : File::Spec->catdir(dirname($hpa), "$tag.vws");
+    my $gpa = $mkv->flagCC('gpath')?
+      $mkv->flagCC('gpath') : File::Spec->catdir(dirname($ogpa), "$tag.vws");
+    $host = $mkv->flagCC('host') if $mkv->flagCC('host');
+    push @opts, '-host', $host, '-hpa', $hpa, '-gpa', $gpa;
+    if (!$mkv->args) {
+      if ($host eq hostname or $gpa =~m%^//%) { #UNC gives 'Access is denied'
+	$mkv->args($hpa);
+      } else {
+	$mkv->args($gpa); #Should work from anywhere
+      }
+    }
+  }
+  $mkv->opts(@opts);
+  my $cs = File::Spec->catfile($ogpa, 'config_spec');
+  my (@eqlst, $lb, $ts, $lbt, $nr, $rt); #reference time
+  if (my $eq = $mkv->flagWRAPPER('equiv')) {
+    ($lb, $ts) = split /,/, $eq;
+    $ct->autochomp(1);
+    $lbt = "lbtype:$lb";
+    if ($lb =~ /^lbtype:(.*)$/) {
+      $lbt = $lb;
+      $lb = $1;
+    }
+    die Msg('E', qq(Label type not found: "$lb"\n))
+      unless $ct->des(['-s'], $lbt)->qx;
+    @eqlst = _EqLbTypeList($lb);
+    $nr = $1 if $eqlst[0] =~ /^.*_(\d+\.\d+)$/;
+    die Msg('E', qq("$lb" is not the top of a label type family\n)) unless $nr;
+    if ($ts) {
+      $rt = str2time($ts);
+      die Msg('E', qq(Failed to parse "$ts" as a timestamp\n)) unless $rt;
+      die Msg('E', qq("$lb" is not a floating label type\n))
+	unless grep /^->/, $ct->des([qw(-s -ahl), $eqhl], $lbt)->qx;
+      my $v = $lb =~ /(@.*)$/? $1 : '';
+      while (str2time($ct->des(qw(-fmt %d), "lbtype:$eqlst[0]$v")->qx) > $rt) {
+	shift @eqlst;
+	last unless @eqlst;
+      }
+      die Msg('E', qq("$ts" too old: no equivalent baseline\n)) unless @eqlst;
+      $nr = $1 if $eqlst[0] =~ /^.*_(\d+\.\d+)$/;
+      my @bits = map{ $_ = 0 unless $_ } strptime($ts);
+      $ts = strftime(q(%Y-%m-%dT%H:%M:%S%z), @bits); #Standardize
+    }
+  }
+  $mkv->system and exit 1;
+  $ct->chview(['-readonly'], $tag)->system if grep /^readonly$/, @prop;
+  if (@eqlst) {
+    my $l = ($lb =~ /^(.*?)@/? $1 : $lb);
+    my $rmat = "Rm$l";
+    my $f = "$hpa/$l";
+    if ($ts) {
+      $f .= ".$ts"
+    } else {
+      $ts = $ct->des([qw(-fmt %d)], $lbt)->qx;
+      $rt = str2time($ts);
+    }
+    my $trim = sub {
+      if ($_ and m%^element\s+\S+\s+(?:\.\.\.)?[/\\](\S+)[/\\]LATEST\b.*$%) {
+	my @bt = split m%[/\\]%, $1;
+	for (@bt) {
+	  return 0 if str2time($ct->des([qw(-fmt %d)], "brtype:$_")->qx) > $rt;
+	}
+      }
+      return 1;
+    };
+    my (@cs1, @cs2, $incfam, $noco);
+    push @cs1, "time $ts\n";
+    open my $fh, '<', $cs or die Msg('E', qq(Unable to access "$cs": $!\n));
+    while (<$fh>) {
+      if (/^element \* $l(\s+-nocheckout)?/) {
+	$noco = $1? $1 : '';
+	$incfam = 1;
+	last;
+      }
+      push @cs1, $_ if $trim->($_);
+    }
+    @cs2 = grep $trim->(), <$fh> if $incfam;
+    close $fh;
+    open $fh, '>', $f
+      or die Msg('E', qq(Failed to write config spec fragment "$f": $!\n));
+    print $fh qq(element * "{lbtype($_)&&!attr_sub($rmat,<=,$nr)}$noco"\n)
+      for @eqlst;
+    close $fh;
+    ($fh, $cs) = tempfile(DIR => File::Spec->tmpdir);
+    print $fh @cs1;
+    print $fh "include $f\n";
+    print $fh @cs2;
+    close $fh;
+  }
+  $ct->setcs(['-tag', $tag], $cs)->exec;
+}
+
 =back
 
 =head1 COPYRIGHT AND LICENSE
 
 Copyright (c) 2007 IONA Technologies PLC (until v0.05),
-2008-2010 Marc Girod (marc.girod@gmail.com) for later versions.
+2008-2011 Marc Girod (marc.girod@gmail.com) for later versions.
 All rights reserved.
 This Perl program is free software; you may redistribute it
 and/or modify it under the same terms as Perl itself.
 
 =head1 SEE ALSO
 
-perl(1), ClearCase::Wrapper, ClearCase::Wrapper::DSB, ClearCase::Argv
+perl(1), ClearCase::Wrapper, ClearCase::Wrapper::DSB, ClearCase::Argv,
+ClearCase::SyncTree
 
 =cut
