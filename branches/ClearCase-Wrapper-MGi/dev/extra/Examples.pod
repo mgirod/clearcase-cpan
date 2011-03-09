@@ -335,12 +335,12 @@ We made two modifications:
 =over 2
 
 =item * We replaced the I<TTT> rule (hence preserving the order of the
-rules) a directive instructing to compute, from the label type family,
-a set of rules equivalent to the I<TTT> floating label, as it was when
-its equivalent fixed type was TTT_1.01
+rules) with a directive instructing to compute, from the label type
+family, a set of rules equivalent to the I<TTT> floating label, as it
+was when its equivalent fixed type was TTT_1.01
 
-=item * We removed the rule based on I<tt> branches, as this would
-conflict with the intention of selected only versions labeled at the
+=item * We removed the rule based on I<tt> branches, as this one would
+conflict with the intention of selecting only versions labeled at the
 time.
 
 =back

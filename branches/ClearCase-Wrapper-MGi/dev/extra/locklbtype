@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 BEGIN {
-  $ENV{PATH} = '';
+  $_ = '' for @ENV{qw(PATH ENV)};
 }
 use strict;
 use Sys::Hostname;
