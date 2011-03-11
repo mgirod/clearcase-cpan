@@ -146,7 +146,7 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- rmtype: fix for family types
 	- mklbtype -arc locks the types archived
 
-0.25 Tue Mar  1 12:09:45 GMTST 2011
-        - Examples.pod: typos
+0.25 Fri Mar 11 16:48:50 GMT 2011
+        - Examples.pod: typos, and switched setcs for mkview -equiv
 	- des -fam n: only the most recent equivalent fixed types
 	- mkview -clone -equiv TTT,1-Jan --requires Date::Parse
