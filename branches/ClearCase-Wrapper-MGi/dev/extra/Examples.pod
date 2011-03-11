@@ -314,58 +314,65 @@ the I<BL> labels.
 
 =head2 REPRODUCING A PAST CONFIGURATION
 
-=head3 Set a view equivalent to TTT at 1.01
+=head3 Clone a view, in the state it was on January 1.
 
- $ ct mkview -tag ttTTT -stg -auto
- ...
- $ ct catcs > /tmp/cs
- $ perl -pi -le 's%^el.* TTT$%##:IncrementalLabels: TTT_1.01@/vob/test%' /tmp/cs
- $ perl -ni -le 'print unless m%^el.*/tt/LATEST$%' /tmp/cs
- $ ct setcs -tag ttTTT /tmp/cs
- $ ct setview ttTTT
+ $ ct mkview -tag ttt_Jan1 -clone ttt -equiv TTT,1-Jan
+ Created view.
+ Host-local path: jeeves:/views/mg/ttt.vws
+ Global path:     /views/mg/ttt.vws
+ It has the following rights:
+ User : mg       : rwx
+ Group: foo      : rwx
+ Other:          : r-x
+ $ diff /views/mg/ttt.vws/config_spec /views/mg/ttt_Jan1.vws/config_spec
+ 0a1
+ > time 2011-01-01T00:00:00+0000
+ 3d3
+ < element * .../mg/LATEST
+ 5c5
+ < element * MG
+ ---
+ > include /views/mg/ttt_Jan1.vws/TTT.2011-01-01T00:00:00+0000
+ $ ct setview ttt_Jan1
  $ ct ls -d a/foo a
  a/foo@@/main/tt-001/2            Rule: {lbtype(TTT_1.01)&&!attr_sub(RmTTT,<=,1.01)}
  a@@/main/tt-001/1                Rule: {lbtype(TTT_1.00)&&!attr_sub(RmTTT,<=,1.01)}
 
-We modified the config spec, by saving it to a file, editing this one,
-and setting the config spec back from the modified file.
-
-We made two modifications:
+The script made three modifications to the initial config spec:
 
 =over 2
 
-=item * We replaced the I<TTT> rule (hence preserving the order of the
-rules) with a directive instructing to compute, from the label type
-family, a set of rules equivalent to the I<TTT> floating label, as it
-was when its equivalent fixed type was TTT_1.01
+=item * It added a time rule, corresponding to the specified time..
 
-=item * We removed the rule based on I<tt> branches, as this one would
-conflict with the intention of selecting only versions labeled at the
-time.
+=item * It removed rules based on branches using a type created after
+the specified time.
+
+=item * It replaced the I<TTT> rule (hence preserving the order of the
+rules) with a directive including set of rules, equivalent to the
+I<TTT> floating label asthe specified time. This is achieved by
+determining the the fixed label in the family, which was then
+'equivalent' to I<TTT>: I<TTT_1.01>.
 
 =back
 
 We checked that these rules selected the correct versions of our two
 reference elements (the I<foo> file, and the I<a> directory).
 
-The directive was actually converted as a inclusion of a new file:
+Let's examine the new file:
 
- $ ct catcs | head -1
- include /cc/views/mg/ttTTT.vws/TTT_1.01
- $ cat /cc/views/mg/ttTTT.vws/TTT_1.01
+ $ cat /views/mg/ttt.vws/TTT.2011-01-01T00:00:00+0000
  element * "{lbtype(TTT_1.01)&&!attr_sub(RmTTT,<=,1.01)}"
  element * "{lbtype(TTT_1.00)&&!attr_sub(RmTTT,<=,1.01)}"
 
-=head3 Set views equivalent to 1.02 and 1.03 stages of TTT
+=head3 Examine config specs equivalent to 1.02 and 1.03 stages of TTT
 
- $ perl -pi -e 's/TTT_1.01/TTT_1.02/ if $.==1' /tmp/cs
- $ ct setcs -tag ttTTT /tmp/cs
- $ ct setview ttTTT
+ $ ct mkview -tag ttt_1.02 -clone ttt -equiv TTT_1.02
+ $ ct setview ttt_1.02
  $ ct ls -d a/foo a
  a/foo@@/main/0                   Rule: /main/0 [-mkbranch tt]
  a@@/main/tt-001/1                Rule: {lbtype(TTT_1.00)&&!attr_sub(RmTTT,<=,1.02)}
- $ perl -pi -e 's/TTT_1.02/TTT_1.03/ if $.==1' /tmp/cs
- $ ct setcs /tmp/cs
+ $ ct mkview -tag ttt_1.03 -clone ttt -equiv TTT_1.03
+ $ ct setview ttt_1.03
  $ ct ls -d a/foo a
  a/foo@@/main/tt-001/3            Rule: {lbtype(TTT_1.03)&&!attr_sub(RmTTT,<=,1.03)}
  a@@/main/tt-001/1                Rule: {lbtype(TTT_1.00)&&!attr_sub(RmTTT,<=,1.03)}
@@ -392,10 +399,10 @@ And of course (but not showing the attributes):
    foo@@/main/tt-001/2 (TTT_1.01)
     foo@@/main/tt-001/1 (TTT_1.00)
 
-=head3 Choose the suitable increment
+=head3 Pick the right increment/date
 
-One needs a convenient way to figure which increment to feed to this
-equivalent old config spec. Fortunately, the I<-family> extension of
+One needs a convenient way to figure what increment and what date
+correspond to which changes. Fortunately, the I<-family> extension of
 I<describe> allows you to apply the formats of your choice to each an
 every element of the type family:
 
