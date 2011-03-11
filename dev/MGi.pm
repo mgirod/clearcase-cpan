@@ -2457,6 +2457,10 @@ sub mkview {
     ($fh, $cs) = tempfile(DIR => File::Spec->tmpdir);
     print $fh @cs1;
     if ($incfam) {
+      if ($^O eq 'cygwin') {
+	$f =~ s%^/cygdrive/(\w)%$1:%;
+	$f =~ s%/%\\%g;
+      }
       print $fh "include $f\n";
       print $fh @cs2;
     }
