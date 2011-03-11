@@ -2421,6 +2421,7 @@ sub mkview {
     } else {
       $ts = $ct->des([qw(-fmt %d)], $lbt)->qx;
       $rt = str2time($ts);
+      $l =~ s/^(.*)_[\d.]+$/$1/;
     }
     my $trim = sub {
       if ($_ and m%^element\s+\S+\s+(?:\.\.\.)?[/\\](\S+)[/\\]LATEST\b.*$%) {
@@ -2444,15 +2445,21 @@ sub mkview {
     }
     @cs2 = grep $trim->(), <$fh> if $incfam;
     close $fh;
-    open $fh, '>', $f
-      or die Msg('E', qq(Failed to write config spec fragment "$f": $!\n));
-    print $fh qq(element * "{lbtype($_)&&!attr_sub($rmat,<=,$nr)}$noco"\n)
-      for @eqlst;
-    close $fh;
+    if ($incfam) {
+      open $fh, '>', $f
+	or die Msg('E', qq(Failed to write config spec fragment "$f": $!\n));
+      print $fh qq(element * "{lbtype($_)&&!attr_sub($rmat,<=,$nr)}$noco"\n)
+	for @eqlst;
+      close $fh;
+    } else {
+      warn Msg('W', qq(No rule based on "$l" was found in "$cs".\n));
+    }
     ($fh, $cs) = tempfile(DIR => File::Spec->tmpdir);
     print $fh @cs1;
-    print $fh "include $f\n";
-    print $fh @cs2;
+    if ($incfam) {
+      print $fh "include $f\n";
+      print $fh @cs2;
+    }
     close $fh;
   }
   $ct->setcs(['-tag', $tag], $cs)->exec;
