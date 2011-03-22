@@ -330,7 +330,7 @@ the I<BL> labels.
  3d3
  < element * .../mg/LATEST
  5c5
- < element * MG
+ < element * TTT
  ---
  > include /views/mg/ttt_Jan1.vws/TTT.2011-01-01T00:00:00+0000
  $ ct setview ttt_Jan1

@@ -1,6 +1,6 @@
 package ClearCase::Wrapper::MGi;
 
-$VERSION = '0.25';
+$VERSION = '0.26';
 
 use warnings;
 use strict;
@@ -36,6 +36,7 @@ use AutoLoader 'AUTOLOAD';
   $rmtype = "\n* [-family] [-increment]";
   $setcs = "\n* [-clone view-tag] [-expand] [-sync|-needed]";
   $mkview = "\n* [-clone view-tag [-equiv lbtype,timestamp]]";
+  $describe = "\n* [-par/ents <n>] [-fam/ily <n>]";
 }
 
 #############################################################################
@@ -2259,15 +2260,19 @@ sub describe {
 		    fmt=s alabel=s aattr=s ahlink=s ihlink=s
 		    cview version=s ancestor
 		    predecessor pname type=s cact));
-  $desc->parseWRAPPER(qw(parents|par9999=s family=s));
+  $desc->parseWRAPPER(qw(parents|par9999=i family=i));
   my $generations = abs($desc->flagWRAPPER('parents') || 0);
+  my @args = $desc->args;
+  if (grep /^--?par/, @args) {
+    @args = grep !/^-par/, @args;
+    $generations = 1;
+  }
   my $rc = 0;
   if ($generations) {
     die Msg('E', 'incompatible flags: "parents" and "family"')
       if $desc->flagWRAPPER('family');
     $ct = new ClearCase::Argv({autochomp=>1});
     my @nargs;
-    my @args = $desc->args;
     for my $arg (@args) {
       my $i = $generations;
       my ($ele, $ver, $type) =
@@ -2291,21 +2296,29 @@ sub describe {
       push(@nargs, @p) if @p;
     }
     scalar @nargs? $desc->args(@nargs) : exit 0;
-  } elsif (my $nr = abs($desc->flagWRAPPER('family') || 0)) {
-    my @args = $desc->args;
-    my @nargs;
-    for my $t (@args) {
-      if ($t =~ /^lbtype:.*?(@.*)?$/) {
-	my $v = $1? $1 : '';
-	my @l = _EqLbTypeList($t);
-	$nr = $#l if $nr and $nr > $#l;
-	push @nargs, "lbtype:$_$v" for $nr?(@l)[0..$nr-1]:@l;
+  } else {
+    my $nr;
+    if (defined($desc->flagWRAPPER('family')) or grep /^-fam/, @args) {
+      if (grep /^--?fam/, @args) {
+	@args = grep !/^-fam/, @args;
+	$nr = 0;
       } else {
-	warn Msg('E', "Unable to access '$t': 'lbtype:' prefix required");
-	$rc = 1;
+	$nr = abs($desc->flagWRAPPER('family'));
       }
+      my @nargs;
+      for my $t (@args) {
+	if ($t =~ /^lbtype:.*?(@.*)?$/) {
+	  my $v = $1? $1 : '';
+	  my @l = _EqLbTypeList($t);
+	  $nr = $#l if $nr and $nr > $#l;
+	  push @nargs, "lbtype:$_$v" for $nr?(@l)[0..$nr-1]:@l;
+	} else {
+	  warn Msg('E', "Unable to access '$t': 'lbtype:' prefix required");
+	  $rc = 1;
+	}
+      }
+      @nargs? $desc->args(@nargs) : exit $rc;
     }
-    scalar @nargs? $desc->args(@nargs) : exit $rc;
   }
   $rc |= $desc->system('CC');
   exit $rc;
@@ -2424,10 +2437,20 @@ sub mkview {
       $l =~ s/^(.*)_[\d.]+$/$1/;
     }
     my $trim = sub {
-      if ($_ and m%^element\s+\S+\s+(?:\.\.\.)?[/\\](\S+)[/\\]LATEST\b.*$%) {
-	my @bt = split m%[/\\]%, $1;
-	for (@bt) {
-	  return 0 if str2time($ct->des([qw(-fmt %d)], "brtype:$_")->qx) > $rt;
+      if ($_ and m%^element\s+(\S+)\s+(?:\.\.\.)?[/\\](\S+)[/\\]LATEST\b.*$%) {
+	my $vb = $1;
+	my @bt = split m%[/\\]%, $2;
+	if ($vb) {
+	  $vb =~ s%^(.*?)[/\\]\.\.\.%$1%;
+	  $vb = $ct->des(['-s'], "vob:$vb")->stderr(0)->qx;
+	}
+	my $ext = $vb? "\@$vb" : '';
+	$vb = 'this vob' unless $vb;
+	for my $t (@bt) {
+	  my $ts = $ct->des([qw(-fmt %d)], "brtype:$t$ext")->stderr(0)->qx;
+	  warn Msg('W', qq(Branch type "$t" not found in $vb.\n))
+	    unless $ts;
+	  return 0 if !$ts or str2time($ts) > $rt;
 	}
       }
       return 1;
