@@ -151,5 +151,6 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- des -fam n: only the most recent equivalent fixed types
 	- mkview -clone -equiv TTT,1-Jan --requires Date::Parse
 
-0.26 Mon Mar 14 13:31:45 GMT 2011
+0.26 Tue Mar 22 17:03:20 GMTST 2011
         - des -par/fam: fix to support no argument
+	- mkview -equiv: non local brtype in config spec
