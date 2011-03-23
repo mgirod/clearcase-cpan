@@ -804,7 +804,7 @@ sub reusemkdir {
 		  }
 		}
 		# Problem: does it match the type under srcbase?
-		if (-d $edst) { # We know it ought to be empty
+		if (-d $edst and !ccsymlink($edst)) { # We know it is empty
 		  opendir(DIR, $edst);
 		  my @f = grep !m%^\.\.?$%, readdir DIR;
 		  closedir DIR;
@@ -832,7 +832,7 @@ sub reusemkdir {
 	}
 	if (!$reused) {
 	    my $err;
-	    mkpath($dst, 0, 0777, {error => \$err});
+	    mkpath($dst, {error => \$err, verbose => 0, mode => 0777});
 	    $self->failm(join(': ', %{$err->[0]})) if $err and @{$err};
 	    $priv{"${dst}/"}++;
 	}
@@ -874,11 +874,11 @@ sub add {
 	my $dst = $self->{ST_ADD}->{$_}->{dst};
 	my $err;
 	if (-d $src && ! src_slink($src)) { # Already checked in the reuse case
-	    -e $dst || mkpath($dst, 0, 0777, {error => \$err});
+	    -e $dst || mkpath($dst, {error=>\$err, verbose=>0, mode=>0777});
 	    $self->failm(join(': ', %{$err->[0]})) if $err and @{$err};
 	} elsif (-e $src) {
 	    my $dad = dirname($dst);
-	    -d $dad || mkpath($dad, 0, 0777, {error => \$err});
+	    -d $dad || mkpath($dad, {error=>\$err, verbose=>0, mode=>0777});
 	    $self->failm(join(': ', %{$err->[0]})) if $err and @{$err};
 	    if (src_slink($src)) {
 		open(SLINK, ">$dst$lext") || $self->failm("$dst$lext: $!");

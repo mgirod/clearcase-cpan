@@ -244,7 +244,7 @@ Revision history for Perl extension ClearCase::SyncTree.
 	- restored less verbosity: no mklabel events
 	- NOTE: all work from 0.48 to here courtesy of Marc Girod.
 
-0.57 Fri Feb 25 16:28:09 GMTST 2011
+0.57 Wed Mar 23 13:01:13 GMT 2011
         - apply even equivalent fixed labels with -rep, to allow for replay
 	- if label existed, check labeled versions first
 	- skip unchanged labeled versions from recursive labeling
@@ -256,3 +256,5 @@ Revision history for Perl extension ClearCase::SyncTree.
 	- file in source, dangling link in dest (maybe second to same): mkelem
 	- fail instead of die in a few more cases (cleanup)
 	- fixes to reusemkdir: reuse is per element, and private dirs may be skipped
+	- skip symlinks to directories in resurrected directories
+	- fix a bug with mkpath syntax resulting in creating 511 and 0 directories
