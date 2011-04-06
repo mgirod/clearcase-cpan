@@ -731,7 +731,7 @@ sub vtree {
     if (!exists $self->{ST_VT}->{$dir}) {
 	my $vt = ClearCase::Argv->lsvtree({autochomp=>1}, [qw(-a -s -nco)]);
 	# optimization: branch/0 of a directory is either empty or duplicate
-	my @vt = reverse grep { m%[/\\](\d+)$% && $1>1 } $vt->args($dir)->qx;
+	my @vt = reverse grep { m%[/\\](\d+)$% && $1>=1 } $vt->args($dir)->qx;
 	$self->{ST_VT}->{$dir} = \@vt;
     }
     return $self->{ST_VT}->{$dir};
@@ -863,7 +863,7 @@ sub add {
 	rmdir($_) for reverse sort @{$self->{ST_IMPLICIT_DIRS}};
 	for my $d (sort keys %{$self->{ST_ADD}}) {
 	    my $dst = $self->{ST_ADD}->{$d}->{dst};
-	    $dir{$dst} = $d if -d $d; # only empty dirs are explicitly added
+	    $dir{$dst} = $d if -d $self->{ST_ADD}->{$d}->{src}; # empty dir
 	    $self->recadd($d, $dst, \%dir, \%rm, \%dseen);
 	}
 	my %found = $self->reusemkdir(\%dir, \%rm);
@@ -1241,8 +1241,9 @@ sub label {
 	my $lbl = $self->lblver;
         if ($lbl) {
 	    my $ct = $self->clone_ct({autochomp=>1, autofail=>0, stderr=>0});
-	    my @rv = grep{ s/^(.*?)(?:@@(.*))/$1/ && !($2 && -r "$1\@\@/$lbl") }
-	                                  $ct->ls([qw(-r -vob -s)], $dbase)->qx;
+	    my @rv = grep{ s/^(.*?)(?:@@(.*))/$1/ &&
+			     ($2 =~ /CHECKEDOUT$/ || !-r "$_\@\@/$lbl") }
+	      $ct->ls([qw(-r -vob -s)], $dbase)->qx;
 	    $ctbool->mklabel([qw(-nc -rep), $lbtype], $dbase, @rv)->system;
         } else {
 	    $ctbool->mklabel([qw(-nc -rep -rec), $lbtype], $dbase)->system;
