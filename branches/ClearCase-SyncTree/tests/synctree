@@ -242,8 +242,23 @@ if ($opt{map}) {
     }
 } elsif (!$opt{flist}) {
     if (@ARGV) {
-        if (-r $ARGV[0]) {
-	    $_ = File::Spec->rel2abs($_) for @ARGV;
+        require Cwd;
+        if (-r $ARGV[0]) { # relative paths are OK, but must point under src
+	    my @abort;
+	    for my $arg (@ARGV) {
+		my $real = Cwd::realpath($arg);
+		$real =~ s%\\%/%g if MSWIN;
+		if ($real =~ /^\Q$opt{sbase}\E/) {
+		    $arg = $real;
+		} else {
+		    push @abort, $arg;
+		}
+	    }
+	    if (@abort) {
+		my $msg1 = @abort > 1? 'arguments are' : 'argument is';
+		my $msg2 = "$opt{sbase}\n  " . join "\n  ", @abort;
+		die "$prog: Error: the following $msg1 not under $msg2\n";
+	    }
 	} else {
 	    $_ = File::Spec->catfile($opt{sbase}, $_) for @ARGV;
 	}

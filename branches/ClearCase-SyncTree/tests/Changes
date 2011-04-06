@@ -260,3 +260,4 @@ Revision history for Perl extension ClearCase::SyncTree.
 	- fix a bug with mkpath syntax resulting in creating 511 and 0 directories
 	- fix to reuse of empty directories
 	- fix in pruning of versions in vtree
+	- arguments given with relative paths must point under srcbase
