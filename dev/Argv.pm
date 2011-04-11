@@ -1,6 +1,6 @@
 package ClearCase::Argv;
 
-$VERSION = '1.50';
+$VERSION = '1.51';
 
 use Argv 1.26;
 
@@ -18,12 +18,10 @@ my $NUL = MSWIN ? 'NUL' : '/dev/null';
 use strict;
 
 my $class = __PACKAGE__;
-my $cygpfx = '';
 if (CYGWIN) {
     require Text::ParseWords;
     $class->inpathnorm(1);
     $class->outpathnorm(1);
-    $cygpfx = (split/ +/,(`df /tmp`)[1])[0];
 }
 my %pidcount;
 END {
@@ -139,7 +137,7 @@ sub system {
     my @args = @{$self->{AV_ARGS}};
     my @cmd = (@prog, @opts, @args);
     my $dbg = $self->dbglevel;
-    $self->_addstats("cleartool @prog", scalar @args) if defined %Argv::Summary;
+    $self->_addstats("cleartool @prog", scalar @args) if %Argv::Summary;
     $self->warning("cannot close stdin of child process") if $ifd;
     if ($self->noexec && !$self->_read_only) {
 	$self->_dbg($dbg, '-', \*STDERR, @cmd);
@@ -231,7 +229,7 @@ sub qx {
     my @opts = $self->_sets2opts(@_);
     my @args = @{$self->{AV_ARGS}};
     my @cmd = (@prog, @opts, @args);
-    $self->_addstats("cleartool @prog", scalar @args) if defined %Argv::Summary;
+    $self->_addstats("cleartool @prog", scalar @args) if %Argv::Summary;
     $self->warning("cannot close stdin of child process") if $ifd;
     if ($self->noexec && !$self->_read_only) {
 	$self->_dbg($dbg, '-', \*STDERR, @cmd);
@@ -588,6 +586,7 @@ sub ipc {
 sub _cw_map {
     use File::Basename;
     no warnings;
+    my $cpath = Argv->new({stderr=>0, autochomp=>1}, 'cygpath', [qw(-w)]);
     for (@_) {
         next if s%^(vob:)?/cygdrive/([A-Za-z])%$1$2:%;
 	next if s%^(vob:)?/view%$1//view%;
@@ -596,7 +595,7 @@ sub _cw_map {
 	    if ($p eq '/') {
 	        s%^/%\\%; # case of vob tags
 	    } elsif (-r $p) {
-	        $_ = "${cygpfx}$_";
+	        $_ = $cpath->args($_)->qx;
 	    }
 	}
     }
@@ -787,10 +786,9 @@ sub quote {
     # Single quotes aren't understood by the &*&#$ Windows shell
     # but cleartool gets them right so this quoting is simpler.
     my $inpathnorm = $self->inpathnorm;
+    my $cpath = Argv->new({stderr=>0, autochomp=>1}, 'cygpath') if CYGWIN;
     for (@_) {
-	if (CYGWIN) {
-	    s%^/cygdrive/([a-zA-Z])%$1:% || s%^/%$cygpfx/%;
-	}
+        $_ = $cpath->args($_)->qx if CYGWIN && m%^/%;
 	# If requested, change / for \ in Windows file paths.
 	s%/%\\%g if $inpathnorm;
 	# Now quote embedded quotes ...
