@@ -362,9 +362,9 @@ sub unixpath {
 	    my @bit = $odd? split/(\s+)/,$line
 	      : Text::ParseWords::parse_line('\s+', 'delimiters', $line);
 	    map {
-	        s%\\%/%g if m%(?:^(?:"|[A-Za-z]:|vob:|[\w/.-]*)|\@)\\%;
-		if (m%\A([A-Za-z]):(.*)\Z%) {
-		  $_ = "/cygdrive/" . lc($1) . $2;
+	        s%\\%/%g if m%(?:^(?:"|[\w/.-]*)|\@)\\%;
+		if (m%^(vob|[A-Za-z]):%) {
+		  $_ = Cygwin::win_to_posix_path($_);
 		} else {
 		  s%^//view%/view%;
 		}
@@ -586,7 +586,6 @@ sub ipc {
 sub _cw_map {
     use File::Basename;
     no warnings;
-    my $cpath = Argv->new({stderr=>0, autochomp=>1}, 'cygpath', [qw(-w)]);
     for (@_) {
         next if s%^(vob:)?/cygdrive/([A-Za-z])%$1$2:%;
 	next if s%^(vob:)?/view%$1//view%;
@@ -595,7 +594,7 @@ sub _cw_map {
 	    if ($p eq '/') {
 	        s%^/%\\%; # case of vob tags
 	    } elsif (-r $p) {
-	        $_ = $cpath->args($_)->qx;
+	        $_ = Cygwin::posix_to_win_path($_);
 	    }
 	}
     }
@@ -786,9 +785,8 @@ sub quote {
     # Single quotes aren't understood by the &*&#$ Windows shell
     # but cleartool gets them right so this quoting is simpler.
     my $inpathnorm = $self->inpathnorm;
-    my $cpath = Argv->new({stderr=>0, autochomp=>1}, 'cygpath') if CYGWIN;
     for (@_) {
-        $_ = $cpath->args($_)->qx if CYGWIN && m%^/%;
+        $_ = Cygwin::posix_to_win_path($_) if CYGWIN && m%^/%;
 	# If requested, change / for \ in Windows file paths.
 	s%/%\\%g if $inpathnorm;
 	# Now quote embedded quotes ...
