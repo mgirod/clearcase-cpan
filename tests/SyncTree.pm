@@ -548,13 +548,36 @@ sub analyze {
     # comparing src/dst files.
     delete $self->{ST_ADD};
     delete $self->{ST_MOD};
+    my @sl = sort grep{-d $_}
+      $self->clone_ct->find($dbase, qw(-type l -print))->qx;
+    map { $_ = "/$_" } @sl if CYGWIN; # mismatch between conventions
+    if (@sl) {
+	my %sl = map{ $_ => 1} @sl;
+	for my $l (@sl) {
+	    my $s = $l;
+	    $s =~ s%^\Q$dbase\E/(.*)$%$1%;
+	    if (exists $self->{ST_SRCMAP}->{$s}) {
+		$s = join('/', $sbase, $s);
+		delete $sl{$l} if src_slink($s);
+	    }
+	}
+	@sl = sort keys %sl;
+    }
     my $comparator = $self->no_cmp ? undef : $self->cmp_func;
-    for (sort keys %{$self->{ST_SRCMAP}}) {
+    SRC: for (sort keys %{$self->{ST_SRCMAP}}) {
 	next if $self->{ST_SRCMAP}->{$_}->{type} &&
 		$self->{ST_SRCMAP}->{$_}->{type} !~ /$type/;
 	my $src = join('/', $sbase, $_);
 	$src = $_ unless -e $src || src_slink($src);
 	my $dst = join('/', $dbase, $self->{ST_SRCMAP}->{$_}->{dst} || $_);
+	for my $s (@sl) {
+	    if ($dst =~ /^\Q$s\E/) {
+		$self->{ST_DIRLNK}->{$s} = 1;
+		$self->{ST_ADD}->{$_}->{src} = $src;
+		$self->{ST_ADD}->{$_}->{dst} = $dst;
+		next SRC;
+	    }
+	}
 	# It's possible for a symlink to not satisfy -e if it's dangling.
 	# Case-insensitive file test operators are a problem on Windows.
 	# You cannot modify files when they don't exist under the proper name.
@@ -567,6 +590,20 @@ sub analyze {
 		$self->{ST_MOD}->{$_}->{dst} = $dst;
 	    }
 	}
+    }
+    if ($self->{ST_DIRLNK}) {
+	my @rem;
+	my @slst = sort keys %{$self->{ST_DIRLNK}};
+	for (reverse @slst) {
+	    for my $l (@slst) {
+		if (/^\Q$l\E./) {
+		    push @rem, $_;
+		    last;
+		}
+	    }
+	}
+	delete @{$self->{ST_DIRLNK}}{@rem} if @rem;
+	unlink $self->{ST_DIRLNK} unless keys %{$self->{ST_DIRLNK}};
     }
     # Last, check for subtractions but only if asked - it's potentially
     # expensive and error-prone.
@@ -607,6 +644,13 @@ sub preview {
     my $self = shift;
     my $indent = ' ' x 4;
     my($adds, $mods, $subs) = (0, 0, 0);
+    if ($self->{ST_DIRLNK}) {
+	my $dl = keys %{$self->{ST_DIRLNK}};
+	print "Removing $dl directory symlinks:\n";
+	for (sort keys %{$self->{ST_DIRLNK}}) {
+	    print "${indent}$_\n";
+	}
+    }
     if ($self->{ST_ADD}) {
 	$adds = keys %{$self->{ST_ADD}};
 	print "Adding $adds elements:\n";
@@ -692,6 +736,17 @@ sub branchco {
     return $rc;
 }
 
+sub rmdirlinks {
+    my $self = shift;
+    return unless $self->{ST_DIRLNK};
+    my $lsco = ClearCase::Argv->lsco([qw(-s -d -cview)]);
+    for (sort {$b cmp $a} keys %{$self->{ST_DIRLNK}}) {
+      my $dad = dirname $_;
+      $self->branchco(1, $dad) unless $lsco->args($dad)->qx;
+      $self->clone_ct->rm($_)->system;
+    }
+}
+
 sub mkrellink {
     my ($self, $src) = @_;
     my $txt = src_rlink($src);
@@ -775,6 +830,7 @@ sub reusemkdir {
 	      while (ccsymlink($dirext)) {
 		$name = readcclink $dirext;
 		$name =~ s/\@\@$//;
+		$dirext = "$_/$name";
 		# consider only relative, and local symlinks
 		next VER if !ecs($dirext) ||
 		  $dm->args($dirext)->qx eq 'file element';
@@ -862,8 +918,9 @@ sub add {
 	# in the way if added in _mkbase as view private; ignore failures
 	rmdir($_) for reverse sort @{$self->{ST_IMPLICIT_DIRS}};
 	for my $d (sort keys %{$self->{ST_ADD}}) {
+	    my $src = $self->{ST_ADD}->{$d}->{src};
 	    my $dst = $self->{ST_ADD}->{$d}->{dst};
-	    $dir{$dst} = $d if -d $self->{ST_ADD}->{$d}->{src}; # empty dir
+	    $dir{$dst} = $d if -d $src && !src_slink($src); # empty dir
 	    $self->recadd($d, $dst, \%dir, \%rm, \%dseen);
 	}
 	my %found = $self->reusemkdir(\%dir, \%rm);

@@ -244,7 +244,7 @@ Revision history for Perl extension ClearCase::SyncTree.
 	- restored less verbosity: no mklabel events
 	- NOTE: all work from 0.48 to here courtesy of Marc Girod.
 
-0.57 Wed Apr  6 15:36:39 GMTDT 2011
+0.57 Fri Apr 15 15:16:02 GMTDT 2011
         - apply even equivalent fixed labels with -rep, to allow for replay
 	- if label existed, check labeled versions first
 	- skip unchanged labeled versions from recursive labeling
@@ -261,3 +261,4 @@ Revision history for Perl extension ClearCase::SyncTree.
 	- fix to reuse of empty directories
 	- fix in pruning of versions in vtree
 	- arguments given with relative paths must point under srcbase
+	- remove symlinks to directories under dstbase, which could fool synctree
