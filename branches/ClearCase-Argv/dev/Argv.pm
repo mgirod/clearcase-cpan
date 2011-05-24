@@ -591,7 +591,7 @@ sub _cw_map {
 	next if s%^(vob:)?/view%$1//view%;
 	if (m%^/[^/]%) {
 	    my $p = dirname $_;
-	    if ($p eq '/') {
+	    if ($p eq '/' && ! -r) {
 	        s%^/%\\%; # case of vob tags
 	    } elsif (-r $p) {
 	        $_ = Cygwin::posix_to_win_path($_);
