@@ -548,8 +548,8 @@ sub analyze {
     # comparing src/dst files.
     delete $self->{ST_ADD};
     delete $self->{ST_MOD};
-    my @sl = sort grep{-d $_}
-      $self->clone_ct->find($dbase, qw(-type l -print))->qx;
+    my @sl = $dbase eq $self->{ST_MKBASE}? sort grep{-d $_}
+      $self->clone_ct->find($dbase, qw(-type l -print))->qx : ();
     map { $_ = "/$_" } @sl if CYGWIN; # mismatch between conventions
     if (@sl) {
 	my %sl = map{ $_ => 1} @sl;
@@ -741,9 +741,9 @@ sub rmdirlinks {
     return unless $self->{ST_DIRLNK};
     my $lsco = ClearCase::Argv->lsco([qw(-s -d -cview)]);
     for (sort {$b cmp $a} keys %{$self->{ST_DIRLNK}}) {
-      my $dad = dirname $_;
-      $self->branchco(1, $dad) unless $lsco->args($dad)->qx;
-      $self->clone_ct->rm($_)->system;
+	my $dad = dirname $_;
+	$self->branchco(1, $dad) unless $lsco->args($dad)->qx;
+	$self->clone_ct->rm($_)->system;
     }
 }
 
@@ -1300,7 +1300,8 @@ sub label {
 	    my $ct = $self->clone_ct({autochomp=>1, autofail=>0, stderr=>0});
 	    my @rv = grep{ s/^(.*?)(?:@@(.*))/$1/ &&
 			     ($2 =~ /CHECKEDOUT$/ || !-r "$_\@\@/$lbl") }
-	      $ct->ls([qw(-r -vob -s)], $dbase)->qx;
+	      $ct->ls([qw(-r -vob -s)], $dbase)->qx,
+	      $ct->ls([qw(-d -vob -s)], $dbase)->qx;
 	    $ctbool->mklabel([qw(-nc -rep), $lbtype], $dbase, @rv)->system;
         } else {
 	    $ctbool->mklabel([qw(-nc -rep -rec), $lbtype], $dbase)->system;
