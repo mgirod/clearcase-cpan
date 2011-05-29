@@ -349,7 +349,7 @@ the specified time.
 
 =item * It replaced the I<TTT> rule (hence preserving the order of the
 rules) with a directive including set of rules, equivalent to the
-I<TTT> floating label asthe specified time. This is achieved by
+I<TTT> floating label at the specified time. This is achieved by
 determining the the fixed label in the family, which was then
 'equivalent' to I<TTT>: I<TTT_1.01>.
 

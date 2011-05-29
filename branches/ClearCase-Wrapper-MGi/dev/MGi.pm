@@ -247,7 +247,7 @@ sub _Mkbco {
       $ver .= '/LATEST' if $typ eq 'branch';
     }
     if (!$ver or !$bt) {
-      my $sel = $ct->argv('ls', '-d', $e)->qx;
+      my $sel = $ct->ls(['-d'], $e)->qx;
       if ($bt) {
 	$ver = $1 if $sel =~ /^(.*?) +Rule/;
       } elsif ($sel =~ /^(.*?) +Rule:.*-mkbranch (.*?)\]?$/) {
@@ -255,9 +255,9 @@ sub _Mkbco {
       }
     }
     if ($bt and _Checkcs($e)) {
-      my $main = ($ct->argv('lsvtree', $e)->qx)[0];
+      my $main = ($ct->lsvtree($e)->qx)[0];
       $main =~ s%^[^@]*\@\@[\\/](.*)$%$1%;
-      my $vob = $ct->argv('des', '-s', "vob:$e")->qx;
+      my $vob = $ct->des(['-s'], "vob:$e")->qx;
       my $re = _Pbrtype(\%pbrt, "$bt\@$vob") ?
 	qr([\\/]${main}[\\/]$bt[\\/]\d+$) : qr([\\/]$bt[\\/]\d+$);
       if ($ver =~ m%$re%) {
@@ -265,12 +265,11 @@ sub _Mkbco {
 	$rc |= $ct->argv('co', @opts)->system;
       } else {
 	my @mkbcopt = @cmt? @cmt : qw(-nc);
-	if ($ct->argv('mkbranch', @mkbcopt, '-ver', "/$main/0", $bt, $e)
-	      ->stderr(0)->system) {
+	if ($ct->mkbranch([@mkbcopt, '-ver', "/$main/0", $bt], $e)->system) {
 	  $rc = 1;
 	} else {
 	  if ($ver !~ m%\@\@[\\/]${main}[\\/]0$%) {
-	    my $lrc = $ct->argv('merge', '-to', $e, $ver)->stdout(0)->system;
+	    my $lrc = $ct->merge(['-to', $e], $ver)->stdout(0)->system;
 	    unlink glob("$e.contrib*");
 	    $rc |= $lrc;
 	  }
@@ -1093,6 +1092,7 @@ sub _GenMkTypeSub {
 	  } keys %pair;
 	} elsif ($opt{archive}) {
 	  my $rc = 0;
+	  $ntype->opts('-nc', $ntype->opts);
 	  foreach my $t (@args) {
 	    my ($pfx, $vob) = $t =~ /^$type:(.*?)(@.*)$/;
 	    my ($prev) = grep s/^-> $type:(.*?)@.*/$1/,
@@ -1116,7 +1116,6 @@ sub _GenMkTypeSub {
 	      next;
 	    }
 	    $ntype->args($t);
-	    $ntype->opts('-nc', $ntype->opts);
 	    $ntype->system;
 	    my $at = "$type:${arc}$vob";
 	    $silent->mkhlink([$prhl], $t, $at)->system;
@@ -1131,7 +1130,7 @@ sub _GenMkTypeSub {
 	      push @arg, $eq if $eq;
 	      $ct->lock(@arg)->system;
 	    }
-	    $ct->argv('chevent', @cmt, $at)->stdout(0)->system
+	    $ct->chevent([@cmt], $at)->stdout(0)->system
 	      unless $cmt[0] and $cmt[0] =~ /^-nc/;
 	  }
 	  exit $rc;
