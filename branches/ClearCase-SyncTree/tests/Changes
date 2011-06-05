@@ -242,7 +242,6 @@ Revision history for Perl extension ClearCase::SyncTree.
 	- checkin in reverse sort order, to cope with 'not selected by view'
 	- removed from subtract list any symlink already renamed
 	- restored less verbosity: no mklabel events
-	- NOTE: all work from 0.48 to here courtesy of Marc Girod.
 
 0.57 Fri Apr 15 15:16:02 GMTDT 2011
         - apply even equivalent fixed labels with -rep, to allow for replay
@@ -262,3 +261,4 @@ Revision history for Perl extension ClearCase::SyncTree.
 	- fix in pruning of versions in vtree
 	- arguments given with relative paths must point under srcbase
 	- remove symlinks to directories under dstbase, which could fool synctree
+	- NOTE: all work from 0.48 to here courtesy of Marc Girod.
