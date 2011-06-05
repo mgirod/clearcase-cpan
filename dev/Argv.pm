@@ -1188,7 +1188,7 @@ Cygwin preliminary support on Windows.
 The 'exit' cleartool command is dangerous in ipc mode: it will stop the
 coprocess unconditionally, without Argv updating its ipc status, and the
 ipccount. This will affect any other users of the same coprocess.
-An other symptom of the problem is a 'broken pipe' error. Argv writes
+Another symptom of the problem is a 'broken pipe' error. Argv writes
 to the coprocess, but obviously fails to read anything coming back.
 
 Some multiline commands work in the fork mode, but not in the ipc one.

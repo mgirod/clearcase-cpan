@@ -353,8 +353,8 @@ Revision history for Perl extension ClearCase::Argv.
 	- setview: fix bug reported by Dirk Heinrichs, and other glitches
 
 1.51 Tue Apr 12 14:46:48 GMTDT 2011
-        - defined(%hash) deprecated in Perl 5.12
-	- cygwin: used perlcygwin API to convert paths (e.g. /usr/lib is c:\cygwin\lib)
+	- defined(%hash) deprecated in Perl 5.12
+	- cygwin: use perlcygwin API to convert paths (e.g. /usr/lib is c:\cygwin\lib)
 
 BACKWARD COMPATIBILITY NOTES:
 
