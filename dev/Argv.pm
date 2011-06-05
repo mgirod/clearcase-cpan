@@ -3,7 +3,7 @@ package Argv;
 $VERSION = '1.27';
 @ISA = qw(Exporter);
 
-use constant MSWIN => $^O =~ /MSWin32|Windows_NT/i ? 1 : 0;
+use constant MSWIN => $^O =~ /MSWin|Windows_NT/i ? 1 : 0;
 use constant CYGWIN	=> $^O =~ /cygwin/i ? 1 : 0;
 
 # To support the "FUNCTIONAL INTERFACE"
