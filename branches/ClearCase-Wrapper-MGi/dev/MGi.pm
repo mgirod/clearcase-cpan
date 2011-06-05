@@ -1280,7 +1280,8 @@ sub _GenMkTypeSub {
 	  map { $_ = "$type:$_" } @a;
 	  my @link = grep s/^\s*(.*) -> .*$/$1/,
 	    $ct->argv(qw(des -l -ahl), "$eqhl,$prhl", @a)->qx;
-	  $ct->argv('rmhlink', @link)->system;
+	  $ct->argv('rmhlink', @link)->system if @link;
+	  return $ntype->system;
 	} else {
 	  foreach (@args) {
 	    s/^$type://;
@@ -2037,7 +2038,7 @@ sub rmtype {
       } else {
 	my ($prev) = grep s/^-> (lbtype:.*)/$1/,
 	  $ct->argv(qw(des -s -ahl), $prhl, $eq)->qx;
-	if ($ct->argv(qw(lslock -s), $prev)->stderr(0)->qx) {
+	if ($prev and $ct->argv(qw(lslock -s), $prev)->stderr(0)->qx) {
 	  push @lck, $prev;
 	  my @out = $lct->argv('unlock', $prev)->stderr(1)->qx;
 	  if (grep /^cleartool: Error/, @out) {
@@ -2081,10 +2082,12 @@ sub rmtype {
 	    $rs = 1;
 	  }
 	} else {
-	  my $t0 = "lbtype:${base}_0$vob"; # store the last eq into hidden type
-	  $ct->argv(qw(mklbtype -nc), $t0)->stdout(0)->system;
-	  $ct->argv(qw(mkhlink), $eqhl, $t0, $prev)->stdout(0)->system;
-	  $ct->argv('lock', $t0)->stdout(0)->system;
+	  if ($prev) {
+	    my $t0 = "lbtype:${base}_0$vob"; # store the last eq into hidden type
+	    $ct->argv(qw(mklbtype -nc), $t0)->stdout(0)->system;
+	    $ct->argv(qw(mkhlink), $eqhl, $t0, $prev)->stdout(0)->system;
+	    $ct->argv('lock', $t0)->stdout(0)->system;
+	  }
 	  push @eq, $eq;
 	}
       }
