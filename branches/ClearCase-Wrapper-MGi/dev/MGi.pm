@@ -1,6 +1,6 @@
 package ClearCase::Wrapper::MGi;
 
-$VERSION = '0.26';
+$VERSION = '0.27';
 
 use warnings;
 use strict;
@@ -160,7 +160,7 @@ sub _Checkcs {
   $ct = $ct->clone();
   $v =~ s/^(.*?)\@\@.*$/$1/;
   my $dest = dirname($v);
-  $dest = '' if $dest eq '.';
+  $dest .= '/' unless $dest =~ m%/$%;
   my $pwd = getcwd();
   $ct->argv('cd', $dest)->system if $dest;
   my @cs = grep /^\#\#:BranchOff: *root/, $ct->argv('catcs')->qx;
@@ -176,15 +176,17 @@ sub _Pbrtype {
   }
   return $pbrt->{$bt};
 }
-sub _Parsevtree($$$) {
+sub _Parsevtree {
   my ($ele, $obs, $sel) = @_;
-  $ct->argv('lsvtree');
+  $ct->lsvtree;
   my @opt = qw(-merge -all);
   push @opt, '-obs' if $obs;
   $ct->opts(@opt);
-  my @vt = grep m%(^$sel|[\\/]([1-9]\d*|CHECKEDOUT))( .*)?$%,
-    $ct->args($ele)->qx;
-  map { s%\\%/%g } @vt;
+  my @vt = $ct->args($ele)->qx;
+  my $v0 = $vt[1];
+  @vt = grep m%(^$sel|[\\/]([1-9]\d*|CHECKEDOUT))( .*)?$%, $ct->args($ele)->qx;
+  map { s%\\%/%g } @vt, $v0;
+  $v0 =~ s%/0 \(.*$%/0%; #In case of labels on the /main/0 version...
   my %gen = ();
   my @stack = ();
   foreach my $g (@vt) {
@@ -203,6 +205,9 @@ sub _Parsevtree($$$) {
     if (_Findpredinstack($g, \@stack)) {
       push @{ $gen{$g}{parents} }, $stack[-1];
       push @{ $gen{$stack[-1]}{children} }, $g;
+    } else {
+      push @{ $gen{$g}{parents} }, $v0;
+      push @{ $gen{$v0}{children} }, $g;
     }
     push @stack, $g;
   }
@@ -388,7 +393,7 @@ sub _PreCi {
 }
 sub _Preemptcmt { #return the comments apart: e.g. mklbtype needs discrimination
   use File::Temp qw(tempfile);
-  my ($cmd, $fn, $tst) = @_; #parsed, 3 groups: cquery|cqeach nc c|cfile=s
+  my ($cmd, $fn, $tst, $tnc) = @_; #parsed, 3 groups: cquery|cqeach nc c|cfile=s
   use warnings;
   use strict;
   my @opts = $cmd->opts;
@@ -432,6 +437,14 @@ sub _Preemptcmt { #return the comments apart: e.g. mklbtype needs discrimination
   if ($ncf or $cf) {
     if ($ncf) {
       $cmd->opts(grep !/^-nc(?:omment)?$/,@opts);
+      if ($tst and $tnc) {
+	my (@args1, @args) = $cmd->args;
+	for (@args1) {
+	  push @args, $_ if $tst->($cmd, $_);
+	}
+	exit 0 unless @args;
+	$cmd->args(@args);
+      }
       $ret = $fn->($cmd, qw(-nc));
     } else {
       my $skip = 0;
@@ -495,7 +508,7 @@ sub _Unco {
   for my $arg ($unco->args) { # Already sorted if several
     my $b0 = $ct->argv(qw(ls -s -d), $arg)->qx;
     $rc |= $unco->args($arg)->system;
-    if ($b0 =~ s%^(.*)[\\/]CHECKEDOUT$%$1%) {
+    if ($b0 =~ s%^(.*)[\\/]CHECKEDOUT$%$1% and $b0 !~ m%@@/[^/]+$%) {
       opendir BR, $b0 or next;
       my @f = grep !/^\.\.?$/, readdir BR;
       closedir BR;
@@ -1827,16 +1840,19 @@ sub checkin {
   for (@elems) {
     die Msg('E', "$_: appears to be open in vim!") if -f ".$_.swp";
   }
-  if ($opt{diff} or $opt{revert}) {
+  if ($opt{diff}) {
+    warn Msg('W', 'Ignoring c/nc flags when diff set')
+      if grep /^-c|-nc$/, $ci->opts;
     # In case ~/.clearcase_profile makes ci -nc the default, make sure
     # we prompt for a comment - unless checking in dirs only.
-    if (!grep(/^-c|^-nc$/, $ci->opts) && grep(-f, @elems)) {
-      $ci->opts('-cqe', $ci->opts);
+    if (grep(-f, @elems)) {
+      $ci->opts('-cqe', grep(!/^-c|^-nc$/, $ci->opts));
       $ci->{AV_LKG}{''}{cquery}=1;
+      delete @{$ci->{AV_LKG}{''}}{qw(c nc)};
     }
   }
   $ci->{opthashre} = \%opt;
-  _Preemptcmt($ci, \&_Checkin, \&_PreCi);
+  _Preemptcmt($ci, \&_Checkin, \&_PreCi, $opt{revert});
 }
 
 =item * RMBRANCH

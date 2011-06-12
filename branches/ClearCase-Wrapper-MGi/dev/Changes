@@ -151,10 +151,13 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- des -fam n: only the most recent equivalent fixed types
 	- mkview -clone -equiv TTT,1-Jan --requires Date::Parse
 
-0.26 Sun Jun  5 18:53:44 GMTDT 2011
+0.26 Tue Mar 22 17:03:20 GMTST 2011
         - des -par/fam: fix to support no argument
 	- mkview -equiv: non local brtype in config spec
+
+0.27 Sun Jun 12 16:15:55 GMTDT 2011
 	- co/mkbranch: display mkbranch stderr
 	- fix mk*type -arc with multiple arguments
 	- fix mk*type -rep for non family type
 	- fix rmtype with family lbtype without a previous equivalent fixed
+        - fixes to revert, parse vtree, unco/rmbranch
