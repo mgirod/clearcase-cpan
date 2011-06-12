@@ -186,8 +186,8 @@ sub _Parsevtree {
   my $v0 = $vt[1];
   @vt = grep m%(^$sel|[\\/]([1-9]\d*|CHECKEDOUT))( .*)?$%, $ct->args($ele)->qx;
   map { s%\\%/%g } @vt, $v0;
-  $v0 =~ s%/0 \(.*$%/0%; #In case of labels on the /main/0 version...
   my %gen = ();
+  $gen{$v0}{labels} = $1 if $v0 =~ s%/0 (\(.*)$%/0%;
   my @stack = ();
   foreach my $g (@vt) {
     $g =~ s%^(.*/CHECKEDOUT) view ".*"(.*)$%$1$2%;
@@ -205,7 +205,7 @@ sub _Parsevtree {
     if (_Findpredinstack($g, \@stack)) {
       push @{ $gen{$g}{parents} }, $stack[-1];
       push @{ $gen{$stack[-1]}{children} }, $g;
-    } else {
+    } elsif ($g ne $v0) {
       push @{ $gen{$g}{parents} }, $v0;
       push @{ $gen{$v0}{children} }, $g;
     }
@@ -234,7 +234,7 @@ sub _Mkbco {
   die Msg('E', 'Element pathname required.') unless $cmd->args;
   foreach my $e ($cmd->args) {
     my $ver = $cmd->{ver};
-    my $typ = $ct->argv(qw(des -fmt %m), $e)->qx;
+    my $typ = $ct->des([qw(-fmt %m)], $e)->qx;
     if ($typ !~ /(branch|version)$/) {
       warn Msg('W', "Not a vob object: $e");
       $rc = 1;
@@ -260,8 +260,11 @@ sub _Mkbco {
       }
     }
     if ($bt and _Checkcs($e)) {
-      my $main = ($ct->lsvtree($e)->qx)[0];
-      $main =~ s%^[^@]*\@\@[\\/](.*)$%$1%;
+      my $main = 'main';
+      if ($ct->des(['-s'], "$e\@\@/main/0")->stderr(0)->stdout(0)->system) {
+	$main = ($ct->lsvtree($e)->qx)[0];
+	$main =~ s%^[^@]*\@\@[\\/](.*)$%$1%;
+      }
       my $vob = $ct->des(['-s'], "vob:$e")->qx;
       my $re = _Pbrtype(\%pbrt, "$bt\@$vob") ?
 	qr([\\/]${main}[\\/]$bt[\\/]\d+$) : qr([\\/]$bt[\\/]\d+$);
