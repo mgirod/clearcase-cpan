@@ -262,3 +262,6 @@ Revision history for Perl extension ClearCase::SyncTree.
 	- arguments given with relative paths must point under srcbase
 	- remove symlinks to directories under dstbase, which could fool synctree
 	- NOTE: all work from 0.48 to here courtesy of Marc Girod.
+
+0.58 Sun Jun 12 19:12:38 GMTDT 2011
+        - branchco optimization: avoid lsvtree if possible

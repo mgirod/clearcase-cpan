@@ -1,6 +1,6 @@
 package ClearCase::SyncTree;
 
-$VERSION = '0.57';
+$VERSION = '0.58';
 
 require 5.004;
 
@@ -15,7 +15,7 @@ use File::Path;
 use File::Spec 0.82;
 use ClearCase::Argv 1.34 qw(chdir);
 
-use constant MSWIN => $^O =~ /MSWin32|Windows_NT/i ? 1 : 0;
+use constant MSWIN => $^O =~ /MSWin|Windows_NT/i ? 1 : 0;
 use constant CYGWIN => $^O =~ /cygwin/i ? 1 : 0;
 
 my $lext = '.=lnk=';	# special extension for pseudo-symlinks
@@ -701,37 +701,41 @@ sub branchco {
     my $rc;
     if ($self->{branchoffroot}) {
 	foreach my $e (@ele) {
-	    my $sel = $ct->argv('ls', '-d', "$e")->autochomp(1)->qx;
+	    my $sel = $ct->ls(['-d'], $e)->autochomp(1)->qx;
 	    if ($sel =~ /^(.*?) +Rule:.*-mkbranch (.*?)\]?$/) {
 		my ($ver, $bt) = ($1, $2);
-		my $main = ($ct->argv('lsvtree', $e)->autochomp(1)->qx)[0];
-		$main =~ s%^[^@]*\@\@[\\/](.*)\r?$%$1%;
+		my $sil = $self->clone_ct({stdout=>0, stderr=>0});
+		my $main = 'main';
+		if ($sil->des(['-s'], "$e\@\@/main/0")->system) {
+		    $main = ($ct->lsvtree($e)->autochomp(1)->qx)[0];
+		    $main =~ s%^[^@]*\@\@[\\/](.*)\r?$%$1%;
+		}
 		my $re = $self->pbrtype($bt) ?
 		  qr([\\/]${main}[\\/]$bt[\\/]\d+$) : qr([\\/]$bt[\\/]\d+$);
 		if ($ver =~ m%$re%) {
-		    $rc |= $ct->argv('co', $self->comment, "$e")->system;
+		    $rc |= $ct->co([$self->comment], $e)->system;
 		} else {
-		    my $r = $ct->argv('mkbranch', $self->comment,
-				      '-ver', "/${main}/0", $bt, "$e")->system;
+		    my $r = $ct->mkbranch([$self->comment, '-ver',
+					      "/${main}/0", $bt], $e)->system;
 		    if ($r) {
 			$rc = 1;
 		    } else {
 			if ($ver !~ m%\@\@[\\/]${main}[\\/]0$%) {
 			    $rc |= $dir ?
-				$ct->argv('merge', '-to',
-					  $e, $ver)->stdout(0)->system :
-				$ct->argv('merge', '-ndata', '-to', $e,
-					  $ver)->stdout(0)->system;
+				$ct->merge(['-to', $e],
+					   $ver)->stdout(0)->system :
+				$ct->merge(['-ndata', '-to', $e],
+					   $ver)->stdout(0)->system;
 			    unlink("$e.contrib");
 			}
 		    }
 		}
 	    } else {
-		$rc |= $ct->argv('co', $self->comment, "$e")->system;
+		$rc |= $ct->co([$self->comment], $e)->system;
 	    }
 	}
     } else {
-	$rc = $ct->argv('co', $self->comment, @ele)->system;
+	$rc = $ct->co([$self->comment], @ele)->system;
     }
     return $rc;
 }
