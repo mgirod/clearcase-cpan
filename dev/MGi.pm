@@ -184,7 +184,7 @@ sub _Parsevtree {
   $ct->opts(@opt);
   my @vt = $ct->args($ele)->qx;
   my $v0 = $vt[1];
-  @vt = grep m%(^$sel|[\\/]([1-9]\d*|CHECKEDOUT))( .*)?$%, $ct->args($ele)->qx;
+  @vt = grep m%(^$sel|[\\/]([1-9]\d*|CHECKEDOUT))( .*)?$%, @vt;
   map { s%\\%/%g } @vt, $v0;
   my %gen = ();
   $gen{$v0}{labels} = $1 if $v0 =~ s%/0 (\(.*)$%/0%;
@@ -205,7 +205,7 @@ sub _Parsevtree {
     if (_Findpredinstack($g, \@stack)) {
       push @{ $gen{$g}{parents} }, $stack[-1];
       push @{ $gen{$stack[-1]}{children} }, $g;
-    } elsif ($g ne $v0) {
+    } elsif ($g ne $v0 and !$gen{$g}{parents}) {
       push @{ $gen{$g}{parents} }, $v0;
       push @{ $gen{$v0}{children} }, $g;
     }
