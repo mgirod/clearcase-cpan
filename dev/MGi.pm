@@ -1034,11 +1034,6 @@ sub _GenMkTypeSub {
     my @args = $ntype->args;
     my %opt = %{$ntype->{fopts}};
     my $silent = $ct->clone({stdout=>0});
-    if ((grep /^-glo/, $ntype->opts) or ($ntype->flag('global') and !%opt)) {
-      push @cmt, '-rep' if $rep;
-      $ntype->opts(@cmt, $ntype->opts);
-      return $ntype->system
-    }
     my (%vob, $unkvob);
     /\@(.*)$/? $vob{$1}++ : $vob{'.'}++ for @args;
     my @vob = keys %vob;
@@ -1332,7 +1327,6 @@ sub mklbtype {
   GetOptions('replace' => \$rep);
   die Msg('E', 'Incompatible options: family increment archive')
     if keys %opt > 1;
-  ClearCase::Argv->ipc(1);
   my $ntype = ClearCase::Argv->new(@ARGV);
   $ntype->parse(qw(global|ordinary vpelement|vpbranch|vpversion
 		   pbranch|shared gt|ge|lt|le|enum|default|vtype=s
@@ -2124,6 +2118,52 @@ sub rmtype {
     }
   }
   exit $rs;
+}
+
+=item * CPTYPE
+
+For family types: copy both the "family" (floating) type and its equivalent fixed
+incremental type (and all the hierarchy?).
+
+For global types, create the hyperlinks.
+
+=cut
+
+sub _CpType {
+  use strict;
+  use warnings;
+  my ($cpt, @cmt) = @_;
+  $ct = new ClearCase::Argv({autochomp=>1});
+  my ($src, $dst) = $cpt->args;
+  my $glb = $ct->des([qw(-fmt %[type_scope]p)], $src)->qx;
+  $glb = 0 if $glb and $glb eq 'ordinary';
+  my ($eqt) = grep s/^->\s+(.*)$/$1/, $ct->des([qw(-s -ahl), $eqhl], $src)->qx;
+  my $ret = $cpt->system;
+  return $ret if $ret or !($glb or $eqt);
+  if ($eqt) {
+    my ($deq) = ($eqt =~ /^(.*?)\@/);
+    my ($dvb) = ($dst =~ /^.*?(\@.*)$/);
+    $deq .= $dvb;
+    $ret = $cpt->args($eqt, $deq)->system;
+    $ret = $ct->mkhlink(['GlobalDefinition'], $deq, $eqt)->system
+      if $glb and !$ret;
+  }
+  $ret += $ct->mkhlink(['GlobalDefinition'], $dst, $src)->system if $glb;
+  return $ret;
+}
+sub cptype {
+  use strict;
+  use warnings;
+  my $cpt = ClearCase::Argv->new(@ARGV);
+  $cpt->parse(qw(c|cfile cq|cqe nc replace));
+  if (scalar $cpt->args != 2) {
+    warn Msg('E', 'Type name required.');
+    @ARGV = qw(help cptype);
+    ClearCase::Wrapper->help();
+    return 1;
+  }
+  return 1 if ClearCase::Argv->des(['-s'], ($cpt->args)[0])->stdout(0)->system;
+  _Preemptcmt($cpt, \&_CpType);
 }
 
 =item * SETCS
