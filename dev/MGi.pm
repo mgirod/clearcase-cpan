@@ -1059,15 +1059,30 @@ sub _GenMkTypeSub {
 	warn Msg('W', "making global type(s) @args");
       }
     }
+    my %targ; #target vobs per type, for use with -inc and -arc
     if (%opt) {
-      map { s/^${type}:(.*)$/$1/ } @args;
-      my @a = @args;
+      map { s/^$type://; $_ } @args;
+      if (!$opt{family} and !$ntype->flag('global')) { #before ensuring types
+	my @glb = grep /^global/,
+	  map{$ct->des([qw(-fmt %[type_scope]p)], "$type:$_")->qx} @args;
+	die Msg('E', "Cannot process a mixture of global and ordinary types\n")
+	  if @glb and scalar @glb != scalar @args;
+	if (@glb) {
+	  $ntype->opts('-global', $ntype->opts);
+	  my @a = @args;
+	  map {($_) = grep s/^$type://,
+		 $ct->des([qw(-fmt %Xn)], "$type:$_")->qx} @args;
+	  my $cvob = $ct->des(['-s'], 'vob:.')->qx;
+	  $targ{$_} = (shift(@a) =~ /(\@.*)$/)? $1: $cvob for @args;
+	  @vob = (); #The types were already created
+	}
+      }
       _Ensuretypes((grep /^-glo/, $ntype->opts), @vob);
       if ($rep) {
 	@args = grep { $_ = $ct->des([qw(-fmt %Xn)], "$type:$_")->qx } @args;
 	exit 1 unless @args;
 	if ($opt{family}) {
-	  @a = ();
+	  my @a = ();
 	  my $gflg = (grep /^-glo/, $ntype->opts)? '-glo' : '-ord';
 	  foreach my $t (@args) {
 	    if ($ct->des([qw(-s -ahl), $eqhl], $t)->stderr(0)->qx) {
@@ -1128,6 +1143,11 @@ sub _GenMkTypeSub {
 	    }
 	    $ntype->args($t);
 	    $ntype->system;
+	    if (my $v = $targ{(split /:/, $t)[1]}) {
+	      my $t2 = "${1}$v" if $t =~ /^(.*?)\@/;
+	      $silent->cptype($t, $t2)->system;
+	      $silent->mkhlink(['GlobalDefinition'], $t2, $t)->system;
+	    }
 	    my $at = "$type:${arc}$vob";
 	    $silent->mkhlink([$prhl], $t, $at)->system;
 	    if ($type eq 'lbtype') {
@@ -1150,7 +1170,7 @@ sub _GenMkTypeSub {
 	}
       } else {
 	if ($opt{family}) {
-	  @a = @args;
+	  my @a = @args;
 	  map { $_ = "$type:$_" } @a;
 	  die Msg('E', "Some types already exist among @args")
 	    unless $silent->argv(qw(des -s), @a)->stderr(0)->system;
@@ -1215,12 +1235,12 @@ sub _GenMkTypeSub {
 	  my ($fl, $loaded) = $ENV{FORCELOCK};
 	INCT: for my $t (@args) {
 	    my ($pt, $lck) = "$type:$t";
-	    if (!$ct->argv(qw(des -s), $pt)->stderr(0)->qx) {
+	    if (!$ct->des(['-s'], $pt)->stderr(0)->qx) {
 	      warn Msg('E', qq($Name type not found: "$t"));
 	      next;
 	    }
 	    my ($pair) = grep s/^\s*(.*) -> $type:(.*)\@(.*)$/$1,$2,$3/,
-	      $ct->argv(qw(des -l -ahl), $eqhl, $pt)->stderr(0)->qx;
+	      $ct->des([qw(-l -ahl), $eqhl], $pt)->stderr(0)->qx;
 	    my ($hlk, $prev, $vob) = split /,/, $pair if $pair;
 	    if (!$prev) {
 	      warn Msg('E', "Not a family type: $t");
@@ -1228,11 +1248,11 @@ sub _GenMkTypeSub {
 	    }
 	    my ($t1) = $t =~ /^(.*?)(@|$)/;
 	    for my $l ($t1, $prev) {
-	      if ($ct->argv(qw(lslock -s), "lbtype:$l\@$vob")->stderr(0)->qx) {
+	      if ($ct->lslock(['-s'], "lbtype:$l\@$vob")->stderr(0)->qx) {
 		$lck = 1;  #remember to lock the equivalent fixed type
 		#This should happen as vob owner, to retain the timestamp
 		my @out =
-		  $lct->argv('unlock', "lbtype:$l\@$vob")->stderr(1)->qx;
+		  $lct->unlock("lbtype:$l\@$vob")->stderr(1)->qx;
 		if (grep /^cleartool: Error/, @out) {
 		  if ($fl and !$loaded) {
 		    my $fn = $fl; $fn =~ s%::%/%g; $fn .= '.pm';
@@ -1259,16 +1279,22 @@ sub _GenMkTypeSub {
 		$new = "${base}_" .
 		  (defined($min)? $maj . '.' . ++$min : ++$maj);
 		$new .= $ext;
-	      } while ($ct->argv(qw(des -s), "$type:$new")->stderr(0)->qx);
+	      } while $ct->des(['-s'], "$type:$new")->stderr(0)->qx;
 	      $ntype->args($new)->system and exit 1;
-	      $silent->argv('rmhlink', $hlk)->system;
-	      $silent->argv(qw(mkhlink -nc), $eqhl,
-			    "$type:$t", "$type:$new")->system;
-	      $silent->argv(qw(mkhlink -nc), $prhl,
-			    "$type:$new", "$type:$p1")->system;
+	      $silent->rmhlink($hlk)->system;
+	      $silent->mkhlink(['-nc', $eqhl,
+			    "$type:$t"], "$type:$new")->system;
+	      $silent->mkhlink(['-nc', $prhl,
+			    "$type:$new"], "$type:$p1")->system;
+	      if (my $v = $targ{$t}) {
+		my $t1 = "$type:$new";
+		my $t2 = "$type:${1}$v" if $new =~ /^(.*?)\@/;
+		$silent->cptype($t1, $t2)->system;
+		$silent->mkhlink(['GlobalDefinition'], $t2, $t1)->system;
+	      }
 	      if ($lck) {
 		my @out =
-		  $lct->argv('lock', "lbtype:$prev\@$vob")->stderr(1)->qx;
+		  $lct->lock("lbtype:$prev\@$vob")->stderr(1)->qx;
 		if ($fl and grep /^cleartool: Error/, @out) {
 		  flocklt($prev, $vob); # loaded while unlocking
 		} else {
@@ -2147,6 +2173,9 @@ sub _CpType {
     $ret = $cpt->args($eqt, $deq)->system;
     $ret = $ct->mkhlink(['GlobalDefinition'], $deq, $eqt)->system
       if $glb and !$ret;
+  }
+  if ($dst !~ /:/) {
+    $dst = "$1$dst" if $src =~ /^(.*?:)/;
   }
   $ret += $ct->mkhlink(['GlobalDefinition'], $dst, $src)->system if $glb;
   return $ret;
