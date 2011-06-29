@@ -155,7 +155,7 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
         - des -par/fam: fix to support no argument
 	- mkview -equiv: non local brtype in config spec
 
-0.27 Tue Jun 21 13:58:08 BST 2011
+0.27 Wed Jun 29 18:07:38 GMTDT 2011
 	- co/mkbranch: display mkbranch stderr
 	- fix mk*type -arc with multiple arguments
 	- fix mk*type -rep for non family type
@@ -164,3 +164,4 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- optimization: co doesn't use lsvtree if /main/0 exists
 	- fix to mklbtype -glo -fam
 	- cptype: support for family types, and linking global types
+	- mklbtype -inc on global type
