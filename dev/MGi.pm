@@ -186,7 +186,7 @@ sub _Parsevtree {
   my $v0 = $vt[1];
   @vt = grep m%(^$sel|[\\/]([1-9]\d*|CHECKEDOUT))( .*)?$%, @vt;
   map { s%\\%/%g } @vt, $v0;
-  my %gen = ();
+  my (%gen, @root);
   $gen{$v0}{labels} = $1 if $v0 =~ s%/0 (\(.*)$%/0%;
   my @stack = ();
   foreach my $g (@vt) {
@@ -206,10 +206,14 @@ sub _Parsevtree {
       push @{ $gen{$g}{parents} }, $stack[-1];
       push @{ $gen{$stack[-1]}{children} }, $g;
     } elsif ($g ne $v0 and !$gen{$g}{parents}) {
-      push @{ $gen{$g}{parents} }, $v0;
-      push @{ $gen{$v0}{children} }, $g;
+      push @root, $g; #come back later
     }
     push @stack, $g;
+  }
+  for (@root) {
+    next if $gen{$_}{parents};
+    push @{ $gen{$_}{parents} }, $v0;
+    push @{ $gen{$v0}{children} }, $_;
   }
   return %gen;
 }
@@ -695,13 +699,14 @@ sub lsgenealogy {
   $ct->ipc(1) unless $ct->ctcmd(1);
   while (my $e = shift @argv) {
     my ($ele, $ver, $type) =
-      $ct->argv(qw(des -fmt), '%En\n%En@@%Vn\n%m', $e)->qx;
+      $ct->des([qw(-fmt %En\n%En@@%Vn\n%m)], $e)->qx;
     if (!defined($type) or ($type !~ /version$/)) {
       warn Msg('W', "Not a version: $e");
       next;
     }
     $ele =~ s%\\%/%g;
     $ver =~ s%\\%/%g;
+    $ver =~ s%^\Q$ele\E.*?\@%$ele\@%; # case of vob root directory
     my %gen = _Parsevtree($ele, $opt{obsolete}, $ver);
     _Setdepths($ver, 0, \%gen);
     my %seen = ();
