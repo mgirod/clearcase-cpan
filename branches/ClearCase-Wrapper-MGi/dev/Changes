@@ -161,8 +161,10 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- fix mk*type -rep for non family types;
 	  for family types: -glo/-ord also affects equivalent types;
 	    no other flag drops back to non-family types (removes hyperlinks)
+	- fix to mklbtype -glo -fam
 	- fix rmtype with family lbtype without a previous equivalent fixed
         - fixes to revert, parse vtree, unco/rmbranch
 	- optimization: co doesn't use lsvtree if /main/0 exists
 	- cptype: support for family types, and linking global types
 	- mklbtype -inc on global type
+	- lsgen: fix for vob root
