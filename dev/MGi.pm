@@ -1073,7 +1073,11 @@ sub _GenMkTypeSub {
 	  map {($_) = grep s/^$type://,
 		 $ct->des([qw(-fmt %Xn)], "$type:$_")->qx} @args;
 	  my $cvob = $ct->des(['-s'], 'vob:.')->qx;
-	  $targ{$_} = (shift(@a) =~ /(\@.*)$/)? $1: $cvob for @args;
+	  for (@args) {
+	    my $mvob = $1 if /\@(.*)$/;
+	    my $lvob = (shift(@a) =~ /\@(.*)$/)? $1: $cvob;
+	    $targ{$_} = $lvob unless $lvob eq $mvob;
+	  }
 	  @vob = (); #The types were already created
 	}
       }
@@ -1144,7 +1148,7 @@ sub _GenMkTypeSub {
 	    $ntype->args($t);
 	    $ntype->system;
 	    if (my $v = $targ{(split /:/, $t)[1]}) {
-	      my $t2 = "${1}$v" if $t =~ /^(.*?)\@/;
+	      my $t2 = "${1}$v" if $t =~ /^(.*?\@)/;
 	      $silent->cptype($t, $t2)->system;
 	      $silent->mkhlink(['GlobalDefinition'], $t2, $t)->system;
 	    }
@@ -1288,7 +1292,7 @@ sub _GenMkTypeSub {
 			    "$type:$new"], "$type:$p1")->system;
 	      if (my $v = $targ{$t}) {
 		my $t1 = "$type:$new";
-		my $t2 = "$type:${1}$v" if $new =~ /^(.*?)\@/;
+		my $t2 = "$type:${1}$v" if $new =~ /^(.*?\@)/;
 		$silent->cptype($t1, $t2)->system;
 		$silent->mkhlink(['GlobalDefinition'], $t2, $t1)->system;
 	      }
@@ -1308,17 +1312,25 @@ sub _GenMkTypeSub {
 	}
       }
       exit 0;
-    } else {			# non inc/arc/fam
+    } else {			# no inc/arc/fam option
       if ($rep) {
 	$ntype->opts(@cmt, '-replace', $ntype->opts);
 	map { $_ = "$type:$_" unless /^$type:/ } @args;
-	my @a = $ct->argv(qw(des -s), @args)->stderr(0)->qx;
+	my @a = $ct->argv(qw(des -fmt %Xn), @args)->stderr(0)->qx;
 	if (@a) {
-	  map { $_ = "$type:$_" } @a;
-	  my @link = grep s/^\s*(.*) -> .*$/$1/,
-	    $ct->argv(qw(des -l -ahl), "$eqhl,$prhl", @a)->qx;
-	  $ct->argv('rmhlink', @link)->system if @link;
-	  return $ntype->system;
+	  my @link;
+	  if ($ntype->flag('global')) { # replace also the equivalent types
+	    my @eq = grep s/^-> (.*)$/$1/,
+	      $ct->argv(qw(des -s -ahl), $eqhl, @a)->qx;
+	    push @args, @eq;
+	    $ntype->args(@args);
+	  } else { # remove the hyperlinks, i.e. make the types 'non-family'
+	    @link = grep s/^\s*(.*) -> .*$/$1/,
+	      $ct->argv(qw(des -l -ahl), "$eqhl,$prhl", @a)->qx;
+	  }
+	  my $ret = $ntype->system; # may fail because of restrictions: first
+	  $ret = $ct->argv('rmhlink', @link)->system if @link and !$ret;
+	  return $ret;
 	} else {
 	  foreach (@args) {
 	    s/^$type://;
@@ -2171,8 +2183,13 @@ sub _CpType {
     my ($dvb) = ($dst =~ /^.*?(\@.*)$/);
     $deq .= $dvb;
     $ret = $cpt->args($eqt, $deq)->system;
-    $ret = $ct->mkhlink(['GlobalDefinition'], $deq, $eqt)->system
-      if $glb and !$ret;
+    if (!$ret) {
+      if ($glb) {
+	$ret = $ct->mkhlink(['GlobalDefinition'], $deq, $eqt)->system;
+      } else {
+	$ret = $ct->mkhlink([$eqhl], $dst, $deq)->system;
+      }
+    }
   }
   if ($dst !~ /:/) {
     $dst = "$1$dst" if $src =~ /^(.*?:)/;
