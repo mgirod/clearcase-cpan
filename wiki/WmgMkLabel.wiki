@@ -14,7 +14,7 @@ In addition, we retain the _-up_ extension from !ClearCase::Wrapper::DSB, which 
     * Note that the error may happen with hard links, in which case the versions may differ, so that additional information is needed to decide what to do; but it may also happen with symbolic links, and then, the versions are always the same, so the error is spurious...
   * I check locks on the floating type:
     *  The rationale for the lslock check, is that the first label which will be applied is the equivalent fixed one. One needs thus to anticipate a failure to apply the floating...
-    * What drives the vob selection to pick the type, is the element (unless the vob of the type is explicitly specified). A type short name is only a string pattern, which may resolve into several distinct types, is elements are given in different vobs.
+    * What drives the vob selection to pick the type, is the element (unless the vob of the type is explicitly specified). A type short name is only a string pattern, which may resolve into several distinct types, if elements are given in different vobs.
     * This case anticipates the problems with supporting the -con option.
     * Note that symbolic links are not followed.
     * The solution is to create a hash indexed per vobs, of both elements and equivalent types.
