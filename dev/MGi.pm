@@ -45,7 +45,7 @@ use AutoLoader 'AUTOLOAD';
 *co             = *checkout;
 *ci		= *checkin;
 *des            = *describe;
-*desc            = *describe;
+*desc           = *describe;
 *lsgen		= *lsgenealogy;
 *unco           = *uncheckout;
 
@@ -90,17 +90,15 @@ sub _Printparents {
     for my $c (@s) {
       $cprinted++ if $$gen{$c}{printed};
     }
-    if ($cprinted) {
+    if ($cprinted or !$ind) {
+      my $plural = @u>1? 's' : '';
       if ($ind == 0) {
-	print "\[offsprings:";
+	print "\[offspring${plural}: ";
       } else {
 	my $pind = $ind - 1;
-	printf("%${pind}s\[siblings:", '');
+	print ' 'x$pind, "\[sibling${plural}: ";
       }
-      foreach (@u) {
-	print " $_";
-      }
-      print "\]\n";
+      print join(' ', @u), "\]\n";
     }
   }
   my $yes = ($opt{all} or (scalar(@p) != 1) or (scalar(@s) != 1)
@@ -668,6 +666,8 @@ Show 'uninteresting' versions, otherwise skipped:
 
 =back
 
+Note: I<-all> is implicit while using I<-depth>.
+
 =item B<-obsolete>
 
 Add obsoleted branches to the search.
@@ -688,6 +688,7 @@ the element.
 
 sub lsgenealogy {
   GetOptions(\%opt, qw(short all obsolete depth=i));
+  $opt{all} = 1 if defined $opt{depth};
   Assert(@ARGV > 1);		# die with usage msg if untrue
   shift @ARGV;
   my @argv = ();

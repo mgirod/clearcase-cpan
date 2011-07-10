@@ -167,4 +167,5 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- optimization: co doesn't use lsvtree if /main/0 exists
 	- cptype: support for family types, and linking global types
 	- mklbtype -inc on global type
-	- lsgen: fix for vob root
+	- lsgen: fix for vob root; -a implicit with -d;
+	  print offsprings in addition to siblings
