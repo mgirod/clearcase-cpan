@@ -265,3 +265,4 @@ Revision history for Perl extension ClearCase::SyncTree.
 
 0.58 Sun Jun 12 19:12:38 GMTDT 2011
         - branchco optimization: avoid lsvtree if possible
+	- subtract: fix to filtering--quoted variable in regexp (error with 'Tools++')

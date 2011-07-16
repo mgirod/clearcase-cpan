@@ -713,9 +713,9 @@ sub branchco {
 		my $re = $self->pbrtype($bt) ?
 		  qr([\\/]${main}[\\/]$bt[\\/]\d+$) : qr([\\/]$bt[\\/]\d+$);
 		if ($ver =~ m%$re%) {
-		    $rc |= $ct->co([$self->comment], $e)->system;
+		    $rc |= $ct->co($self->comment, $e)->system;
 		} else {
-		    my $r = $ct->mkbranch([$self->comment, '-ver',
+		    my $r = $ct->mkbranch([@{$self->comment}, '-ver',
 					      "/${main}/0", $bt], $e)->system;
 		    if ($r) {
 			$rc = 1;
@@ -731,11 +731,11 @@ sub branchco {
 		    }
 		}
 	    } else {
-		$rc |= $ct->co([$self->comment], $e)->system;
+		$rc |= $ct->co($self->comment, $e)->system;
 	    }
 	}
     } else {
-	$rc = $ct->co([$self->comment], @ele)->system;
+	$rc = $ct->co($self->comment, @ele)->system;
     }
     return $rc;
 }
@@ -1239,7 +1239,7 @@ sub subtract {
     my %checkedout = map {$_ => 1} $self->_lsco;
     my (@exfiles, $flt, %seen);
     for (sort keys %{$self->{ST_SUB}->{exfiles}}) {
-	next if $flt && /^$flt/; # ignore entries under removed dirs
+	next if $flt && m%^\Q$flt\E/%; # ignore entries under removed dirs
 	push @exfiles, $_ unless $seen{$_}++;
 	$flt = $_ if -d $_;
     }
