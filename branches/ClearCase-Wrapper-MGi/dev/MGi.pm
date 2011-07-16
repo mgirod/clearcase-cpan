@@ -215,6 +215,59 @@ sub _Parsevtree {
   }
   return %gen;
 }
+sub _DepthGen {
+  use strict;
+  use warnings;
+  my ($ele, $dep, $sel, $verbose) = @_;
+  my %gen;
+  my $parents = sub {
+    my $ver = shift;
+    # v0 is $ele@@/main/0, whatever the actual name of 'main' for $ele
+    # Only mention v0 as last recourse, if there is nothing else
+    my $pred = $ct->des([qw(-fmt %En@@%PVn)], $ver)->qx;
+    return if $pred eq "$ele@@"; # Only v0 has no parent
+    my @ret = grep s/^<- .*?(@.*)/$ele$1/,
+      $ct->des([qw(-s -ahl Merge)], $ver)->qx;
+    $pred = $ct->des([qw(-fmt %En@@%PVn)], $pred)->qx
+      while $pred =~ m%\@[^@]*[/\\][^@]+[/\\][^@]+[/\\]0$%;
+    s%\\%/%g for grep $_, $pred, @ret; # Windows...
+    push @ret, $pred unless $pred =~ m%/0$% and @ret;
+    return @ret
+  };
+  if ($verbose) {
+    my @offsp = grep s/^-> .*?(@.*)/$ele$1/,
+      $ct->des([qw(-s -ahl Merge)], $sel)->qx;
+    my ($br, $nr) = ($sel =~ m%^(.*)/(\d+)$%); # $sel is normalized
+    if ($br and opendir BR, $br) { # Skip for CHECKEDOUT
+      my @f = grep !/^\.\.?/, readdir BR;
+      closedir BR;
+      my @n = sort grep { (/^\d+$/ and $_ > $nr) or $_ eq 'CHECKEDOUT' } @f;
+      push @offsp, join('/', $br, $n[0]) if @n;
+      my $sil = new ClearCase::Argv({autochomp=>1, stdout=>0, stderr=>0});
+      push @offsp, join('/', $br, $_, '0')
+       	for grep { /^\D/ and !$sil->des(['-s'], "brtype:$_")->system } @f;
+      push @{ $gen{$sel}{children} }, @offsp;
+    }
+  }
+  if ($dep) {
+    my @set = ($sel);
+    do {
+      my @nxt;
+      for my $s (@set) {
+	next if defined $gen{$s}{parents};
+	my @p = $parents->($s);
+	@{ $gen{$s}{parents} } = @p;
+	$gen{$s}{labels} = $ct->des([qw(-fmt %l)], $s)->qx;
+	push @{ $gen{$_}{children} }, $s for @p;
+	push @nxt, @p;
+      }
+      @set = @nxt;
+    } while $dep--;
+  } else {
+    $gen{$sel}{labels} = $ct->des([qw(-fmt %l)], $sel)->qx;
+  }
+  return %gen;
+}
 sub _Mkbco {
   my ($cmd, @cmt) = @_;
   my $rc = 0;
@@ -371,14 +424,10 @@ sub _PreCi {
   my $diff = $ci->clone->prog('diff');
   $ct = $ci->clone;
   $ct->autochomp(1);
-  my $ver = $ct->argv(qw(des -fmt %En@@%Vn), $elem)->qx;
-  $ver =~ s%\\%/%g;
-  my $bra = $1 if $ver =~ m%^(.*?)/(?:\d+|CHECKEDOUT)$%;
-  my %gen = _Parsevtree($elem, 1, $ver);
-  my $p = $gen{$ver}{'parents'};
-  my ($brp) = grep { m%^$bra/\d+$% } @{$p};
+  my $par = $ct->argv(qw(des -fmt %En@@%PVn), $elem)->qx;
+  $par =~ s%\\%/%g;
   $diff->optsDIFF(q(-serial), $diff->optsDIFF);
-  $diff->args($brp? $brp : $p->[0], $elem);
+  $diff->args($par, $elem);
   # Without -diff we only care about return code
   $diff->stdout(0) unless $opt->{diff};
   # With -revert, suppress msgs from typemgrs that don't do diffs
@@ -656,7 +705,8 @@ Flags:
 
 =item B<-all>
 
-Show 'uninteresting' versions, otherwise skipped:
+Show 'uninteresting' versions, otherwise skipped
+(implicit while using I<-depth>):
 
 =over 1
 
@@ -665,8 +715,6 @@ Show 'uninteresting' versions, otherwise skipped:
 =item - not at a chain boundary.
 
 =back
-
-Note: I<-all> is implicit while using I<-depth>.
 
 =item B<-obsolete>
 
@@ -687,7 +735,7 @@ the element.
 =cut
 
 sub lsgenealogy {
-  GetOptions(\%opt, qw(short all obsolete depth=i));
+  GetOptions(\%opt, qw(short all obsolete depth=i pp=i));
   $opt{all} = 1 if defined $opt{depth};
   Assert(@ARGV > 1);		# die with usage msg if untrue
   shift @ARGV;
@@ -697,18 +745,20 @@ sub lsgenealogy {
     push @argv, MSWIN ? glob($_) : $_;
   }
   $ct = ClearCase::Argv->new({autofail=>0,autochomp=>1,stderr=>0});
-  $ct->ipc(1) unless $ct->ctcmd(1);
   while (my $e = shift @argv) {
-    my ($ele, $ver, $type) =
-      $ct->des([qw(-fmt %En\n%En@@%Vn\n%m)], $e)->qx;
+    my ($ver, $type) =
+      $ct->des([qw(-fmt %En@@%Vn\n%m)], $e)->qx;
     if (!defined($type) or ($type !~ /version$/)) {
       warn Msg('W', "Not a version: $e");
       next;
     }
-    $ele =~ s%\\%/%g;
     $ver =~ s%\\%/%g;
-    $ver =~ s%^\Q$ele\E.*?\@%$ele\@%; # case of vob root directory
-    my %gen = _Parsevtree($ele, $opt{obsolete}, $ver);
+    my $ele = $ver;
+    $ele =~ s%^(.*?)\@.*%$1%; # normalize in case of vob root directory
+    $opt{depth} = $opt{pp} if defined $opt{pp}; # May be 0!
+    my $pv = (defined $opt{pp} or !defined $opt{depth}); # Temporary!
+    my %gen = $pv? _Parsevtree($ele, $opt{obsolete}, $ver)
+      : _DepthGen($ele, $opt{depth}, $ver, !$opt{short});
     _Setdepths($ver, 0, \%gen);
     my %seen = ();
     _Printparents($ver, \%gen, \%seen, 0);
@@ -880,7 +930,7 @@ sub diff {
     $ele =~ s%\\%/%g;
     $ver =~ s%\\%/%g;
     my $bra = $1 if $ver =~ m%^(.*?)/(?:\d+|CHECKEDOUT)$%;
-    my %gen = _Parsevtree($ele, 1, $ver);
+    my %gen = _DepthGen($ele, 1, $ver);
     my $p = $gen{$ver}{'parents'};
     $p = $gen{$p->[0]}{'parents'} while $p and $limit--;
     if (!$p) {
@@ -888,7 +938,7 @@ sub diff {
       $rc = 1;
       next;
     }
-    my ($brp) = grep { m%^$bra/\d+$% } @{$p};
+    my ($brp) = grep { m%^\Q$bra\E/\d+$% } @{$p};
     $ver = $ele if $ver =~ m%/CHECKEDOUT$%;
     $rc |= $diff->args($brp? $brp : $p->[0], $ver)->system;
   }
@@ -2388,16 +2438,16 @@ sub describe {
     my @nargs;
     for my $arg (@args) {
       my $i = $generations;
-      my ($ele, $ver, $type) =
-	$ct->des([qw(-fmt %En\n%En@@%Vn\n%m)], $arg)->qx;
+      my ($ver, $type) =
+	$ct->des([qw(-fmt %En@@%Vn\n%m)], $arg)->qx;
       if (!defined($type) or ($type !~ /version$/)) {
 	warn Msg('W', "Not a version: $arg");
 	next;
       }
-      $ele =~ s%\\%/%g;
       $ver =~ s%\\%/%g;
-      my $bra = $1 if $ver =~ m%^(.*?)/(?:\d+|CHECKEDOUT)$%;
-      my %gen = _Parsevtree($ele, 1, $ver);
+      my $ele = $ver;
+      $ele =~ s%^(.*?)\@.*%$1%; # normalize in case of vob root directory
+      my %gen = _DepthGen($ele, $i, $ver);
       my @p = @{$gen{$ver}{'parents'}};
       while (@p and --$i) {
 	my %q;
