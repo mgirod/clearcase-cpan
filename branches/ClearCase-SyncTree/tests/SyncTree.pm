@@ -1236,40 +1236,45 @@ sub subtract {
     my $self = shift;
     return unless $self->{ST_SUB};
     my $ct = $self->clone_ct;
-    my %checkedout = map {$_ => 1} $self->_lsco;
-    my (@exfiles, $flt, %seen);
-    for (sort keys %{$self->{ST_SUB}->{exfiles}}) {
-	next if $flt && m%^\Q$flt\E/%; # ignore entries under removed dirs
-	push @exfiles, $_ unless $seen{$_}++;
-	$flt = $_ if -d $_;
-    }
-    for my $dad (map {dirname($_)} @exfiles) {
-	$self->branchco(1, $dad) unless $checkedout{$dad}++;
-    }
-    # Will fail for checkedouts (all created in this session!) or unreachable
-    $ct->rm($self->comment, @exfiles)->system if @exfiles;
-    my %dirs = %{$self->{ST_SUB}->{dirs}}; # Dirs which existed originally
-    my @exdirs;
-    while (1) {
-	for (sort {$b cmp $a} keys %dirs) {
-	    next if $self->{ST_SRCMAP}->{$dirs{$_}};
-	    if (opendir(DIR, $_)) {
-		my @entries = readdir DIR;
-		closedir(DIR);
-		next if @entries > 2;
-		push(@exdirs, $_);
+    my %co = map {$_ => 1} $self->_lsco;
+    my $exnames = $self->{ST_SUB}->{exfiles}; # Entries to remove
+    my (%dir, %keep); # Directories respectively to inspect, and to keep
+    $dir{dirname($_)}++ for keys %{$exnames};
+    $dir{$_}++ for keys %{$self->{ST_SUB}->{dirs}}; # Existed originally
+    my $dbase = $self->dstbase;
+    for my $d (sort {$b cmp $a} keys %dir) {
+	next if $keep{$d};
+	my ($k) = ($d =~ m%^\Q$dbase\E/(.*)$%);
+	if ($self->{ST_SRCMAP}->{$k}) {
+	    delete $exnames->{$d};
+	    my $dad = $d;
+	    $keep{$dad}++ while $dad = dirname($dad) and $dad gt $dbase;
+	    next;
+	}
+	if (opendir(DIR, $d)) {
+	    my @entries = grep !/^\.\.?$/, readdir DIR;
+	    closedir(DIR);
+	    map { $_ = join('/', $d, $_) } @entries;
+	    if (grep { !$exnames->{$_} } @entries) { # Something not to delete
+		my $dad = $d;
+		$keep{$dad}++ while $dad = dirname($dad) and $dad gt $dbase;
+	    } else {
+		if (@entries) {
+		    my @co = grep {$co{$_}} @entries; # Checkin before removing
+		    $ct->ci($self->comment, @co)->system if @co;
+		    delete @$exnames{@entries}; # Remove the contents
+		}
+		$exnames->{$d}++; # Add the container
 	    }
 	}
-	last if !@exdirs;
-	for my $dad (map {dirname($_)} @exdirs) {
-	    $self->branchco(1, $dad) if !$checkedout{$dad}++;
-	}
-	if (my @co = $ct->argv('lsco', [qw(-s -cvi -d)], @exdirs)->qx) {
-	    $ct->ci($self->comment, @co)->system;
-	}
-	$ct->rmname($self->comment, @exdirs)->system;
-	@exdirs = ();
     }
+    delete @$exnames{keys %keep};
+    my @exnames = keys %{$exnames};
+    for my $dad (map {dirname($_)} @exnames) {
+	$self->branchco(1, $dad) unless $co{$dad}++;
+    }
+    # Will fail for checkedouts (all created in this session!) or unreachable
+    $ct->rm($self->comment, @exnames)->system if @exnames;
 }
 
 sub label {
