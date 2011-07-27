@@ -705,8 +705,7 @@ Flags:
 
 =item B<-all>
 
-Show 'uninteresting' versions, otherwise skipped
-(implicit while using I<-depth>):
+Show 'uninteresting' versions, otherwise skipped:
 
 =over 1
 
@@ -715,6 +714,10 @@ Show 'uninteresting' versions, otherwise skipped
 =item - not at a chain boundary.
 
 =back
+
+Note that a different algorithm is used with and without the C<-all> option.
+The latter uses C<lsvtree> and may thus be slow on elements with a large
+version tree. The former is thus more scalable.
 
 =item B<-obsolete>
 
@@ -735,8 +738,7 @@ the element.
 =cut
 
 sub lsgenealogy {
-  GetOptions(\%opt, qw(short all obsolete depth=i pp=i));
-  $opt{all} = 1 if defined $opt{depth};
+  GetOptions(\%opt, qw(short all obsolete depth=i));
   Assert(@ARGV > 1);		# die with usage msg if untrue
   shift @ARGV;
   my @argv = ();
@@ -744,7 +746,7 @@ sub lsgenealogy {
     $_ = readlink if -l && defined readlink;
     push @argv, MSWIN ? glob($_) : $_;
   }
-  $ct = ClearCase::Argv->new({autofail=>0,autochomp=>1,stderr=>0});
+  $ct = ClearCase::Argv->new({autofail=>0, autochomp=>1, stderr=>0});
   while (my $e = shift @argv) {
     my ($ver, $type) =
       $ct->des([qw(-fmt %En@@%Vn\n%m)], $e)->qx;
@@ -755,10 +757,8 @@ sub lsgenealogy {
     $ver =~ s%\\%/%g;
     my $ele = $ver;
     $ele =~ s%^(.*?)\@.*%$1%; # normalize in case of vob root directory
-    $opt{depth} = $opt{pp} if defined $opt{pp}; # May be 0!
-    my $pv = (defined $opt{pp} or !defined $opt{depth}); # Temporary!
-    my %gen = $pv? _Parsevtree($ele, $opt{obsolete}, $ver)
-      : _DepthGen($ele, $opt{depth}, $ver, !$opt{short});
+    my %gen = $opt{all}? _DepthGen($ele, $opt{depth}, $ver, !$opt{short})
+      : _Parsevtree($ele, $opt{obsolete}, $ver);
     _Setdepths($ver, 0, \%gen);
     my %seen = ();
     _Printparents($ver, \%gen, \%seen, 0);
@@ -930,7 +930,7 @@ sub diff {
     $ele =~ s%\\%/%g;
     $ver =~ s%\\%/%g;
     my $bra = $1 if $ver =~ m%^(.*?)/(?:\d+|CHECKEDOUT)$%;
-    my %gen = _DepthGen($ele, 1, $ver);
+    my %gen = _DepthGen($ele, $limit + 1, $ver);
     my $p = $gen{$ver}{'parents'};
     $p = $gen{$p->[0]}{'parents'} while $p and $limit--;
     if (!$p) {
@@ -2535,22 +2535,42 @@ sub mkview {
   my @k = grep !/(stgloc|host|hpath|gpath|tmode|shareable_dos)/,
     keys %{$mkv->{AV_LKG}{'CC'}};
   my @opts = (map(("-$_", $mkv->flagCC($_)), @k), '-tmo', $tmo, "-$shdo");
-  my ($host, $ogpa, $hpa) = ($2, $1, $3) if $lsv =~
-    /Global path: (.*?)\n.*Server host: (.*?)\n.*access path: (.*?)\n/s;
+  my ($host, $ogpa, $hpa, $own) = ($2, $1, $3, $4)
+    if $lsv =~ m{ \QGlobal path: \E(.*?)\n.*
+		  \QServer host: \E(.*?)\n.*
+		  \Qaccess path: \E(.*?)\n.*
+		  \QView owner: \E(?:.*?/)(.*?)\n
+	      }xs;
   if ($mkv->flagCC('stgloc')) {
     push @opts, '-stg', $mkv->flagCC('stgloc');
   } else {
-    $hpa = $mkv->flagCC('hpath')?
-      $mkv->flagCC('hpath') : File::Spec->catdir(dirname($hpa), "$tag.vws");
-    my $gpa = $mkv->flagCC('gpath')?
-      $mkv->flagCC('gpath') : File::Spec->catdir(dirname($ogpa), "$tag.vws");
+    my $pwnam = (getpwuid($<))[0];
+    if ($mkv->flagCC('hpath')) {
+      $hpa = $mkv->flagCC('hpath');
+    } else {
+      my $pdir = dirname($hpa);
+      if (basename($pdir) eq $own) {
+	$hpa = File::Spec->catdir(dirname($pdir), $pwnam, "$tag.vws");
+      } else {
+	$hpa = File::Spec->catdir($pdir, "$tag.vws");
+      }
+    }
+    my $gpa = $mkv->flagCC('gpath');
+    if (!$gpa) {
+      my $pdir = dirname($ogpa);
+      if (basename($pdir) eq $own) {
+	$gpa = File::Spec->catdir(dirname($pdir), $pwnam, "$tag.vws");
+      } else {
+	$gpa = File::Spec->catdir($pdir, "$tag.vws");
+      }
+    }
     $host = $mkv->flagCC('host') if $mkv->flagCC('host');
     push @opts, '-host', $host, '-hpa', $hpa, '-gpa', $gpa;
     if (!$mkv->args) {
-      if ($host eq hostname or $gpa =~m%^//%) { #UNC gives 'Access is denied'
+      if ($host eq hostname or $gpa =~ m%^//%) { #UNC gives 'Access is denied'
 	$mkv->args($hpa);
       } else {
-	$mkv->args($gpa); #Should work from anywhere
+	$mkv->args($gpa);	#Should work from anywhere
       }
     }
   }

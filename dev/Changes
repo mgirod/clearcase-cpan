@@ -169,5 +169,6 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- mklbtype -inc on global type
 	- lsgen: fix for vob root; -a implicit with -d;
 	  print offsprings in addition to siblings
-	- avoid lsvtree when possible (lsgen, ci, diff, des)
+	- avoid lsvtree when possible (lsgen -all, ci, diff, des)
 	- ci -revert: this doesn't need genealogy--only the physical parent.
+	- mkview -clone: fix to the storage paths, to clone other users' views
