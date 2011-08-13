@@ -1748,8 +1748,9 @@ sub mklabel {
     push @lt, "$lbtype\@$_" for keys %vb;
   }
   my @lt1 = @lt;
+  my $fail = ClearCase::Argv->new({autochomp=>1, autofail=>1});
   my @et = grep s/^-> lbtype:(.*)@.*$/$1/,
-    map { $ct->argv(qw(des -s -ahl), $eqhl, "lbtype:$_")->qx } @lt1;
+    map { $fail->argv(qw(des -s -ahl), $eqhl, "lbtype:$_")->qx } @lt1;
   return 0 unless $opt{up} or $opt{over} or @et;
   my $fail = $ct->clone({autofail=>1});
   $fail->argv(qw(des -s), @elems)->stdout(0)->system
