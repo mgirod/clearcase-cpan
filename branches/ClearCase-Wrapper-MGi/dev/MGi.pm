@@ -1,6 +1,6 @@
 package ClearCase::Wrapper::MGi;
 
-$VERSION = '0.27';
+$VERSION = '0.28';
 
 use warnings;
 use strict;
@@ -1210,6 +1210,8 @@ sub _GenMkTypeSub {
 	    }
 	    my $at = "$type:${arc}$vob";
 	    $silent->mkhlink([$prhl], $t, $at)->system;
+	    $ct->chevent([@cmt], $at)->stdout(0)->system
+	      unless $cmt[0] and $cmt[0] =~ /^-nc/;
 	    if ($type eq 'lbtype') {
 	      my $t0 = $t;
 	      $t0 =~ s/^lbtype:(.*?)(@.*)$/lbtype:${1}_0$2/;
@@ -1221,8 +1223,6 @@ sub _GenMkTypeSub {
 	      push @arg, $eq if $eq;
 	      $ct->lock(@arg)->system;
 	    }
-	    $ct->chevent([@cmt], $at)->stdout(0)->system
-	      unless $cmt[0] and $cmt[0] =~ /^-nc/;
 	  }
 	  exit $rc;
 	} else {		# increment
