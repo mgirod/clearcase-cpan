@@ -1197,6 +1197,11 @@ sub _GenMkTypeSub {
 	    while ($ct->des(['-s'], "$type:${arc}$vob")->stderr(0)->qx) {
 	      $arc = $pfx . $nr++;
 	    }
+	    if ($ct->lslock(['-s'], $t)->qx and $ct->unlock($t)->system) {
+	      warn Msg('E', "Cannot unlock: cannot rename!\n");
+	      $rc = 1;
+	      next;
+	    }
 	    if ($ct->rename($t, $arc)->system) {
 	      $rc = 1;
 	      next;
@@ -1221,7 +1226,7 @@ sub _GenMkTypeSub {
 		$ct->des([qw(-s -ahl), $eqhl], $arc)->stderr(0)->qx;
 	      my @arg = ($t0, $arc);
 	      push @arg, $eq if $eq;
-	      $ct->lock(@arg)->system;
+	      $ct->lock(@arg)->stderr(0)->system;
 	    }
 	  }
 	  exit $rc;
@@ -1748,11 +1753,10 @@ sub mklabel {
     push @lt, "$lbtype\@$_" for keys %vb;
   }
   my @lt1 = @lt;
-  my $fail = ClearCase::Argv->new({autochomp=>1, autofail=>1});
+  my $fail = $ct->clone({autofail=>1});
   my @et = grep s/^-> lbtype:(.*)@.*$/$1/,
     map { $fail->argv(qw(des -s -ahl), $eqhl, "lbtype:$_")->qx } @lt1;
   return 0 unless $opt{up} or $opt{over} or @et;
-  my $fail = $ct->clone({autofail=>1});
   $fail->argv(qw(des -s), @elems)->stdout(0)->system
     unless $opt{over} and !@elems; #eq fixed => 1 failure fails all
   die Msg('E', "Only one vob supported for family types") if @et > 1;

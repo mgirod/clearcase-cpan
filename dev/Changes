@@ -176,3 +176,4 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 0.28 Sat Aug 13 10:51:53 BST 2011
         - mklbtype -arc: add the comment before locking the archive type.
 	- mklabel -over: faster fail if no type given
+	- mklbtype -arc: unlock if necessary
