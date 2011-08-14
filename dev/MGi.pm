@@ -1202,16 +1202,18 @@ sub _GenMkTypeSub {
 	      $rc = 1;
 	      next;
 	    }
+	    my @cpy = grep {s/^<- (.*)$/$1/}
+	      $ct->des([qw(-s -ahl GlobalDefinition)], $t)->qx
+		if grep /^-glo/, $ntype->opts;
 	    if ($ct->rename($t, $arc)->system) {
 	      $rc = 1;
 	      next;
 	    }
 	    $ntype->args($t);
 	    $ntype->system;
-	    if (my $v = $targ{(split /:/, $t)[1]}) {
-	      my $t2 = "${1}$v" if $t =~ /^(.*?\@)/;
-	      $silent->cptype($t, $t2)->system;
-	      $silent->mkhlink(['GlobalDefinition'], $t2, $t)->system;
+	    for (@cpy) {
+	      $silent->cptype($t, $_)->system;
+	      $silent->mkhlink(['GlobalDefinition'], $_, $t)->system;
 	    }
 	    my $at = "$type:${arc}$vob";
 	    $silent->mkhlink([$prhl], $t, $at)->system;
@@ -1239,13 +1241,16 @@ sub _GenMkTypeSub {
 	  map { $_ = "$type:$_" } @a;
 	  die Msg('E', "Some types already exist among @args")
 	    unless $silent->argv(qw(des -s), @a)->stderr(0)->system;
-	  my (%pair, @skip) = ();
+	  my @opts = $ntype->opts();
+	  my (%pair, @skip, %glo) = ();
 	TYPE: foreach my $t (@args) {
 	    if ($t =~ /^(.*?)(@.*)?$/) {
 	      my ($pfx, $sfx) = ($1, $2?$2:'');
 	      if ($type eq 'lbtype') {
 		my $t0 = "lbtype:${pfx}_0$sfx";
 		if ($ct->argv(qw(des -s), $t0)->stderr(0)->qx) {
+		  $glo{$t} = 1 if !grep(/^-glo/, @opts) and
+		    $ct->des([qw(-fmt %[type_scope]p)], $t0)->qx eq 'global';
 		  $ct->argv('unlock', $t0)->system;
 		  $ct->argv('rename', $t0, "lbtype:$t")->stderr(0)->system
 		    and die Msg('E', qq(Failed to restore "$t0" into "$t".));
@@ -1265,13 +1270,6 @@ sub _GenMkTypeSub {
 	      }
 	    }
 	  }
-	  my @opts = $ntype->opts();
-	  if (%pair) {
-	    _Findfreeinc(\%pair);
-	    $ntype->args(values %pair);
-	    $ntype->opts(@cmt, @opts);
-	    $ntype->system;
-	  }
 	  if (@skip) {
 	    my $sk = '(' . join('|', @skip) . ')';
 	    @a = grep !/$sk/, @args;
@@ -1283,15 +1281,31 @@ sub _GenMkTypeSub {
 	    $ntype->opts('-nc', @opts);
 	    $ntype->system;
 	  }
-	  my $gflg = (grep /^-glo/, $ntype->opts)? '-glo' : '-ord';
-	  for (keys %pair) {
-	    if (defined($pair{$_})) {
-	      my $inc = "$type:$pair{$_}";
-	      $silent->argv('mkhlink', $eqhl, "$type:$_", $inc)->system;
+	  if (%pair) {
+	    _Findfreeinc(\%pair);
+	    for my $t (keys %pair) {
+	      next unless defined $pair{$t};
+	      my @o = @opts;
+	      my $gflg = $glo{$t}? '-glo' : '-ord';
+	      push @o, $gflg;
+	      $ntype->args($pair{$t});
+	      $ntype->opts(@cmt, @o);
+	      $ntype->system;
+	      my $inc = "$type:$pair{$t}";
+	      my $tt = $ct->des([qw(-fmt %Xn)], "$type:$t")->qx;
+	      $silent->argv('mkhlink', $eqhl, $tt, $inc)->system;
 	      next if $type eq 'brtype';
-	      my $att = "Rm$_";
+	      if ($glo{$t}) {
+		for my $v (grep {s/^<- lbtype:.*?\@(.*)$/$1/}
+		  $ct->des([qw(-s -ahl GlobalDefinition)], $tt)->qx) {
+		  my ($cpy) = ($inc =~ /^(.*?\@)/);
+		  $cpy .= $v;
+		  $silent->cptype($inc, $cpy)->system;
+		  $silent->mkhlink(['GlobalDefinition'], $cpy, $inc)->system;
+		}
+	      }
 	      $ct->argv(qw(mkattype -vtype real -c), q(Deleted in increment),
-			$gflg, "$att")->stderr(0)->system;
+			$gflg, "Rm$t")->stderr(0)->system;
 	    }
 	  }
 	} elsif ($opt{increment}) { # increment
@@ -2256,6 +2270,14 @@ sub _CpType {
     $dst = "$1$dst" if $src =~ /^(.*?:)/;
   }
   $ret += $ct->mkhlink(['GlobalDefinition'], $dst, $src)->system if $glb;
+  my $rmat = $src;
+  $rmat =~ s/lbtype:/attype:Rm/;
+  if (my $s = $ct->des([qw(-fmt %[type_scope]p)], $rmat)->qx
+	and $s eq 'global') {
+    $dst =~ s/lbtype:/attype:Rm/;
+    $ret += $cpt->args($rmat, $dst)->system;
+    $ret += $ct->mkhlink(['GlobalDefinition'], $dst, $rmat)->system if $glb;
+  }
   return $ret;
 }
 sub cptype {
