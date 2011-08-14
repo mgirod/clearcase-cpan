@@ -1050,6 +1050,12 @@ a suffix of I<_1.00>.
 
 Also create a I<RmLBTYPE> attribute type to record removals of labels.
 
+For lbtypes, if the floating type was previously archived (e.g. to
+deactivate config spec rules), then the command I<revives> the type
+hidden as part of archiving (and not applied anywhere). The new
+equivalent fixed type is the one following the last equivalent type,
+which is however B<not> set as its I<previous> increment.
+
 =item B<-inc/rement>
 
 Create a new increment of an existing label type family, given as argument.
@@ -1057,6 +1063,13 @@ This new type will take the place of the previous increment, as the
 destination of the B<EqInc> hyperlink on the I<family> type.
 It will have a B<PrevInc> hyperlink pointing to the previous increment in
 the family.
+
+For lbtypes, if the floating type was previously archived, then the
+behavior reverts to the B<-fam/ily> one.  This means that an archived
+label type may be I<incremented>. This however amounts to a new
+creation and is only provided as a convenience (no need to remember
+the state of the family--whether it was rolled out and archived or
+not).
 
 =item B<-arc/hive>
 
@@ -1115,13 +1128,27 @@ sub _GenMkTypeSub {
 	warn Msg('W', "making global type(s) @args");
       }
     }
-    my %targ; #target vobs per type, for use with -inc and -arc
+    my %targ; #target vobs per type, for use with -inc
     if (%opt) {
       map { s/^$type://; $_ } @args;
+      if ($opt{increment} and $type eq 'lbtype') {
+	my @new = grep {$silent->des(['-s'], "lbtype:$_")->stderr(0)->system}
+	  @args;
+	if (@new) {
+	  {no warnings qw(uninitialized); map{s/^(.*?)(\@.*)?$/${1}_0$2/} @new}
+	  my @arc = grep {$ct->des(['-s'], "lbtype:$_")->stderr(0)->qx} @new;
+	  die Msg('E', "Cannot process a mix of active and archived types\n")
+	    if @arc and scalar @arc != scalar @args;
+	  if (@arc) {
+	    undef $opt{increment};
+	    $opt{family} = 1;
+	  }
+	}
+      }
       if (!$opt{family} and !$ntype->flag('global')) { #before ensuring types
 	my @glb = grep /^global/,
 	  map{$ct->des([qw(-fmt %[type_scope]p)], "$type:$_")->qx} @args;
-	die Msg('E', "Cannot process a mixture of global and ordinary types\n")
+	die Msg('E', "Cannot process a mix of global and ordinary types\n")
 	  if @glb and scalar @glb != scalar @args;
 	if (@glb) {
 	  $ntype->opts('-global', $ntype->opts);
