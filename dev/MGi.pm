@@ -2299,8 +2299,7 @@ sub _CpType {
   $ret += $ct->mkhlink(['GlobalDefinition'], $dst, $src)->system if $glb;
   my $rmat = $src;
   $rmat =~ s/lbtype:/attype:Rm/;
-  if (my $s = $ct->des([qw(-fmt %[type_scope]p)], $rmat)->qx
-	and $s eq 'global') {
+  if ($ct->des([qw(-fmt %[type_scope]p)], $rmat)->stderr(0)->qx eq 'global') {
     $dst =~ s/lbtype:/attype:Rm/;
     $ret += $cpt->args($rmat, $dst)->system;
     $ret += $ct->mkhlink(['GlobalDefinition'], $dst, $rmat)->system if $glb;
