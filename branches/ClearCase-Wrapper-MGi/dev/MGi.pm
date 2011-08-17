@@ -2054,10 +2054,12 @@ sub rmlabel {
     $_ = glob($_) for @elems;
   }
   $lbtype =~ s/^lbtype://;
-  my (%vb, @lt, %et);
+  my (%vb, @lt, %et, %vpe);
   for my $e (@elems) {
     my $v = $ct->argv(qw(des -s), "vob:$e")->stderr(0)->qx;
-    $vb{$v}++ if $v;
+    next unless $v;
+    $vb{$v}++;
+    $vpe{$e} = $v;
   }
   if ($lbtype =~ /@(.*)$/) {
     my ($v, @v) = ($1, keys %vb);
@@ -2079,7 +2081,9 @@ sub rmlabel {
     my @opcm = @opts;
     push @opcm, @cmt;
     my $rc = 0;
+    my %query; #Cache the queries per vob
     for (@elems) {
+      my $v = $vpe{$_};
       my $e = $ct->des([qw(-s)], $_)->qx; #in case passed by the label: f@@/L
       $rml->opts(@opcm);
       $rml->args($lbtype, $e);
@@ -2090,12 +2094,16 @@ sub rmlabel {
 	$val =~ s/^.*_//;
 	if (!$r1) { #floating successfully removed
 	  my ($f) = ($e =~ /(.*)@@.*$/);
-	  my @eqlst = grep s/(.*)/lbtype($1)/, _EqLbTypeList($lbtype);
-	  next unless @eqlst;
-	  my $query = (@eqlst==1? $eqlst[0] : '(' . join('||', @eqlst) . ')')
-	    . "&&!attype($att)";
-	  my @v = $ct->find($f, qw(-d -ver), $query, '-print')->qx;
-	  $ct->mkattr([$att, $val], @v)->stdout(0)->system if @v;
+	  if (!defined $query{$v}) {
+	    my @eqlst = grep s/(.*)/lbtype($1)/, _EqLbTypeList("$lbtype\@$v");
+	    $query{$v} =
+	      (@eqlst? (@eqlst==1? $eqlst[0] : '(' . join('||', @eqlst) . ')')
+		 . "&&!attype($att)" : 0);
+	  }
+	  if ($query{$v}) {
+	    my @v = $ct->find($f, qw(-d -ver), $query{$v}, '-print')->qx;
+	    $ct->mkattr([$att, $val], @v)->stdout(0)->system if @v;
+	  }
 	}
 	$rml->opts(@opts);
 	$rml->args($et, $e);

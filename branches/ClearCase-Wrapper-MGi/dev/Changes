@@ -173,7 +173,7 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- ci -revert: this doesn't need genealogy--only the physical parent
 	- mkview -clone: fix to the storage paths, to clone other users' views
 
-0.28 Sun Aug 14 19:35:52 BST 2011
+0.28 Wed Aug 17 12:37:44 GMTDT 2011
         - mklbtype -arc: add the comment before locking the archive type
 	- mklabel -over: faster fail if no type given
 	- mklbtype -arc: unlock if necessary
@@ -181,3 +181,4 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- cptype: copy and link the Rm attribute type if needed
 	- mklbtype -fam: fix to linking eqinc, as reviving a global archived lbtype
 	- mklbtype -inc: same as -fam for previously archived lbtype
+	- rmlabel: fix for remote elements (passed with a full path)
