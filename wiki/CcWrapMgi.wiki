@@ -32,7 +32,7 @@ The code on this site is developed in a _dev_ branch.
     * [CwmLockingIssues lock/unlock], using site specific methods when not owning the equivalent or previous types.
   * Recently done:
     * support for incremental types:
-      * support for global types (using admin vobs or not)
+      * support for [GlobalTypes global types] (using admin vobs or not)
       * folding config specs (automatic generation of the cascading rules)
     * [WmgArc mkxxtype -arc]
   * Under work:
