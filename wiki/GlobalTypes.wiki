@@ -10,7 +10,8 @@ If one wants to have the effect of a config spec rule span across several vobs, 
 The resulting objects are however distinct.
 
 Types may be _global_ or _ordinary_.
-Global types may be linked with _GlobalDefinition_ hyperlinks.
+Global types may be linked with _!GlobalDefinition_ hyperlinks.
+The result is for the source of the _!GlobalDefinition_ hyperlink to accept a role of proxy, delegating its function to the remote homonymous type. This is convenient, as its extends the scope of action of functions such as _lock_ or _rmtype_. It does in effect share the types between several vobs.
 
 = The concept of admin vob, and its shortcomings =
 
