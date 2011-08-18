@@ -20,6 +20,8 @@ Without script support, this requires several commands and a good understanding 
 
 Admin vobs allow to create new copies of types pre-existing in a centralized location. The new copies may even be created as needed, e.g. while applying labels with _mklabel_. At first sight, this is thus a valuable convenience.
 
+The price to pay is unfortunately too high.
+
 == _lstype_ errors or warnings ==
 
 = Global types without admin vobs =
