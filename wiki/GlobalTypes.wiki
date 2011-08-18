@@ -1,0 +1,19 @@
+#summary Global types: good; admin vobs: bad
+#labels Phase-Design
+
+= Global types are useful =
+
+Config specs use types only by name.
+The names are guaranteed to be unique per vob, but not across vobs.
+It results that the config specs are not guaranteed to deal with the _same_ objects (even semantically, considering the intention for their creation): there may easily be accidental matches.
+If one wants to have the effect of a config spec rule span across several vobs, one may use _cptype_ to copy the types.
+The resulting objects are however distinct.
+
+Types may be _global_ or _ordinary_.
+Global types may be linked with _GlobalDefinition_ hyperlinks.
+
+= The concept of admin vob, and its shortcomings =
+
+== _lstype_ errors or warnings ==
+
+= Global types without admin vobs =
