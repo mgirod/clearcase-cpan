@@ -11,7 +11,7 @@ This was the opportunity of a life-time for the team who had been developing DSE
 
 = Bold Originality =
 
-!ClearCase was a breakthrough. Its distinctive feature was a virtual file system, and this one's application, _Workspace Management_, a conceptual novelty. Management was made available where and when it was needed, at the developer's and during the development, before stable versions where achieved. In fact, the artifacts in direst need for management where not _versions_ at all (in the narrow sense of traditional CM: source items under version _control_); they were derived objects: the products of builds, the most volatile and most valuable artifacts, the ones eventually to be delivered.
+!ClearCase was a breakthrough. Its distinctive feature was a virtual file system, and this one's application, _Workspace Management_, a conceptual novelty. Management was made available where and when it was needed, at the developer's and during the development, before stable versions where achieved. In fact, the artifacts in direct need for management where not _versions_ at all (in the narrow sense of traditional CM: source items under version _control_); they were derived objects: the products of builds, the most volatile and most valuable artifacts, the ones eventually to be delivered.
 
 The main tools were _dynamic views_ and _clearmake_.
 
