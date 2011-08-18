@@ -15,6 +15,11 @@ The result is for the _local_ type, source of the _!GlobalDefinition_ hyperlink,
 
 = The concept of admin vob, and its shortcomings =
 
+Copying types, and linking them only concerns existing types.
+Without script support, this requires several commands and a good understanding of the tools.
+
+Admin vobs allow to create new copies of types pre-existing in a centralized location. The new copies may even be created as needed, e.g. while applying labels with _mklabel_. At first sight, this is thus a valuable convenience.
+
 == _lstype_ errors or warnings ==
 
 = Global types without admin vobs =
