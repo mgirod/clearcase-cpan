@@ -18,7 +18,6 @@ The code on this site is developed in a _dev_ branch.
     * missing support for graphical {{{lsgen}}} (based on Tk)
     * missing support for {{{annotate}}} (based on pruning the -all output)
   * No major [http://code.google.com/p/clearcase-cpan/issues/list known bugs] now, but:
-    * {{{setdepth}}} recursion could maybe be shortened (performance) when a depth is given, e.g. supporting {{{diff -pred}}} but there is an ambiguity with 'depth': currently, it is the number of levels _displayed_ (intuitive, so probably to be kept).
     * ipc is better supported in !ClearCase::Argv, even *only* under cygwin. The mode is forced in every function and {{{ctcmd}}} may still be preferred for some (which is wrong). It will always succeed on Windows, either on top of !ClearCase::!CtCmd if installed, or on top of CAL. I originally missed the existence of support in !ClearCase::Wrapper for flags such as {{{-/ipc=1}}}, and the possibility to set it in the {{{.clearcase_profile.pl}}} file.
     * The source containers get slightly bloated: every new branch results in a full copy. This is only a minor nuisance... Solving it is possible: via a special element type manager... with its own quirks (would need to be installed on every client!)
   * Intentions:
@@ -31,6 +30,7 @@ The code on this site is developed in a _dev_ branch.
     * [CavComments interactive input]: generalize to avoid all hangs
     * [CwmLockingIssues lock/unlock], using site specific methods when not owning the equivalent or previous types.
   * Recently done:
+    * {{{setdepth}}} recursion was shortened (for performance and scalability reasons) when a depth is given, e.g. supporting {{{diff -pred}}}. The ambiguity with 'depth' (default: the number of levels _displayed_ which is intuitive and follows _lsvtree_) may be lifted by using the {{{-a/ll}}} option.
     * support for incremental types:
       * support for [GlobalTypes global types] (using admin vobs or not)
       * folding config specs (automatic generation of the cascading rules)
