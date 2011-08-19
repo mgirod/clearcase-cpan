@@ -1128,10 +1128,9 @@ sub _GenMkTypeSub {
 	warn Msg('W', "making global type(s) @args");
       }
     }
-    my %targ; #target vobs per type, for use with -inc
     if (%opt) {
       map { s/^$type://; $_ } @args;
-      if ($opt{increment} and $type eq 'lbtype') {
+      if ($opt{increment}) { # lbtypes only
 	my @new = grep {$silent->des(['-s'], "lbtype:$_")->stderr(0)->system}
 	  @args;
 	if (@new) {
@@ -1142,6 +1141,8 @@ sub _GenMkTypeSub {
 	  if (@arc) {
 	    undef $opt{increment};
 	    $opt{family} = 1;
+	  } else {
+	    die Msg('E', "Use -fam to create the family types\n");
 	  }
 	}
       }
@@ -1152,15 +1153,6 @@ sub _GenMkTypeSub {
 	  if @glb and scalar @glb != scalar @args;
 	if (@glb) {
 	  $ntype->opts('-global', $ntype->opts);
-	  my @a = @args;
-	  map {($_) = grep s/^$type://,
-		 $ct->des([qw(-fmt %Xn)], "$type:$_")->qx} @args;
-	  my $cvob = $ct->des(['-s'], 'vob:.')->qx;
-	  for (@args) {
-	    my $mvob = $1 if /\@(.*)$/;
-	    my $lvob = (shift(@a) =~ /\@(.*)$/)? $1: $cvob;
-	    $targ{$_} = $lvob unless $lvob eq $mvob;
-	  }
 	  @vob = (); #The types were already created
 	}
       }
@@ -1263,8 +1255,8 @@ sub _GenMkTypeSub {
 	  die Msg('E', "Incompatible flags: replace and incremental");
 	}
       } else {
+	my @a = @args;
 	if ($opt{family}) {
-	  my @a = @args;
 	  map { $_ = "$type:$_" } @a;
 	  die Msg('E', "Some types already exist among @args")
 	    unless $silent->argv(qw(des -s), @a)->stderr(0)->system;
@@ -1313,8 +1305,7 @@ sub _GenMkTypeSub {
 	    for my $t (keys %pair) {
 	      next unless defined $pair{$t};
 	      my @o = @opts;
-	      my $gflg = $glo{$t}? '-glo' : '-ord';
-	      push @o, $gflg;
+	      push @o, '-glo' if $glo{$t};
 	      $ntype->args($pair{$t});
 	      $ntype->opts(@cmt, @o);
 	      $ntype->system;
@@ -1331,11 +1322,20 @@ sub _GenMkTypeSub {
 		  $silent->mkhlink(['GlobalDefinition'], $cpy, $inc)->system;
 		}
 	      }
-	      $ct->argv(qw(mkattype -vtype real -c), q(Deleted in increment),
-			$gflg, "Rm$t")->stderr(0)->system;
+	      unshift @o, q(Deleted in increment);
+	      $ct->mkattype([qw(-vty real -c), @o], "Rm$t")->stderr(0)->system;
 	    }
 	  }
 	} elsif ($opt{increment}) { # increment
+	  map {($_) = grep s/^$type://,
+		 $ct->des([qw(-fmt %Xn)], "$type:$_")->qx} @args;
+	  my %targ;		#target vobs per type
+	  my $cvob = $ct->des(['-s'], 'vob:.')->qx;
+	  for (@args) {
+	    my $mvob = $1 if /\@(.*)$/;
+	    my $lvob = (shift(@a) =~ /\@(.*)$/)? $1: $cvob;
+	    $targ{$_} = $lvob unless $lvob eq $mvob;
+	  }
 	  $ntype->opts(@cmt, $ntype->opts);
 	  my $lct = ClearCase::Argv->new(); #Not autochomp
 	  my ($fl, $loaded) = $ENV{FORCELOCK};
@@ -2307,10 +2307,11 @@ sub _CpType {
   $ret += $ct->mkhlink(['GlobalDefinition'], $dst, $src)->system if $glb;
   my $rmat = $src;
   $rmat =~ s/lbtype:/attype:Rm/;
-  if ($ct->des([qw(-fmt %[type_scope]p)], $rmat)->stderr(0)->qx eq 'global') {
+  if (!$ct->des(['-s'], $rmat)->stdout(0)->stderr(0)->system) {
     $dst =~ s/lbtype:/attype:Rm/;
     $ret += $cpt->args($rmat, $dst)->system;
-    $ret += $ct->mkhlink(['GlobalDefinition'], $dst, $rmat)->system if $glb;
+    $ret += $ct->mkhlink(['GlobalDefinition'], $dst, $rmat)->system
+      if $ct->des([qw(-fmt %[type_scope]p)], $rmat)->stderr(0)->qx eq 'global';
   }
   return $ret;
 }
