@@ -24,7 +24,7 @@ The price to pay is unfortunately too high.
 
 Let's first notice that the _!GlobalDefinition_ hyperlinks are, as all hyperlinks, directed, and that this directivity is useful and part of the value of global types. Admin vobs form however an acyclic global graph, hence grab this directivity in a generic way, at the vob grain, not at the specific grain of individual types.
 
-This request for consistency is excessive at the site level: it hardly grow bottom-up. Different types will produce conflicting pressures. The worst is however met with !MultiSite. The probability of conflicts raises with the number of sites and the decrease of coupling between them. The admin vob graph must be universal, which breaks the fairness among replicas.
+This request for consistency is excessive at the site level: it hardly grows bottom-up. Different types will produce conflicting pressures. The worst is however met with !MultiSite. The probability of conflicts raises with the number of sites and the decrease of coupling between them. The admin vob graph must be universal, which breaks the fairness among replicas.
 
 == _lstype_ errors or warnings ==
 
