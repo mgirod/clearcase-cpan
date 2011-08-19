@@ -32,7 +32,7 @@ This request for consistency is excessive at the site level: it hardly grow bott
 
 However, missing an admin vob is a global error: it may affect unpredictable commands (applying arbitrary types). The effect cannot be restricted to certain types. This may be detected by running _lstype_ queries. At that point, in the absence of sufficient information about the real impact, the system emits an error which aborts the query.
 
-As we saw above, these conditions are met randomly under normal conditions. Note again that without admin vobs, the scope of the impact is limited to the types concerned: a warning is sufficient, and there is no reason to hold the availabilty of the _lstype_ command.
+As we saw above, these conditions are met randomly under normal conditions. Note again that without admin vobs, the scope of the impact is limited to the types concerned: a warning is sufficient, and there is no reason to hold the availability of the _lstype_ command.
 
 The conclusion is that admin vobs result in a global dependency on the state of the replication coupled to the creation of types.
 
