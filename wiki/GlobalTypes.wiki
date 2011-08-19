@@ -28,7 +28,7 @@ This request for consistency is excessive at the site level: it hardly grow bott
 
 == _lstype_ errors or warnings ==
 
-MultiSite replication works at the vob level. This means that the production, shipping, and import of packets for different vobs is decoupled. It makes it unavoidable that cross-vob hyperlinks are now and then in a transient way dangling.
+!MultiSite replication works at the vob level. This means that the production, shipping, and import of packets for different vobs is decoupled. It makes it unavoidable that cross-vob hyperlinks are now and then in a transient way dangling.
 
 However, missing an admin vob is a global error: it may affect unpredictable commands (applying arbitrary types). The effect cannot be restricted to certain types. This may be detected by running _lstype_ queries. At that point, in the absence of sufficient information about the real impact, the system emits an error which aborts the query.
 
