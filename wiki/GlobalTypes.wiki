@@ -44,4 +44,4 @@ Some wrapper support may ease the use of global types:
   * _cptype_ may link the types it copies
   * _archiving_ a family type may insure that the hidden type is created in all the vobs in which the type had been created, so that it may be 'revived' (with a correct value for the next equivalent fixed type) from any of the vobs
   * types created from a config record (non implemented yet) should be global by default
-  * types created in an admin vob are global by default (this is from DSB wrapper &mdash; surprisingly not in _cleartool_)
+  * types created in an admin vob are global by default (this is from DSB wrapper -- surprisingly not in _cleartool_)
