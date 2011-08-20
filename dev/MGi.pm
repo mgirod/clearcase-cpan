@@ -4,8 +4,8 @@ $VERSION = '0.28';
 
 use warnings;
 use strict;
-use vars qw($ct $eqhl $prhl $diat);
-($eqhl, $prhl) = qw(EqInc PrevInc);
+use vars qw($ct $eqhl $prhl $sthl);
+($eqhl, $prhl, $sthl) = qw(EqInc PrevInc StBr);
 
 sub _Compareincs($$) {
   my ($t1, $t2) = @_;
@@ -1757,6 +1757,11 @@ the versions specified, at least in the first pass. One may thus use an B<-all>
 option which will be passed to the B<find>.
 The B<-over> option doesn't require an element argument (default: current
 directory). With the B<-all> option, it uses one if given, as a filter.
+When using a branch type to apply labels, it links the types with a B<StBr>
+hyperlink. This is in preparation for an eventual rollout of the label type:
+this one will then archive the branch type (away) in addition to the label
+type, if they are used in the config spec, so that rules based on neither
+would hide the updated baseline.
 
 =cut
 
@@ -1844,6 +1849,16 @@ sub mklabel {
       $ver = rel2abs($ver);
       @mod = grep /^${ver}(\W|$)/, @mod;
     }
+    if (!$lb and @mod) { # only if on branches; skip if nothing to label
+      my $sil = $ct->clone({stdout=>0, stderr=>0});
+      my $cmt = 'Stream branch type, to rollout with lbtype';
+      for my $v (keys %vb) {
+	my $ht = "$sthl\@$v";
+	$ct->mkhltype([qw(-shared -c), $cmt], $ht)->system
+	  if $sil->des(['-s'], "hltype:$ht")->system;
+	$sil->mkhlink([$sthl], "lbtype:$lbtype\@$v", "brtype:$t\@$v")->system;
+      }
+    }
   }
   $mkl->opts(grep !/^-r(ec|$)/, @opt); # recurse handled already
   if ($opt{up}) {
@@ -1853,7 +1868,9 @@ sub mklabel {
     File::Spec->VERSION(0.82);
     my $vroot;
     if ($^O eq 'cygwin') {
-      $vroot = '/cygdrive/a';	#just for the length
+      my $d0 = File::Basename::dirname(File::Spec->rel2abs($elems[0]));
+      $d0 =~ m%^(/[^/]+/[^/]+)%;
+      $vroot = $1 || ''; # /cygdrive/a or /view/<tag>... just for the length
     } elsif ($^O =~ /MSWin/) {
       $vroot = 'a:';
     } else {
