@@ -17,10 +17,11 @@ Logging now various concerns and ideas, in prevision of future critique, so as t
   * rollback is a special form of rollout: it produces a *new* (equivalent fixed) label type, higher than the previous
   * rolling back the rollback offers thus the same data, but a new state
   * the same versions may thus have to be rolled back several times, in different contexts (as part of different rollbacks)
-  * one option: create and apply a new label type, e.g FOOb1.01 for FOO_1.01 (none needed for FOO_1.00!?)
-    * heavy?
-    * noise generating?
-  * saving the changeset as an attribute
-    * using oids of the versions?
-    * OK for a few, but what if there are 100s?
-    * probably lighter at rollout, and not cluttering the vtree...
+  * alternative options
+    * create and apply a new label type, e.g FOOb1.01 for FOO_1.01 (none needed for FOO_1.00!?)
+      * heavy?
+      * noise generating?
+    * saving the changeset as an attribute
+      * using oids of the versions?
+      * OK for a few, but what if there are 100s?
+      * probably lighter at rollout, and not cluttering the vtree...
