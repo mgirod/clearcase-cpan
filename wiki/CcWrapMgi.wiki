@@ -21,14 +21,15 @@ The code on this site is developed in a _dev_ branch.
     * ipc is better supported in !ClearCase::Argv, even *only* under cygwin. The mode is forced in every function and {{{ctcmd}}} may still be preferred for some (which is wrong). It will always succeed on Windows, either on top of !ClearCase::!CtCmd if installed, or on top of CAL. I originally missed the existence of support in !ClearCase::Wrapper for flags such as {{{-/ipc=1}}}, and the possibility to set it in the {{{.clearcase_profile.pl}}} file.
     * The source containers get slightly bloated: every new branch results in a full copy. This is only a minor nuisance... Solving it is possible: via a special element type manager... with its own quirks (would need to be installed on every client!)
   * Intentions:
-    * [RollOutBack rollout/rollback] to rollback versions (faster than through generating view equivalent to previous state)
     * support for incremental types, and first for label types, including:
       * consolidation of sparse fixed labels
     * availability of functionality from !ClearCase::Wrapper:DSB, such as inclusion of config spec components
     * integration of {{{synctree}}} under {{{cleartool}}}, including via the graphical interface.
+    * [WmgMkLabel mklabel] -con, and mklbtype -con
   * Mostly done (although now, I'd like to redesign both to use classes, so that it would be easier/shorter to take it in use in new functions: the current technique is too verbose...):
     * [CavComments interactive input]: generalize to avoid all hangs
     * [CwmLockingIssues lock/unlock], using site specific methods when not owning the equivalent or previous types.
+    * rmtype (incremental types and interactive prompts)
   * Recently done:
     * {{{setdepth}}} recursion was shortened (for performance and scalability reasons) when a depth is given, e.g. supporting {{{diff -pred}}}. The ambiguity with 'depth' (default: the number of levels _displayed_ which is intuitive and follows _lsvtree_) may be lifted by using the {{{-a/ll}}} option.
     * support for incremental types:
@@ -36,5 +37,4 @@ The code on this site is developed in a _dev_ branch.
       * folding config specs (automatic generation of the cascading rules)
     * [WmgArc mkxxtype -arc]
   * Under work:
-    * rmtype (incremental types and interactive prompts)
-    * [WmgMkLabel mklabel] -con, and mklbtype -con
+    * [RollOutBack rollout/rollback] to rollback versions (faster than through generating view equivalent to previous state)
