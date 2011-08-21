@@ -27,3 +27,8 @@ Logging now various concerns and ideas, in prevision of future critique, so as t
       * probably lighter at rollout, and not cluttering the vtree...
       * maybe less robust (removed elements?)
       * maybe alternative implementation for small numbers (<=10)
+  * there will be some trivial rollbacks (nothing rolled out on top), and more problematic ones
+    * for the problematic elements:
+      * branch off/checkout
+      * subtractive merge
+      * alter the merge arrows to skip the removed version from the contributing path
