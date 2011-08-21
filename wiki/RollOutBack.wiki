@@ -1,0 +1,19 @@
+#summary Rollout and rollback
+
+= ChangeSet =
+
+Against the UCM _deliver_, the rollout and rollback functionalities make only sense together.
+
+To some extent, they are already implemented, and only need some convenience wrapping up.
+
+Now, if the changeset being rolled out is well-defined, the one being rolled-back is not easily idenitifed. The offering so far uses +mkview -clone+, which works (until proven otherwise), but is relatively heavy, and non obvious to trace back.
+
+Recording the changeset potentially to be rolled back is possible in many different ways, and I haven't made up my mind yet. Or rather, I made it up several times, and changed my mind.
+
+= Implementation ideas =
+
+Logging now various concerns and ideas, in prevision of future critique, so as to have something objective to work on:
+
+  * rollback is a special form of rollout: it produces a *new* (equivalent fixed) label type, higher than the previous
+  * rolling back the rollback offers thus the same data, but a new state
+  * the same versions may thus have to be rolled back several times, in different contexts (as part of different rollbacks)
