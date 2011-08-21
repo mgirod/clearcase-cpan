@@ -1856,7 +1856,9 @@ sub mklabel {
 	my $ht = "$sthl\@$v";
 	$ct->mkhltype([qw(-shared -c), $cmt], $ht)->system
 	  if $sil->des(['-s'], "hltype:$ht")->system;
-	$sil->mkhlink([$sthl], "lbtype:$lbtype\@$v", "brtype:$t\@$v")->system;
+	my $lt = "lbtype:$lbtype\@$v";
+	$sil->mkhlink([$sthl], $lt, "brtype:$t\@$v")->system
+	  unless grep /brtype:$t\@$v$/, $ct->des([qw(-s -ahl), $sthl], $lt)->qx;
       }
     }
   }
