@@ -22,6 +22,8 @@ Logging now various concerns and ideas, in prevision of future critique, so as t
       * heavy?
       * noise generating?
     * saving the changeset as an attribute
-      * using oids of the versions?
-      * OK for a few, but what if there are 100s?
+      * using oids of the versions
+      * OK for a few, but what if there are 100s
       * probably lighter at rollout, and not cluttering the vtree...
+      * maybe less robust (removed elements?)
+      * maybe alternative implementation for small numbers (<=10)
