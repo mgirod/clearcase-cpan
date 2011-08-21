@@ -1,6 +1,6 @@
 #summary Rollout and rollback
 
-= ChangeSet =
+= !ChangeSet =
 
 Against the UCM _deliver_, the rollout and rollback functionalities make only sense together.
 
