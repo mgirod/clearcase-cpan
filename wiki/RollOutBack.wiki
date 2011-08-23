@@ -27,7 +27,7 @@ Logging now various concerns and ideas, in prevision of future critique, so as t
       * probably lighter at rollout, and not cluttering the vtree...
       * maybe less robust (removed elements?)
       * maybe alternative implementation for small numbers (<=10)
-    * not saving the changeset at all, but relying upon ''mkview -clone -equiv'' to compute it as needed. This may be a fallout strategy and win on large numbers.
+    * not saving the changeset at all, but relying upon {{{mkview -clone -equiv}}} to compute it as needed. This may be a fallout strategy and win on large numbers.
   * there will be some trivial rollbacks (nothing rolled out on top), and more problematic ones
     * for the problematic elements:
       * branch off/checkout
