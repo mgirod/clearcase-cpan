@@ -748,6 +748,7 @@ sub rmdirlinks {
 	my $dad = dirname $_;
 	$self->branchco(1, $dad) unless $lsco->args($dad)->qx;
 	$self->clone_ct->rm($_)->system;
+	delete $self->{ST_SUB}->{exfiles}->{$_}; #If it is there
     }
 }
 
