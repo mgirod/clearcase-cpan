@@ -584,7 +584,7 @@ sub analyze {
 	if (! ecs($dst) && ! ccsymlink($dst)) {
 	    $self->{ST_ADD}->{$_}->{src} = $src;
 	    $self->{ST_ADD}->{$_}->{dst} = $dst;
-	} elsif (! -d $src) {
+	  } elsif (! -d $src || src_slink($src)) {
 	    if ($self->_needs_update($src, $dst, $comparator)) {
 		$self->{ST_MOD}->{$_}->{src} = $src;
 		$self->{ST_MOD}->{$_}->{dst} = $dst;
@@ -1227,7 +1227,11 @@ sub modify {
 	    if (!$checkedout{$dad}) {
 		$checkedout{$dad} = 1 if ! $self->branchco(1, $dad);
 	    }
-	    $rm->args($lnk)->system;
+	    if (!$rm->args($lnk)->system) {
+	        my @fil = grep /^\Q$lnk\E/, keys %{$self->{ST_SUB}->{exfiles}};
+	        delete @{$self->{ST_SUB}->{exfiles}}{@fil};
+		delete $self->{ST_SUB}->{dirs}{$lnk};
+	    }
 	    $ln->args($txt, $lnk)->system;
 	}
     }
