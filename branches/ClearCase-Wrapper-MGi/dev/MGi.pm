@@ -17,6 +17,24 @@ sub _Compareincs($$) {
   }
   return ($M1 <=> $M2 or (defined($m1) and defined($m2) and $m1 <=> $m2));
 }
+sub _wrap {
+  local @ARGV = @_;
+  ClearCase::Wrapper::Extension($ARGV[0]);
+  no strict 'refs';
+  my $rc = eval { "ClearCase::Wrapper::$ARGV[0]"->(@ARGV) };
+  if ($@) {
+    chomp $@;		 #One extra newline to avoid dumping the stack
+    if ($@ =~ m%^\d+$%) {
+      $rc = $@;
+    } elsif ($@) {
+      print STDERR "$@\n";
+      $rc = 1;
+    } else {
+      $rc = 0;
+    }
+  }
+  return $rc;			# Completed, successful or not
+}
 use AutoLoader 'AUTOLOAD';
 
 #############################################################################
@@ -37,6 +55,8 @@ use AutoLoader 'AUTOLOAD';
   $setcs = "\n* [-clone view-tag] [-expand] [-sync|-needed]";
   $mkview = "\n* [-clone view-tag [-equiv lbtype,timestamp]]";
   $describe = "\n* [-par/ents <n>] [-fam/ily <n>]";
+  $rollout = "$z [-force] [-c comment] -to baseline brype|lbtype";
+  $rollback = "$z [-force] [-c comment] changeset";
 }
 
 #############################################################################
@@ -48,6 +68,8 @@ use AutoLoader 'AUTOLOAD';
 *desc           = *describe;
 *lsgen		= *lsgenealogy;
 *unco           = *uncheckout;
+*ro             = *rollout;
+*rb             = *rollback;
 
 1;
 
@@ -155,7 +177,6 @@ sub _Checkcs {
   use File::Basename;
   use Cwd;
   my ($v) = @_;
-  $ct = $ct->clone();
   $v =~ s/^(.*?)\@\@.*$/$1/;
   my $dest = dirname($v);
   $dest .= '/' unless $dest =~ m%/$%;
@@ -2754,6 +2775,120 @@ sub mkview {
     close $fh;
   }
   $ct->setcs(['-tag', $tag], $cs)->exec;
+}
+
+=item * ROLLOUT
+
+New command. Deliver by applying labels of the base line family
+(applying the fixed increment and moving the floating).
+
+Without the B<-force> option, will perform a prior I<find> to verify that no
+I<home merge> (I<rebase>) is needed.
+
+As part of the rollout, the type identifying the development (label
+type or branch type) will be I<archived> away if it is used in the
+current config spec. This is to ensure that the config spec will
+select the new baseline after the rollout. Note that branch types
+associated with a family label (used previously with a I<mklabel
+-over>) will be archived as well.
+
+The rollback changeset will be recorded. If the number of elements
+doesn't exceed 10, it will be stored as an attribute of the new
+incremental type. Otherwise, a new label type will be created and
+applied.
+
+If the baseline type is not a family type, it will be moved, and the
+change set will be recorded as a new label.
+
+If both types are global, and defined in the same vobs, the rollout
+will affect all the vobs concerned. If only the development type is
+global, or if the vob sets do not match, the rollout will only affect
+the vob specified. Explicit options may alter this default.
+
+=cut
+
+sub rollout {
+  use strict;
+  use warnings;
+  use Cwd;
+  my %opt;
+  GetOptions(\%opt, qw(force comment=s to=s));
+  Assert(@ARGV > 1);		# die with usage msg if untrue
+  shift @ARGV;
+  my $arg = $ARGV[0];
+  warn Msg('W', "Not fully implemented yet\n");
+  die Msg('E', "The target baseline type is a mandatory argument\n")
+    unless $opt{to};
+  my $bl = $opt{to}; $bl =~ s/^lbtype://;
+  my $lbl = "lbtype:$bl";
+  my @cmt = $opt{comment}? (-c, $opt{comment}) : '-nc';
+  $ct = ClearCase::Argv->new({autochomp=>1});
+  my $sil = $ct->clone({stdout=>0, stderr=>0});
+  my $fail = $ct->clone({autochomp=>1, autofail=>1});
+  $arg =~ s/^.*://; #remove possible prefix
+  my $lvob = $ct->des(['-s'], 'vob:.')->stderr(0)->qx; # Maybe not in a vob
+  my $vob = $arg =~ /\@(.*)$/? $1 : $lvob;
+  if ($bl =~ /\@(.*)$/) {
+    die Msg('E', "$bl must be in the same vob as $arg\n") unless $1 eq $vob;
+  } else {
+    $lbl .= "\@$vob";
+  }
+  my $bt = $sil->des(['-s'], "lbtype:$arg")->system; #branch or label type
+  my $targ = $bt? "brtype:$arg" : "lbtype:$arg";
+  $fail->des(['-s'], $targ)->stdout(0)->system;
+  if ($sil->des(['-s'], $lbl)->system) {
+    local @ARGV = qw(mklbtype); push @ARGV, $bl;
+    my $mklbt = ClearCase::Argv->new(@ARGV);
+    my $fn = _GenMkTypeSub(qw(lbtype Label label));
+    $mklbt->{fopts} = {family => 1};
+    $fn->($mklbt, @cmt);
+  } else {
+    if ($ct->des([qw(-s -ahl), $eqhl], $lbl)->qx) {
+      local @ARGV = qw(mklbtype); push @ARGV, $bl;
+      my $mklbt = ClearCase::Argv->new(@ARGV);
+      my $fn = _GenMkTypeSub(qw(lbtype Label label));
+      $mklbt->{fopts} = {increment => 1};
+      $fn->($mklbt, @cmt);
+    } else {
+      die Msg('E', "Baseline non incremental: comment non supported\n")
+	if $opt{comment};
+      _wrap(qw(unlock), $lbl) if $ct->lslock(['-s'], $lbl)->qx;
+    }
+  }
+  my $la = $arg; $la =~ s/\@.*$//; # Local name: vob in $lbl
+  my $cwd = getcwd;
+  $ct->cd($vob)->system unless $vob eq $lvob;
+  my $rc = _wrap(qw(mklabel -over), $la, $bl);
+  exit $rc if $rc;
+  $ct->cd($cwd)->system unless $vob eq $lvob;
+  if ($bt) {
+    $rc = _wrap(qw(mkbrtype -nc -arc), "brtype:$arg");
+  } else {
+    my @bt = grep s/^-> //, $ct->des([qw(-s -ahl), $sthl], "lbtype:$arg")->qx;
+    _wrap(qw(mklbtype -nc -arc), @bt) if @bt;
+    $rc = _wrap(qw(mkbrtype -nc -arc), "lbtype:$arg");
+  }
+  exit $rc;
+}
+
+=item * ROLLBACK
+
+New command. Cancel the effect of a previous rollout command.
+
+This is in effect a new rollout, and will result in a new increment of
+the baseline family label type.
+
+The change set required as argument is a fixed incremental label type.
+
+=cut
+
+sub rollback {
+  GetOptions(\%opt, qw(force comment=s));
+  Assert(@ARGV > 1);		# die with usage msg if untrue
+  shift @ARGV;
+  $ct = ClearCase::Argv->new({autochomp=>1});
+  warn('E', "Not implemented yet\n");
+  exit 0;
 }
 
 =back
