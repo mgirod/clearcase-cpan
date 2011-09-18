@@ -1168,7 +1168,7 @@ sub modify {
 		my $dir = dirname($dst);
 		$self->branchco(1, $dir) unless $lsco->args($dir)->qx;
 		$self->clone_ct->rm($dst)->system; #remove the first symlink
-		if ($dangling) {
+		if ($dangling || !$self->{ST_SUB}->{exfiles}->{$dst1}) {
 		    if (!copy($src, $dst)) {
 			warn "$0: Error: $dst: $!\n";
 			$rm->fail;
