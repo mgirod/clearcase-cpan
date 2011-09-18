@@ -268,3 +268,4 @@ Revision history for Perl extension ClearCase::SyncTree.
 	- subtract: new implementation--remove only the top of directory trees
 	- rmdirlinks: remove entries from the remove list after removing them
 	- remove directories on the way of symlinks
+	- symlink replaced with file, wile keeping the original target
