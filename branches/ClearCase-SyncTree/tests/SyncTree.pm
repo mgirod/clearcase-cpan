@@ -1189,12 +1189,6 @@ sub modify {
 			delete $self->{ST_MOD}->{$key};
 			push @del, $key;
 		    }
-		    (my $k = $dst1) =~ s%^$self->{ST_DSTBASE}$sep%%;
-		    if ($symlinks{$k}) {
-			my $d = $self->mkrellink($self->{ST_MOD}->{$k}->{src});
-			$ln->args($d, $dst1)->system;
-			delete $symlinks{$k};
-		    }
 		}
 	    }
 	    push(@toco, $dst) unless exists($self->{ST_PRE}->{$dst}) || $new;
