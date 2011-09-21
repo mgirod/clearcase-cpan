@@ -6,7 +6,7 @@ Despite the UCM _deliver_, the rollout and rollback functionalities make only se
 
 To some extent, they are already implemented, and only need some convenience wrapping up.
 
-Now, if the changeset being rolled out is well-defined, the one being rolled-back is not easily idenitifed. The offering so far uses +mkview -clone+, which works (until proven otherwise), but is relatively heavy, and non obvious to trace back.
+Now, if the changeset being rolled out is well-defined, the one being rolled-back is not easily idenitifed. The offering so far uses {{{mkview -clone}}}, which works (until proven otherwise), but is relatively heavy, and non obvious to trace back.
 
 Recording the changeset potentially to be rolled back is possible in many different ways, and I haven't made up my mind yet. Or rather, I made it up several times, and changed my mind.
 
