@@ -2782,8 +2782,8 @@ sub mkview {
 New command. Deliver by applying labels of the base line family
 (applying the fixed increment and moving the floating).
 
-Without the B<-force> option, will perform a prior I<find> to verify that no
-I<home merge> (I<rebase>) is needed.
+Without the B<-force> option, will perform a prior I<find> to verify
+that no I<home merge> (I<rebase>) is needed.
 
 As part of the rollout, the type identifying the development (label
 type or branch type) will be I<archived> away if it is used in the
@@ -2792,13 +2792,13 @@ select the new baseline after the rollout. Note that branch types
 associated with a family label (used previously with a I<mklabel
 -over>) will be archived as well.
 
-The rollback changeset will be recorded. If the number of elements
-doesn't exceed 10, it will be stored as an attribute of the new
-incremental type. Otherwise, a new label type will be created and
-applied.
+Note that the rollout concerns a type at the vob level (or across
+several vobs). It is however dependent on the view used, which is
+assumed to be a development view selecting the versions being
+rolled-out.
 
 If the baseline type is not a family type, it will be moved, and the
-change set will be recorded as a new label.
+change set will be recorded as a new label. [Not supported for now!]
 
 If both types are global, and defined in the same vobs, the rollout
 will affect all the vobs concerned. If only the development type is
@@ -2811,12 +2811,12 @@ sub rollout {
   use strict;
   use warnings;
   use Cwd;
+  use constant CYGWIN => $^O =~ /cygwin/i ? 1 : 0;
   my %opt;
   GetOptions(\%opt, qw(force comment=s to=s));
-  Assert(@ARGV > 1);		# die with usage msg if untrue
+  Assert(@ARGV == 2);		# die with usage msg if untrue
   shift @ARGV;
   my $arg = $ARGV[0];
-  warn Msg('W', "Not fully implemented yet\n");
   die Msg('E', "The target baseline type is a mandatory argument\n")
     unless $opt{to};
   my $bl = $opt{to}; $bl =~ s/^lbtype://;
@@ -2833,22 +2833,24 @@ sub rollout {
   } else {
     $lbl .= "\@$vob";
   }
+  if (!$opt{force}) {
+    # Note: cleartool runs in Windows mode when we are on Cygwin
+    my @nolog = (MSWIN or CYGWIN)? qw(-log NUL) : qw(-log /dev/null);
+    die Msg('E', "Home merge (rebase) needed\n)")
+      if $ct->findmerge($vob, '-fve', $bl, @nolog, '-print')->stderr(0)->qx;
+  }
   my $bt = $sil->des(['-s'], "lbtype:$arg")->system; #branch or label type
   my $targ = $bt? "brtype:$arg" : "lbtype:$arg";
   $fail->des(['-s'], $targ)->stdout(0)->system;
   if ($sil->des(['-s'], $lbl)->system) {
-    local @ARGV = qw(mklbtype); push @ARGV, $bl;
+    local @ARGV = qw(mklbtype); push @ARGV, $lbl;
     my $mklbt = ClearCase::Argv->new(@ARGV);
     my $fn = _GenMkTypeSub(qw(lbtype Label label));
     $mklbt->{fopts} = {family => 1};
     $fn->($mklbt, @cmt);
   } else {
     if ($ct->des([qw(-s -ahl), $eqhl], $lbl)->qx) {
-      local @ARGV = qw(mklbtype); push @ARGV, $bl;
-      my $mklbt = ClearCase::Argv->new(@ARGV);
-      my $fn = _GenMkTypeSub(qw(lbtype Label label));
-      $mklbt->{fopts} = {increment => 1};
-      $fn->($mklbt, @cmt);
+      _wrap(qw(mklbtype -inc), @cmt, $lbl);
     } else {
       die Msg('E', "Baseline non incremental: comment non supported\n")
 	if $opt{comment};
@@ -2858,15 +2860,20 @@ sub rollout {
   my $la = $arg; $la =~ s/\@.*$//; # Local name: vob in $lbl
   my $cwd = getcwd;
   $ct->cd($vob)->system unless $vob eq $lvob;
-  my $rc = _wrap(qw(mklabel -over), $la, $bl);
+  my $rc = _wrap(qw(mklabel -over), $la, $bl, $vob);
   exit $rc if $rc;
   $ct->cd($cwd)->system unless $vob eq $lvob;
   if ($bt) {
-    $rc = _wrap(qw(mkbrtype -nc -arc), "brtype:$arg");
+    my $tag = ViewTag();
+    die Msg('E', "view tag cannot be determined") unless $tag;;
+    my($vws) = reverse split '\s+', $ct->lsview($tag)->qx;
+    my $used = grep /\b\Q$bt\E\b/, grep !/^\s*#/,
+      Burrow('CATCS_00', "$vws/config_spec", 'print');
+    $rc = _wrap(qw(mkbrtype -nc -arc), $arg) if $used;
   } else {
     my @bt = grep s/^-> //, $ct->des([qw(-s -ahl), $sthl], "lbtype:$arg")->qx;
     _wrap(qw(mklbtype -nc -arc), @bt) if @bt;
-    $rc = _wrap(qw(mkbrtype -nc -arc), "lbtype:$arg");
+    $rc = _wrap(qw(mklbtype -nc -arc), $arg);
   }
   exit $rc;
 }
