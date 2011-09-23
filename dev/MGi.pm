@@ -2836,7 +2836,7 @@ sub rollout {
   if (!$opt{force}) {
     # Note: cleartool runs in Windows mode when we are on Cygwin
     my @nolog = (MSWIN or CYGWIN)? qw(-log NUL) : qw(-log /dev/null);
-    die Msg('E', "Home merge (rebase) needed\n)")
+    die Msg('E', "Home merge (rebase) needed\n")
       if $ct->findmerge($vob, '-fve', $bl, @nolog, '-print')->stderr(0)->qx;
   }
   my $bt = $sil->des(['-s'], "lbtype:$arg")->system; #branch or label type
@@ -2864,15 +2864,24 @@ sub rollout {
   exit $rc if $rc;
   $ct->cd($cwd)->system unless $vob eq $lvob;
   if ($bt) {
-    my $tag = ViewTag();
-    die Msg('E', "view tag cannot be determined") unless $tag;;
-    my($vws) = reverse split '\s+', $ct->lsview($tag)->qx;
-    my $used = grep /\b\Q$bt\E\b/, grep !/^\s*#/,
-      Burrow('CATCS_00', "$vws/config_spec", 'print');
-    $rc = _wrap(qw(mkbrtype -nc -arc), $arg) if $used;
+    $rc = _wrap(qw(mkbrtype -nc -arc), $arg);
   } else {
     my @bt = grep s/^-> //, $ct->des([qw(-s -ahl), $sthl], "lbtype:$arg")->qx;
-    _wrap(qw(mklbtype -nc -arc), @bt) if @bt;
+    if (@bt) {
+      my $tag = ViewTag();
+      die Msg('E', "view tag cannot be determined") unless $tag;;
+      my($vws) = reverse split '\s+', $ct->lsview($tag)->qx;
+      my @cs = ();
+      no warnings qw(once);
+      *::push2cs = sub {chomp; s/\#.*//; push @cs, $_};
+      Burrow('CATCS_00', "$vws/config_spec", '::push2cs');
+      my @abt = ();
+      for my $bt (@bt) {
+	my $t = $1 if $bt =~ /^brtype:(.*?)(\@.*)?$/;
+	push @abt, $bt if grep /\b\Q$t\E\b/, @cs;
+      }
+      _wrap(qw(mkbrtype -nc -arc), @abt) if @abt;
+    }
     $rc = _wrap(qw(mklbtype -nc -arc), $arg);
   }
   exit $rc;
