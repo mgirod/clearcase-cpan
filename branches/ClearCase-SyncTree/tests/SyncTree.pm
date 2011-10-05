@@ -1,6 +1,6 @@
 package ClearCase::SyncTree;
 
-$VERSION = '0.58';
+$VERSION = '0.59';
 
 require 5.004;
 
@@ -191,7 +191,7 @@ sub _lsprivate {
 
 sub _lsco {
     my $self = shift;
-    my $base = $self->dstbase;
+    my $base = $self->_mkbase;
     my $ct = $self->clone_ct;
     my %co;
     for ($ct->lsco([qw(-s -cvi -a)], $base)->qx) {
@@ -200,7 +200,7 @@ sub _lsco {
     }
     for my $dir (@{$self->{ST_IMPLICIT_DIRS}}) {
 	my $dad = dirname($dir);
-	$co{$dad}++ if !$ct->lsco([qw(-s -cvi -d)], $dad)->stdout(0)->system;
+	$co{$dad}++ if $ct->lsco([qw(-s -cvi -d)], $dad)->stdout(0)->system;
     }
     return wantarray? sort keys %co : scalar keys %co;
 }
@@ -584,7 +584,7 @@ sub analyze {
 	if (! ecs($dst) && ! ccsymlink($dst)) {
 	    $self->{ST_ADD}->{$_}->{src} = $src;
 	    $self->{ST_ADD}->{$_}->{dst} = $dst;
-	  } elsif (! -d $src || src_slink($src)) {
+	} elsif (! -d $src || src_slink($src)) {
 	    if ($self->_needs_update($src, $dst, $comparator)) {
 		$self->{ST_MOD}->{$_}->{src} = $src;
 		$self->{ST_MOD}->{$_}->{dst} = $dst;
@@ -684,10 +684,10 @@ sub pbrtype {
     my $self = shift;
     my $bt = shift;
     my $ct = $self->clone_ct;
-    my $base = $self->dstbase;
+    my $vob = $self->{ST_DSTVOB};
     if (!defined($self->{ST_PBTYPES}->{$bt})) {
-	my $tc = $ct->argv('desc', qw(-fmt \%[type_constraint]p),
-			   "brtype:$bt\@$base")->qx;
+	my $tc = $ct->des([qw(-fmt %[type_constraint]p)],
+			                              "brtype:$bt\@$vob")->qx;
 	$self->{ST_PBTYPES}->{$bt} = ($tc =~ /one version per branch/);
     }
     return $self->{ST_PBTYPES}->{$bt};
@@ -861,7 +861,7 @@ sub reusemkdir {
 		  while (my $id = shift @intdir) {
 		    $dd = join '/', $dd, $id;
 		    $pf = $pf . $id . '/';
-		    $self->skimdir($dd, $pf) unless $dfound{$dd}++;
+		    $self->skimdir($dd, $pf) if -d $dd && !$dfound{$dd}++;
 		  }
 		}
 		# Problem: does it match the type under srcbase?
