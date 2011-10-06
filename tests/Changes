@@ -273,3 +273,4 @@ Revision history for Perl extension ClearCase::SyncTree.
 0.59 Wed Oct  5 14:41:36 BST 2011
         - reuse failed for the root of dstbase
 	- reuse failed for intermediate dirs, missing from a restored version
+	- silence spurious error messages in _lsco, testing private directories
