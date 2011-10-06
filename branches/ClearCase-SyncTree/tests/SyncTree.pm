@@ -193,6 +193,7 @@ sub _lsco {
     my $self = shift;
     my $base = $self->_mkbase;
     my $ct = $self->clone_ct;
+    my $sil = $self->clone_ct(stdout=>0, stderr=>0, autofail=>0);
     my %co;
     for ($ct->lsco([qw(-s -cvi -a)], $base)->qx) {
 	$_ = $self->normalize($_);
@@ -200,7 +201,7 @@ sub _lsco {
     }
     for my $dir (@{$self->{ST_IMPLICIT_DIRS}}) {
 	my $dad = dirname($dir);
-	$co{$dad}++ if $ct->lsco([qw(-s -cvi -d)], $dad)->stdout(0)->system;
+	$co{$dad}++ if $sil->lsco([qw(-s -cvi -d)], $dad)->system;
     }
     return wantarray? sort keys %co : scalar keys %co;
 }
@@ -361,12 +362,10 @@ sub _mkbase {
 	my $mbase = $self->dstbase;
 	my $dvob = $self->dstvob;
 	(my $dext = $mbase) =~ s%(.*?$dvob)/.*%$1%;
-	my $ct = $self->clone_ct({stdout=>0, stderr=>0});
-	$ct->autofail(0);	# can't be done above, will be lost.
+	my $ct = $self->clone_ct({stdout=>0, stderr=>0, autofail=>0});
 	while (1) {
 	    last if length($mbase) <= length($dext);
-	    last if -d $mbase &&
-			! $ct->argv('desc', ['-s'], "$mbase/.@@")->system;
+	    last if -d $mbase && ! $ct->desc(['-s'], "$mbase/.@@")->system;
 	    push(@{$self->{ST_IMPLICIT_DIRS}}, $mbase);
 	    $mbase = dirname($mbase);
 	}
