@@ -193,7 +193,7 @@ sub _lsco {
     my $self = shift;
     my $base = $self->_mkbase;
     my $ct = $self->clone_ct;
-    my $sil = $self->clone_ct(stdout=>0, stderr=>0, autofail=>0);
+    my $sil = $self->clone_ct(stderr=>0, autofail=>0);
     my %co;
     for ($ct->lsco([qw(-s -cvi -a)], $base)->qx) {
 	$_ = $self->normalize($_);
@@ -201,7 +201,7 @@ sub _lsco {
     }
     for my $dir (@{$self->{ST_IMPLICIT_DIRS}}) {
 	my $dad = dirname($dir);
-	$co{$dad}++ if $sil->lsco([qw(-s -cvi -d)], $dad)->system;
+	$co{$dad}++ if $sil->lsco([qw(-s -cvi -d)], $dad)->qx;
     }
     return wantarray? sort keys %co : scalar keys %co;
 }
