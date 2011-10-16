@@ -4,6 +4,7 @@ $VERSION = '0.28';
 
 use warnings;
 use strict;
+use constant CYGWIN => $^O =~ /cygwin/i ? 1 : 0;
 use vars qw($ct $eqhl $prhl $sthl);
 ($eqhl, $prhl, $sthl) = qw(EqInc PrevInc StBr);
 
@@ -181,9 +182,9 @@ sub _Checkcs {
   my $dest = dirname($v);
   $dest .= '/' unless $dest =~ m%/$%;
   my $pwd = getcwd();
-  $ct->argv('cd', $dest)->system if $dest;
+  $ct->cd($dest)->system if $dest;
   my @cs = grep /^\#\#:BranchOff: *root/, $ct->argv('catcs')->qx;
-  $ct->argv('cd', $pwd)->system if $dest;
+  $ct->cd($pwd)->system if $dest;
   return scalar @cs;
 }
 sub _Pbrtype {
@@ -1351,11 +1352,11 @@ sub _GenMkTypeSub {
 	  map {($_) = grep s/^$type://,
 		 $ct->des([qw(-fmt %Xn)], "$type:$_")->qx} @args;
 	  my %targ;		#target vobs per type
-	  my $cvob = $ct->des(['-s'], 'vob:.')->qx;
+	  my $cvob = $ct->des(['-s'], 'vob:.')->stderr(0)->qx; #Maybe not
 	  for (@args) {
 	    my $mvob = $1 if /\@(.*)$/;
 	    my $lvob = (shift(@a) =~ /\@(.*)$/)? $1: $cvob;
-	    $targ{$_} = $lvob unless $lvob eq $mvob;
+	    $targ{$_} = $lvob if $lvob and $lvob ne $mvob;
 	  }
 	  $ntype->opts(@cmt, $ntype->opts);
 	  my $lct = ClearCase::Argv->new(); #Not autochomp
@@ -2612,7 +2613,7 @@ sub mkview {
 		   shareable_dos|nshareable_dos cachesize=s
 		   stgloc=s host=s hpath=s gpath=s
 		   colocated_server vws=s));
-  $mkv->parseWRAPPER(qw(clone=s equiv=s));
+  $mkv->parseWRAPPER(qw(clone=s equiv=s quiet));
   return 0 unless $mkv->flagWRAPPER('clone');
   my $tag = $mkv->flagCC('tag');
   if (!$tag) {
@@ -2708,6 +2709,7 @@ sub mkview {
       $ts = strftime(q(%Y-%m-%dT%H:%M:%S%z), @bits); #Standardize
     }
   }
+  $mkv->stdout(0) if $mkv->flagWRAPPER('quiet');
   $mkv->system and exit 1;
   $ct->chview(['-readonly'], $tag)->system if grep /^readonly$/, @prop;
   if (@eqlst) {
@@ -2723,7 +2725,7 @@ sub mkview {
     }
     my $trim = sub {
       if ($_ and m%^element\s+(\S+)\s+(?:\.\.\.)?[/\\](\S+)[/\\]LATEST\b.*$%) {
-	my $vb = $1;
+	my $vb = ($1 eq '*'? '' : $1);
 	my @bt = split m%[/\\]%, $2;
 	if ($vb) {
 	  $vb =~ s%^(.*?)[/\\]\.\.\.%$1%;
@@ -2744,8 +2746,8 @@ sub mkview {
     push @cs1, "time $ts\n";
     open my $fh, '<', $cs or die Msg('E', qq(Unable to access "$cs": $!\n));
     while (<$fh>) {
-      if (/^element \* $l(\s+-nocheckout)?/) {
-	$noco = $1? $1 : '';
+      if (/^element .*\s\Q$l\E(\s+-nocheckout)?/) {
+	$noco = defined($1)? $1 : '';
 	$incfam = 1;
 	last;
       }
@@ -2811,7 +2813,6 @@ sub rollout {
   use strict;
   use warnings;
   use Cwd;
-  use constant CYGWIN => $^O =~ /cygwin/i ? 1 : 0;
   my %opt;
   GetOptions(\%opt, qw(force comment=s to=s));
   Assert(@ARGV == 2);		# die with usage msg if untrue
@@ -2843,18 +2844,16 @@ sub rollout {
   my $targ = $bt? "brtype:$arg" : "lbtype:$arg";
   $fail->des(['-s'], $targ)->stdout(0)->system;
   if ($sil->des(['-s'], $lbl)->system) {
-    local @ARGV = qw(mklbtype); push @ARGV, $lbl;
-    my $mklbt = ClearCase::Argv->new(@ARGV);
-    my $fn = _GenMkTypeSub(qw(lbtype Label label));
-    $mklbt->{fopts} = {family => 1};
-    $fn->($mklbt, @cmt);
+    _wrap(qw(mklbtype -fam), @cmt, $lbl) and die "\n";
   } else {
     if ($ct->des([qw(-s -ahl), $eqhl], $lbl)->qx) {
-      _wrap(qw(mklbtype -inc), @cmt, $lbl);
+      _wrap(qw(mklbtype -inc), @cmt, $lbl) and die "\n";
     } else {
       die Msg('E', "Baseline non incremental: comment non supported\n")
 	if $opt{comment};
-      _wrap(qw(unlock), $lbl) if $ct->lslock(['-s'], $lbl)->qx;
+      if ($ct->lslock(['-s'], $lbl)->qx) {
+	_wrap(qw(unlock), $lbl) and die "\n";
+      }
     }
   }
   my $la = $arg; $la =~ s/\@.*$//; # Local name: vob in $lbl
@@ -2889,7 +2888,7 @@ sub rollout {
 
 =item * ROLLBACK
 
-New command. Cancel the effect of a previous rollout command.
+New command. Roll back to a previous increment.
 
 This is in effect a new rollout, and will result in a new increment of
 the baseline family label type.
@@ -2899,12 +2898,136 @@ The change set required as argument is a fixed incremental label type.
 =cut
 
 sub rollback {
-  GetOptions(\%opt, qw(force comment=s));
-  Assert(@ARGV > 1);		# die with usage msg if untrue
+  use strict;
+  use warnings;
+  use Sys::Hostname;
+  use File::Path qw(remove_tree);
+  use Cwd;
+  my %opt;
+  GetOptions(\%opt, qw(force to=s comment=s));
+  Assert(@ARGV == 1);		# die with usage msg if untrue
+  die Msg('E', "to argument mandatory\n") unless $opt{to};
   shift @ARGV;
+  my @cmt = ('-c', ($opt{comment} or "rollback to $opt{to}"));
   $ct = ClearCase::Argv->new({autochomp=>1});
-  warn('E', "Not implemented yet\n");
-  exit 0;
+  my $sil = $ct->clone({stdout=>0, stderr=>0});
+  my $fail = $ct->clone({autochomp=>1, autofail=>1, stdout=>0});
+  my $inc = $opt{to};
+  $inc =~ s/^.*://; #remove possible prefix
+  my $tinc = "lbtype:$inc";
+  $fail->des(['-s'], $tinc)->system;
+  my $t = $tinc;
+  while (my ($t1) =
+	   grep s/^<- (.*)$/$1/, $ct->des([qw(-s -ahl), $prhl], $t)->qx) {
+    $t = $t1;
+  }
+  my ($flt) = grep s/^<- (.*)$/$1/, $ct->des([qw(-s -ahl), $eqhl], $t)->qx;
+  die Msg('E', "Only rolling back to increments (label types)\n") unless $flt;
+  my $tag = ViewTag();
+  die Msg('E', "view tag cannot be determined") unless $tag;;
+  my($vws) = reverse split '\s+', $ct->lsview($tag)->qx;
+  my $used = 0;
+  no warnings qw(once);
+  my $flt0 = $1 if $flt =~ /^lbtype:(.*)$/;
+  my $flt1 = $1 if $flt0 =~ /^(.*?)\@.*$/;
+  die Msg('E', "Unexpected value: $flt") unless $flt1;
+  *::usedflt = sub {chomp; s/\#.*//; $used |= /element .*?\s\Q$flt1\E(\s|$)/};
+  Burrow('CATCS_00', "$vws/config_spec", '::usedflt');
+  die Msg('E', "the current view doesn't use $flt1\n") unless $used;
+  my $tmptag = $tag . '_00';
+  {
+    my $nr = 0;
+    $tmptag = $tag . sprintf("_%02d", ++$nr)
+      until ($sil->lsview(['-s'], $tmptag)->system or $nr == 99);
+    die Msg('E', "100 temporary views not cleaned?") if $nr == 99;
+  }
+  my $rmv = sub{
+    if (MSWIN or CYGWIN) {
+      my ($sto, $uuid) = grep s/^(\s+Global path|View uuid): //,
+	$ct->lsview(['-l'], $tmptag)->qx; #Trust the order in the output...
+      my $host = $1 if $sto =~ m%^//([^/]+)/%;
+      if ($host eq hostname) {
+	if (MSWIN) {
+	  $sto =~ s%^//$host%C:%;
+	} else {
+	  $sto =~ s%^//$host%/cygdrive/c%;
+	}
+      } else {
+	die Msg('E', "Not supported yet: rmview on Windows of remote view");
+      }
+      $ct->endview(['-server'], $tmptag)->system;
+      $ct->rmtag(['-view'], $tmptag)->system;
+      $ct->unregister([qw(-view -uuid)], $uuid)->system;
+      remove_tree($sto);
+      my ($use) = grep /\\\\view\\\Q$tmptag\E\s+/, qx(net use);
+      system(qw(net use /d), $1) if $use =~ /^Unavailable\s+([A-Z]:)\s+/;
+    } else {
+      $ct->rmview(['-tag'], $tmptag)->system;
+    }
+  };
+  my $lvob = $ct->des(['-s'], 'vob:.')->stderr(0)->qx;
+  my $vob = $1 if $flt0 =~ /^.*?\@(.*)$/; #FIXME: global type...
+  my $chdir = ($lvob and $lvob ne $vob);
+  my $cwd = getcwd();
+  if (MSWIN or CYGWIN) {
+    my $winpfx = $1 if $cwd =~ m%^(.*?)\Q$lvob\E.*%;
+    die Msg('E', "Failed to extract the view prefix for $lvob from $cwd\n")
+      unless $winpfx;
+    $ct->cd("${winpfx}$vob")->system if $chdir;
+  } else {
+    $ct->cd($vob)->system if $chdir;
+  }
+  _wrap(qw(mkview -quiet -tag), $tmptag, '-clone', $tag, '-equiv', $tinc)
+    and die "\n";
+  if (_wrap('mklbtype', @cmt, '-inc', $flt)) {
+    $rmv->();
+    die Msg('E', "Failed to increment $flt1: aborting\n");
+  }
+  if (MSWIN or CYGWIN) {
+    my @use = grep /^(?:\w+)?\s+[A-Z]:/, qx(net use);
+    my @unav = grep /^Unavailable/, @use;
+    my $drv;
+    if (@unav) {
+      $drv = $1 if $unav[0] =~ /^Unavailable\s+([A-Z]):/;
+      system(qw(net use /d), "$drv:");
+    } else {
+      my %used;
+      map{$used{$1}++ if /^s+([A-Z]):/} @use;
+      for (reverse 'A'..'Z') {
+	next if $used{$_};
+	$drv = $_;
+	last;
+      }
+    }
+    system(qw(net use), "$drv:", "\\\\view\\$tmptag");
+    if (!$drv) {
+      $rmv->();
+      die Msg('E', "Need a free drive letter to map the $tmptag temp view\n");
+    }
+    if (MSWIN) {
+      $ct->cd("${drv}:$vob")->system;
+    } else {
+      $drv = lc $drv;
+      $ct->cd("/cygdrive/${drv}$vob")->system;
+    }
+  } else {
+    $ct->setview($tmptag)->system;
+  }
+  my $qry = "lbtype($flt1)";
+  my @targ;
+  for ($ct->find(qw(-a -vis -ver), $qry, qw(-nxn -print))->qx) {
+    push @targ, $_
+      unless $ct->des(['-s'], $_)->qx eq $ct->des(['-s'], "$_\@\@/$flt1")->qx
+  }
+  _wrap('mklabel', @cmt, $flt1, @targ) if @targ;
+  @targ = $ct->find(qw(-a -nvis -ver), $qry, '-print')->qx;
+  _wrap('rmlabel', @cmt, $flt1, @targ) if @targ;
+  $ct->cd($cwd)->system if $chdir;
+  if (!(MSWIN or CYGWIN)) {
+    $ct->setview($tag)->system;
+  }
+  $rmv->();
+  exit 0; #FIXME: return code
 }
 
 =back
