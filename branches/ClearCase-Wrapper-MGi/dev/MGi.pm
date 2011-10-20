@@ -779,7 +779,8 @@ sub lsgenealogy {
     $ver =~ s%\\%/%g;
     my $ele = $ver;
     $ele =~ s%^(.*?)\@.*%$1%; # normalize in case of vob root directory
-    my %gen = $opt{all}? _DepthGen($ele, $opt{depth}, $ver, !$opt{short})
+    my %gen = ($opt{all} and defined $opt{depth})?
+      _DepthGen($ele, $opt{depth}, $ver, !$opt{short})
       : _Parsevtree($ele, $opt{obsolete}, $ver);
     _Setdepths($ver, 0, \%gen);
     my %seen = ();
