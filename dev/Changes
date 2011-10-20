@@ -183,3 +183,5 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- mklbtype -inc: same as -fam for previously archived lbtype
 	- rmlabel: fix for remote elements (passed with a full path)
 	- mklabel -over records the brtype for rollout
+	- rollout/rollback
+	- lsgen -a, without -depth: parse lsvtree
