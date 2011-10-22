@@ -2961,20 +2961,21 @@ sub rollback {
       $ct->unregister([qw(-view -uuid)], $uuid)->system;
       remove_tree($sto);
       my ($use) = grep /\\\\view\\\Q$tmptag\E\s+/, qx(net use);
-      system(qw(net use /d), $1) if $use =~ /^Unavailable\s+([A-Z]:)\s+/;
+      my $nul = MSWIN? '>NUL' : '>/dev/null';
+      system("net use /d $1 $nul") if $use =~ /^Unavailable\s+([A-Z]:)\s+/;
     } else {
       $ct->rmview(['-tag'], $tmptag)->system;
     }
   };
   my $lvob = $ct->des(['-s'], 'vob:.')->stderr(0)->qx;
   my $vob = $1 if $flt0 =~ /^.*?\@(.*)$/; #FIXME: global type...
-  my $chdir = ($lvob and $lvob ne $vob);
+  my $chdir = (MSWIN or CYGWIN or ($lvob and $lvob ne $vob));
   my $cwd = getcwd();
   if (MSWIN or CYGWIN) {
     my $winpfx = $1 if $cwd =~ m%^(.*?)\Q$lvob\E.*%;
     die Msg('E', "Failed to extract the view prefix for $lvob from $cwd\n")
       unless $winpfx;
-    $ct->cd("${winpfx}$vob")->system if $chdir;
+    $ct->cd("${winpfx}$vob")->system;
   } else {
     $ct->cd($vob)->system if $chdir;
   }
@@ -2993,18 +2994,18 @@ sub rollback {
       system(qw(net use /d), "$drv:");
     } else {
       my %used;
-      map{$used{$1}++ if /^s+([A-Z]):/} @use;
+      for (@use) { $used{$1}++ if /^\s+([A-Z]):/ }
       for (reverse 'A'..'Z') {
 	next if $used{$_};
 	$drv = $_;
 	last;
       }
     }
-    system(qw(net use), "$drv:", "\\\\view\\$tmptag");
     if (!$drv) {
       $rmv->();
       die Msg('E', "Need a free drive letter to map the $tmptag temp view\n");
     }
+    system(qw(net use), "$drv:", "\\\\view\\$tmptag"); # Cannot redirect
     if (MSWIN) {
       $ct->cd("${drv}:$vob")->system;
     } else {
