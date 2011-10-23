@@ -3025,12 +3025,13 @@ sub rollback {
   my $qry = "lbtype_sub($flt1)||attype_sub(Rm$flt1)";
   my @targ;
   for ($ct->find(qw(-a -vis -ele), $qry, qw(-nxn -print))->qx) {
-    push @targ, $_
-      unless $ct->des(['-s'], $_)->qx eq $ct->des(['-s'], "$_\@\@/$flt1")->qx
+    my $ver = $ct->des(['-s'], $_)->qx;
+    push @targ, $ver unless $ver eq $ct->des(['-s'], "$_\@\@/$flt1")->qx
   }
+  my @rm = $ct->find(qw(-a -nvis -ver), "lbtype($flt1)", '-print')->qx;
   _wrap('mklabel', @cmt, $flt1, @targ) if @targ;
-  @targ = $ct->find(qw(-a -nvis -ver), "lbtype($flt1)", '-print')->qx;
-  _wrap('rmlabel', @cmt, $flt1, @targ) if @targ;
+  _wrap('rmlabel', @cmt, $flt1, @rm) if @rm;
+  _wrap('lock', $flt);
   $ct->cd($cwd)->system if $chdir;
   if (!(MSWIN or CYGWIN)) {
     $ct->setview($tag)->system;
