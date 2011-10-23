@@ -2942,6 +2942,7 @@ sub rollback {
       until ($sil->lsview(['-s'], $tmptag)->system or $nr == 99);
     die Msg('E', "100 temporary views not cleaned?") if $nr == 99;
   }
+  my $nul = MSWIN? '>NUL' : '>/dev/null';
   my $rmv = sub{
     if (MSWIN or CYGWIN) {
       my ($sto, $uuid) = grep s/^(\s+Global path|View uuid): //,
@@ -2961,7 +2962,6 @@ sub rollback {
       $ct->unregister([qw(-view -uuid)], $uuid)->system;
       remove_tree($sto);
       my ($use) = grep /\\\\view\\\Q$tmptag\E\s+/, qx(net use);
-      my $nul = MSWIN? '>NUL' : '>/dev/null';
       system("net use /d $1 $nul") if $use =~ /^Unavailable\s+([A-Z]:)\s+/;
     } else {
       $ct->rmview(['-tag'], $tmptag)->system;
@@ -3005,7 +3005,10 @@ sub rollback {
       $rmv->();
       die Msg('E', "Need a free drive letter to map the $tmptag temp view\n");
     }
-    system(qw(net use), "$drv:", "\\\\view\\$tmptag"); # Cannot redirect
+    open(SAVEOUT, ">&STDOUT");
+    open(STDOUT, $nul);
+    system(qw(net use), "$drv:", "\\\\view\\$tmptag");
+    open(STDOUT, ">&SAVEOUT");
     if (MSWIN) {
       $ct->cd("${drv}:$vob")->system;
     } else {
@@ -3015,14 +3018,14 @@ sub rollback {
   } else {
     $ct->setview($tmptag)->system;
   }
-  my $qry = "lbtype($flt1)";
+  my $qry = "lbtype_sub($flt1)||attype_sub(Rm$flt1)";
   my @targ;
-  for ($ct->find(qw(-a -vis -ver), $qry, qw(-nxn -print))->qx) {
+  for ($ct->find(qw(-a -vis -ele), $qry, qw(-nxn -print))->qx) {
     push @targ, $_
       unless $ct->des(['-s'], $_)->qx eq $ct->des(['-s'], "$_\@\@/$flt1")->qx
   }
   _wrap('mklabel', @cmt, $flt1, @targ) if @targ;
-  @targ = $ct->find(qw(-a -nvis -ver), $qry, '-print')->qx;
+  @targ = $ct->find(qw(-a -nvis -ver), "lbtype($flt1)", '-print')->qx;
   _wrap('rmlabel', @cmt, $flt1, @targ) if @targ;
   $ct->cd($cwd)->system if $chdir;
   if (!(MSWIN or CYGWIN)) {
