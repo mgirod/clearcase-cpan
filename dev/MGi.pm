@@ -2710,7 +2710,10 @@ sub mkview {
       $ts = strftime(q(%Y-%m-%dT%H:%M:%S%z), @bits); #Standardize
     }
   }
-  $mkv->stdout(0) if $mkv->flagWRAPPER('quiet');
+  if ($mkv->flagWRAPPER('quiet')) {
+    $mkv->stdout(0);
+    $mkv->stderr(0);
+  }
   $mkv->system and exit 1;
   $ct->chview(['-readonly'], $tag)->system if grep /^readonly$/, @prop;
   if (@eqlst) {
@@ -2969,8 +2972,9 @@ sub rollback {
   };
   my $lvob = $ct->des(['-s'], 'vob:.')->stderr(0)->qx;
   my $vob = $1 if $flt0 =~ /^.*?\@(.*)$/; #FIXME: global type...
-  my $chdir = (MSWIN or CYGWIN or ($lvob and $lvob ne $vob));
   my $cwd = getcwd();
+  my $chdir = (MSWIN or CYGWIN or $cwd =~ m%^/view/%
+		 or ($lvob and $lvob ne $vob));
   if (MSWIN or CYGWIN) {
     my $winpfx = $1 if $cwd =~ m%^(.*?)\Q$lvob\E.*%;
     die Msg('E', "Failed to extract the view prefix for $lvob from $cwd\n")
