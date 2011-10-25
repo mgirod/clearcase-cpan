@@ -2347,6 +2347,7 @@ sub _CpType {
     $dst = "$1$dst" if $src =~ /^(.*?:)/;
   }
   $ret += $ct->mkhlink(['GlobalDefinition'], $dst, $src)->system if $glb;
+  return $ret unless $src =~ /^lbtype:/;
   my $rmat = $src;
   $rmat =~ s/lbtype:/attype:Rm/;
   if (!$ct->des(['-s'], $rmat)->stdout(0)->stderr(0)->system) {
@@ -2803,13 +2804,17 @@ several vobs). It is however dependent on the view used, which is
 assumed to be a development view selecting the versions being
 rolled-out.
 
-If the baseline type is not a family type, it will be moved, and the
-change set will be recorded as a new label. [Not supported for now!]
+The baseline type must be a family type.
 
-If both types are global, and defined in the same vobs, the rollout
-will affect all the vobs concerned. If only the development type is
-global, or if the vob sets do not match, the rollout will only affect
-the vob specified. Explicit options may alter this default.
+The intention is to eventually support global types.
+This is disabled for now.
+The problem lies in applying labels in multiple vobs, which may be
+too slow to be practical.
+
+If the type being delivered (or eventually any branch type it carries
+changes from) is global, the rollout will affect all the vobs
+concerned. This is a consequence of the fact that the types will get
+archived. The baseline type scope will have to match.
 
 =cut
 
@@ -2838,34 +2843,64 @@ sub rollout {
   } else {
     $lbl .= "\@$vob";
   }
+  my $bt = $sil->des(['-s'], "lbtype:$arg")->system; #branch or label type
+  my $targ = $bt? "brtype:$arg" : "lbtype:$arg";
+  my @vobs;
+  if ($fail->des([qw(-fmt %[type_scope]p)], $targ)->qx eq 'global') {
+    die Msg('E', 'Global types are not supported in this version\n');
+    my @hl = grep/^\s+GlobalDefinition/,
+      $ct->des([qw(-l -ahl GlobalDefinition)], $targ)->qx;
+    if (@hl) {
+      my $hl0 = $1 if $hl[0] =~ /^\s+(\S+)/;
+      my $mvob = $1 if $ct->des("hlink:$hl0")->qx =~ /->\s+\S+@(\S+)$/;
+      if ($mvob ne $vob) {
+	$arg  =~ s/@\Q$vob\E$/\@$mvob/;
+	$targ =~ s/@\Q$vob\E$/\@$mvob/;
+	$bl   =~ s/@\Q$vob\E$/\@$mvob/;
+	$lbl  =~ s/@\Q$vob\E$/\@$mvob/;
+	$vob = $mvob;
+      }
+      for (@hl) { push @vobs, $1 if /<-\s+\S+@(\S+)$/; }
+    }
+  }
   if (!$opt{force}) {
     # Note: cleartool runs in Windows mode when we are on Cygwin
     my @nolog = (MSWIN or CYGWIN)? qw(-log NUL) : qw(-log /dev/null);
-    die Msg('E', "Home merge (rebase) needed\n")
-      if $ct->findmerge($vob, '-fve', $bl, @nolog, '-print')->stderr(0)->qx;
+    my $hmrg;
+    for my $v ($vob, @vobs) {
+      if ($ct->findmerge($v, '-fve', $bl, @nolog, '-print')->stderr(0)->qx) {
+	$hmrg = 1;
+	last;
+      }
+    }
+    die Msg('E', "Home merge (rebase) needed\n") if $hmrg;
   }
-  my $bt = $sil->des(['-s'], "lbtype:$arg")->system; #branch or label type
-  my $targ = $bt? "brtype:$arg" : "lbtype:$arg";
-  $fail->des(['-s'], $targ)->stdout(0)->system;
   if ($sil->des(['-s'], $lbl)->system) {
-    _wrap(qw(mklbtype -fam), @cmt, $lbl) and die "\n";
+    my @opt = @cmt;
+    push @opt, '-glo' if @vobs;
+    _wrap(qw(mklbtype -fam), @opt, $lbl) and die "\n";
+    for (@vobs) {
+      my $dst = $lbl;
+      $dst =~ s/@\Q$vob\E$/\@$_/;
+      _wrap('cptype', $lbl, $dst); #Fails if the type existed in one vob
+    }
   } else {
     if ($ct->des([qw(-s -ahl), $eqhl], $lbl)->qx) {
       _wrap(qw(mklbtype -inc), @cmt, $lbl) and die "\n";
     } else {
-      die Msg('E', "Baseline non incremental: comment non supported\n")
-	if $opt{comment};
-      if ($ct->lslock(['-s'], $lbl)->qx) {
-	_wrap(qw(unlock), $lbl) and die "\n";
-      }
+      die Msg('E', "The baseline type must be a family type\n");
     }
   }
   my $la = $arg; $la =~ s/\@.*$//; # Local name: vob in $lbl
+  my $lb = $bl; $lb =~ s/\@.*$//;
   my $cwd = getcwd;
-  $ct->cd($vob)->system unless $vob eq $lvob;
-  my $rc = _wrap(qw(mklabel -over), $la, $bl, $vob);
+  my $rc = 0;
+  for my $v ($vob, @vobs) {
+    $ct->cd($v)->system;
+    $rc += _wrap(qw(mklabel -over), $la, $bl, $v);
+  }
   exit $rc if $rc;
-  $ct->cd($cwd)->system unless $vob eq $lvob;
+  $ct->cd($cwd)->system;
   if ($bt) {
     $rc = _wrap(qw(mkbrtype -nc -arc), $arg);
   } else {
