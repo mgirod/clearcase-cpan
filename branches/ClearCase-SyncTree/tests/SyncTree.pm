@@ -209,25 +209,15 @@ sub _lsco {
 sub mvfsdrive {
     my $self = shift;
     if (MSWIN && ! $self->{ST_MVFSDRIVE}) {
-	use vars '%RegHash';
-	require Win32::TieRegistry;
-	Win32::TieRegistry->import('TiedHash', '%RegHash');
-	$self->{ST_MVFSDRIVE} = $RegHash{LMachine}->{SYSTEM}->
-		{CurrentControlSet}->{Services}->{Mvfs}->{Parameters}->{drive};
-	# Apparently one must be a local admin to read the HKLM area,
-	# so we fall back to a slower, dumber way if the above fails.
-	# There's also Win32::DriveInfo but that isn't bundled with AS
-	# or Rational Perls.
-	if (! $self->{ST_MVFSDRIVE}) {
-	    for (qx(net use)) {
-		next unless m%\s([D-Z]):\s%i;
-		if (-f "$1:/.specdev") {
-		    $self->{ST_MVFSDRIVE} = $1;
-		    last;
-		}
-	    }
-	}
-	die "$0: Error: unable to find MVFS drive" unless $self->{ST_MVFSDRIVE};
+       no strict 'subs';
+       use vars '$Registry';
+       require Win32::TieRegistry;
+       # HKLM is read-only for non-admins so open read-only
+       Win32::TieRegistry->import('TiedRef', '$Registry', qw(KEY_READ));
+       my $LMachine = $Registry->Open('LMachine', {Access => KEY_READ});
+       $self->{ST_MVFSDRIVE} = $LMachine->{SYSTEM}->
+	        {CurrentControlSet}->{Services}->{Mvfs}->{Parameters}->{drive};
+       die "$0: Error: unable to find MVFS drive" unless $self->{ST_MVFSDRIVE};
     }
     return $self->{ST_MVFSDRIVE};
 }
