@@ -270,7 +270,8 @@ Revision history for Perl extension ClearCase::SyncTree.
 	- symlink replaced with file, while keeping the original target
 	- NOTE: all work from 0.48 to here courtesy of Marc Girod.
 
-0.59 Wed Oct  5 14:41:36 BST 2011
+0.59 Sat Dec 10 16:28:33 GMTST 2011
         - reuse failed for the root of dstbase
 	- reuse failed for intermediate dirs, missing from a restored version
 	- silence spurious error messages in _lsco, testing private directories
+	- James Anderson: in mvfsdrive, always open the Win rgy read-only
