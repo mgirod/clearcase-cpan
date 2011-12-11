@@ -1243,7 +1243,8 @@ sub subtract {
 	    my @entries = grep !/^\.\.?$/, readdir DIR;
 	    closedir(DIR);
 	    map { $_ = join('/', $d, $_) } @entries;
-	    if (grep { !$exnames->{$_} } @entries) { # Something not to delete
+	    if (grep { !$exnames->{$_} and $ct->ls(['-s'], $_)->qx !~ /\@$/}
+		  @entries) { # Something not to delete--some version selected
 		my $dad = $d;
 		$keep{$dad}++ while $dad = dirname($dad) and $dad gt $dbase;
 	    } else {
@@ -1261,8 +1262,8 @@ sub subtract {
     for my $dad (map {dirname($_)} @exnames) {
 	$self->branchco(1, $dad) unless $co{$dad}++;
     }
-    # Will fail for checkedouts (all created in this session!) or unreachable
-    $ct->rm($self->comment, @exnames)->system if @exnames;
+    # Force because of possible checkouts in other views. Fail for unreachable
+    $ct->rm([@{$self->comment}, '-f'], @exnames)->system if @exnames;
 }
 
 sub label {
