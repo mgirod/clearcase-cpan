@@ -25,12 +25,12 @@ The code on this site is developed in a _dev_ branch.
       * consolidation of sparse fixed labels
     * availability of functionality from !ClearCase::Wrapper:DSB, such as inclusion of config spec components
     * integration of {{{synctree}}} under {{{cleartool}}}, including via the graphical interface.
-    * [WmgMkLabel mklabel] -con, and mklbtype -con
   * Mostly done (although now, I'd like to redesign both to use classes, so that it would be easier/shorter to take it in use in new functions: the current technique is too verbose...):
     * [CavComments interactive input]: generalize to avoid all hangs
     * [CwmLockingIssues lock/unlock], using site specific methods when not owning the equivalent or previous types.
     * rmtype (incremental types and interactive prompts)
   * Recently done:
+    * [WmgMkLabel mklabel] -con, and mklbtype -con
     * {{{setdepth}}} recursion was shortened (for performance and scalability reasons) when a depth is given, e.g. supporting {{{diff -pred}}}. The ambiguity with 'depth' (default: the number of levels _displayed_ which is intuitive and follows _lsvtree_) may be lifted by using the {{{-a/ll}}} option.
     * support for incremental types:
       * support for [GlobalTypes global types] (using admin vobs or not)
