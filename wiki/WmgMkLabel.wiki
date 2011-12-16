@@ -18,6 +18,6 @@ In addition, we retain the _-up_ extension from !ClearCase::Wrapper::DSB, which 
     * This case anticipates the problems with supporting the -con option.
     * Note that symbolic links are not followed.
     * The solution is to create a hash indexed per vobs, of both elements and equivalent types.
-  * The _-con_ option should of course be supported.
-  * This forces to work on global types. Note that these ones do not necessarily imply using an admin vob: one may use _cptype_ to maintain hyperlinks.
+  * The _-con_ option is now supported (consolidation pending)
+  * This forces to work on global types. Note that these ones do not necessarily imply using an admin vob: one may use _cptype_ to maintain hyperlinks. In fact, admin vobs are ignored: the types must be created in advance (with mklbtype -con), and the _source_ vob of the type must match this of the config record.
   * One other case is getting the list of versions as a file, or from a pipe, e.g. supporting Audited Objects? Performance may become an issue (running _des -s vob:xxx_ on every argument...)
