@@ -58,6 +58,7 @@ use AutoLoader 'AUTOLOAD';
   $describe = "\n* [-par/ents <n>] [-fam/ily <n>]";
   $rollout = "$z [-force] [-c comment] -to baseline brype|lbtype";
   $rollback = "$z [-force] [-c comment] changeset";
+  $archive = "$z [-c comment|-nc] brtype|lbtype ...";
 }
 
 #############################################################################
@@ -2019,20 +2020,11 @@ sub mklabel {
     require File::Basename;
     require File::Spec;
     File::Spec->VERSION(0.82);
-    my $vroot;
-    if ($^O eq 'cygwin') {
-      my $d0 = File::Basename::dirname(File::Spec->rel2abs($elems[0]));
-      $d0 =~ m%^(/[^/]+/[^/]+)%;
-      $vroot = $1 || ''; # /cygdrive/a or /view/<tag>... just for the length
-    } elsif ($^O =~ /MSWin/) {
-      $vroot = 'a:';
-    } else {
-      $vroot = $ct->argv(qw(pwv -root))->qx;
-    }
     my %ancestors;
     for my $pname (@elems) {
       my $vobtag = $dsc->desc(['-s'], "vob:$pname")->qx;
-      my $stop = length("$vroot$vobtag");
+      my $vroot = $1 if $pname =~ m%^(.*?\Q$vobtag\E)%;
+      my $stop = length("$vroot");
       for (my $dad = File::Basename::dirname(File::Spec->rel2abs($pname));
 	   length($dad) >= $stop;
 	   $dad = File::Basename::dirname($dad)) {
@@ -3212,6 +3204,61 @@ sub rollback {
   }
   $rmv->();
   exit 0; #FIXME: return code
+}
+
+=back
+
+=item * ARCHIVE
+
+New command. Synonymous to alternatively mkbrtype or mklbtype -arc
+
+This command assigns the comment in a more intuitive way than its
+alternative with mkbrtype: the comment goes to the type being
+archived, instead of to the new type being created.
+
+The non-intuitive behaviour is justified by the consistency with the
+behaviour of mklbtype -arc, for which no user visible type is created.
+
+Another advantage of this syntax over the alternative is the
+possibility to archive in a single command both a lbtype and a brtype
+associated, as happens with the rollout command.
+
+Label types and branch types are grouped and processed in this order.
+
+=cut
+
+sub archive {
+  use strict;
+  use warnings;
+  my %opt;
+  GetOptions(\%opt, qw(nc c|cfile=s));
+  if (keys %opt > 1) {
+    warn Msg('E', 'Only one comment option supported');
+  } elsif (@ARGV > 1) {
+    shift @ARGV;
+    my @lbt = grep /^lbtype:/, @ARGV;
+    my @brt = grep /^brtype:/, @ARGV;
+    if (@lbt + @brt != @ARGV) {
+      my @unk = grep !/(br|lb)type:/, @ARGV;
+      warn Msg('E', "'lbtype: or 'brtype:' prefix required for '@unk'");
+    } else {
+      my @opt = qw(-arc);
+      if ($opt{nc}) {
+	unshift @opt, '-nc';
+      } elsif (%opt) {
+	my ($k, $v) = each %opt;
+	unshift @opt, "-$k", $v;
+      }
+      my $rc = _wrap('mklbtype', @opt, @lbt) if @lbt;
+      $rc   += _wrap('mkbrtype', @opt, @brt) if @brt;
+      exit $rc;
+    }
+  } else {
+    warn Msg('E', 'Type name required.');
+  }
+  @ARGV = qw(help archive);
+  ClearCase::Wrapper->help();
+  return 1;
 }
 
 =back
