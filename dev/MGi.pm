@@ -2015,11 +2015,11 @@ sub mklabel {
     }
   }
   $mkl->opts(grep !/^-r(ec|$)/, @opt); # recurse handled already
+  require File::Basename;
+  require File::Spec;
+  File::Spec->VERSION(0.82);
   if ($opt{up}) {
     my $dsc = ClearCase::Argv->new({-autochomp=>1});
-    require File::Basename;
-    require File::Spec;
-    File::Spec->VERSION(0.82);
     my %ancestors;
     for my $pname (@elems) {
       my $vobtag = $dsc->desc(['-s'], "vob:$pname")->qx;
@@ -2058,6 +2058,18 @@ sub mklabel {
 	$ct->find($_, qw(-a -ver), "lbtype($lbtype)", '-print')->qx;
       _wrap('rmlabel', $lbtype, @ver) if @ver;
     }
+    my $cr = $con{cr};
+    my $vob = $ct->des('-s', "vob:$cr")->qx;
+    for my $t (qw(ConfigRecordDO ConfigRecordOID)) {
+      $ct->mkattype(qw(-vty string -nc), "$t\@$vob")->system
+	unless $ct->des('-s', "attype:$t\@$vob")->stderr(0)->qx;
+    }
+    my $lb = "lbtype:$lbtype\@$vob";
+    my $val = $ct->des(['-s'], File::Spec->rel2abs($cr))->qx;
+    $val =~ s%^.*?\Q$vob\E%$vob%;
+    $ct->mkattr([qw(-rep ConfigRecordDO), qq("$val")], $lb)->system;
+    $val = '"' . $ct->des([qw(-fmt %On)], $cr)->qx . '"';
+    $ct->mkattr([qw(-rep ConfigRecordOID), $val], $lb)->system;
   }
   exit $ret unless @mod;
   my $rmattr = ClearCase::Argv->rmattr([("Rm$lbtype")]);
