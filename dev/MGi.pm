@@ -1858,6 +1858,16 @@ application after a first failure.
 It may also be used to apply labels upwards even if recursive application
 produced errors.
 
+B<-config>: adapted for incremental types. This requires that the
+label types have been created previously with I<mklbtype -config>.
+It will not use admin vobs!
+
+The script will skip, and report, vobs in which the types have not
+been copied/linked to.
+
+With incremental types, the I<-replace> flag is implicit in
+conjunction with I<-config>.
+
 Extension: B<-over> takes either a label or a branch type. In either case,
 the labels will be applied over the result of a find command run on the
 unique version argument, and looking for versions matching respectively
@@ -1880,6 +1890,9 @@ would hide the updated baseline.
 sub mklabel {
   use warnings;
   use strict;
+  use File::Basename;
+  use File::Spec::Functions qw(rel2abs);
+  File::Spec->VERSION(0.82);
   my %opt;
   GetOptions(\%opt, qw(up force over=s all config=s));
   ClearCase::Argv->ipc(1);
@@ -1889,11 +1902,18 @@ sub mklabel {
   my @opt = $mkl->opts();
   die Msg('E', 'all is only supported in conjunction with over')
     if $opt{all} and !$opt{over};
-  die Msg('E', 'Incompatible flags: up and config')
-    if $opt{up} and $opt{config};
-  die Msg('E', 'Incompatible flags: recurse and over')
-    if $opt{over} and grep /^-r(ec|$)/, @opt;
-  die Msg('E', 'Incompatible flags: up and over') if $opt{up} and $opt{over};
+  {
+    my @inc = ([qw(up config)], [qw(up over)]);
+    for (@inc) {
+      my ($a, $b) = @{$_}[0..1];
+      die Msg('E', "Incompatible flags: $a and $b") if $opt{$a} and $opt{$b};
+    }
+    @inc = qw(config over);
+    for (@inc) {
+      die Msg('E', "Incompatible flags: $_ and recurse")
+	if $opt{$_} and grep /^-r(ec|$)/, @opt;
+    }
+  }
   my($lbtype, @elems) = $mkl->args;
   die Msg('E', 'Only one version argument with the over flag')
     if $opt{over} and scalar @elems > 1;
@@ -1927,12 +1947,15 @@ sub mklabel {
   }
   return 0 unless $opt{up} or $opt{over} or @et;
   $fail->argv(qw(des -s), @elems)->stdout(0)->system if @elems; #-over & -con ok
-  my %con = (cr => $opt{config}) if $opt{config}; # offer a scope to globals
+  my %con = (cr => rel2abs($opt{config})) if $opt{config}; # scope globals
   if (%con) {
+    push @opt, '-rep' if @et and !grep /^-rep/, @opt;
     my $cr = $con{cr}; # for convenience
     die Msg('E', "No arguments expected: '@elems'") if @elems;
     my @dir = $ct->catcr([qw(-flat -s -type d -nxn)], $cr)->qx;
     die "\n" if grep /^</, @dir; #one vob not mounted
+    my $mvob = $ct->des(['-s'], "vob:$cr")->qx;
+    my $pfx = $1 if $cr =~ m%^(.*?)$mvob%; #Windows, cygwin, view extended path
     my (%crvb, %lbvb);
     $crvb{$ct->des(['-s'], "vob:$_")->stderr(0)->qx}++ for @dir;
     $lbvb{$_}++ for grep s/^<- .*\@(.*)$/$1/,
@@ -1952,7 +1975,7 @@ sub mklabel {
       delete $crvb{$_};
     }
     for ($ct->catcr([qw(-flat -s -ele -type fd)], $cr)->qx) {
-      $con{ver}{$_}++ if $crvb{$ct->des(['-s'], "vob:$_")->qx};
+      $con{ver}{$_}++ if $crvb{$ct->des(['-s'], "vob:$pfx$_")->qx};
     }
     @elems = keys %{$con{ver}};
     @{$con{vob}} = keys %crvb;
@@ -1997,7 +2020,6 @@ sub mklabel {
     $base = '-a' if $opt{all};
     @mod = $ct->argv('find', $base, '-ver', $query, '-print')->stderr(0)->qx;
     if ($opt{all} and $ver) {
-      use File::Spec::Functions qw(rel2abs);
       $ver = rel2abs($ver);
       @mod = grep /^${ver}(\W|$)/, @mod;
     }
@@ -2015,9 +2037,6 @@ sub mklabel {
     }
   }
   $mkl->opts(grep !/^-r(ec|$)/, @opt); # recurse handled already
-  require File::Basename;
-  require File::Spec;
-  File::Spec->VERSION(0.82);
   if ($opt{up}) {
     my $dsc = ClearCase::Argv->new({-autochomp=>1});
     my %ancestors;
@@ -2025,7 +2044,7 @@ sub mklabel {
       my $vobtag = $dsc->desc(['-s'], "vob:$pname")->qx;
       my $vroot = $1 if $pname =~ m%^(.*?\Q$vobtag\E)%;
       my $stop = length("$vroot");
-      for (my $dad = File::Basename::dirname(File::Spec->rel2abs($pname));
+      for (my $dad = File::Basename::dirname(rel2abs($pname));
 	   length($dad) >= $stop;
 	   $dad = File::Basename::dirname($dad)) {
 	$ancestors{$dad}++;
@@ -2053,19 +2072,52 @@ sub mklabel {
       my @ver = $ct->find($_, qw(-a -ver), "lbtype($lbtype)", '-print')->qx;
       _wrap('rmlabel', $lbtype, @ver) if @ver;
     }
+    my $chkalias = sub {
+      local $_;
+      my $v = shift;
+      my @al = split /, /, $ct->des([qw(-fmt %[aliases]ACp)], $v)->qx;
+      return 0 if @al == 1; #don't waste more time
+      # describe returns aliases in a different way than find
+      my $e = ($v =~ /^(.*?)\@/)? $1 : $v;
+      my $d = dirname $e;
+      my ($a1, $a2, $rc);
+      push @{/^\Q$d\E/?$a1:$a2}, $_ for @al;
+      if (@{$a1} > 1) {
+	my $dv = $ct->ls([qw(-s -d)], $d)->qx;
+	for (grep s%\Q$dv\E%$d%, @{$a1}) {
+	  next if $v =~ /^\Q$_\E\@/; #original representation
+	  if ($con{ver}{$ct->ls([qw(-s -d)], $_)->qx}) {
+	    $rc = 1;
+	    last;
+	  }
+	}
+      }
+      return 1 if $rc;
+      for (@{$a2}) {
+	my $d1 = $1 if /^(.*?)\@/; #Should always match
+	my $dv = $ct->ls([qw(-s -d)], $d1)->qx;
+	s%\Q$dv\E%$d1%;
+	if ($con{ver}{$ct->ls([qw(-s -d)], $_)->qx}) {
+	  $rc = 1;
+	  last;
+	}
+      }
+      return $rc;
+    };
     for (@{$con{vob}}) {
-      my @ver = grep {!$con{ver}{$_}}
+      my @ver = grep { !$con{ver}{$_} and !$chkalias->($_) }
 	$ct->find($_, qw(-a -ver), "lbtype($lbtype)", '-print')->qx;
       _wrap('rmlabel', $lbtype, @ver) if @ver;
     }
     my $cr = $con{cr};
+    $ct->winkin($cr)->system;
     my $vob = $ct->des('-s', "vob:$cr")->qx;
     for my $t (qw(ConfigRecordDO ConfigRecordOID)) {
       $ct->mkattype(qw(-vty string -nc), "$t\@$vob")->system
 	unless $ct->des('-s', "attype:$t\@$vob")->stderr(0)->qx;
     }
-    my $lb = "lbtype:$lbtype\@$vob";
-    my $val = $ct->des(['-s'], File::Spec->rel2abs($cr))->qx;
+    my $lb = "lbtype:$et[0]\@$vob";
+    my $val = $ct->des(['-s'], $cr)->qx;
     $val =~ s%^.*?\Q$vob\E%$vob%;
     $ct->mkattr([qw(-rep ConfigRecordDO), qq("$val")], $lb)->system;
     $val = '"' . $ct->des([qw(-fmt %On)], $cr)->qx . '"';
