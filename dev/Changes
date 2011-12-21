@@ -191,3 +191,4 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- mklabel -config
 	- fixed mklabel -up to view extended path trying to label beyond the root
 	- archive: convenience synonymous of mk(lb|br)type -arc
+	- lock/unlock: global types must be handled via their source vob
