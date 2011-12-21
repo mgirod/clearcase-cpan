@@ -1674,7 +1674,6 @@ sub lock {
   my (%opt, $nusers);
   GetOptions(\%opt, qw(allow=s deny=s iflocked));
   GetOptions('nusers=s' => \$nusers);
-  ClearCase::Argv->ipc(1);
   my $lock = ClearCase::Argv->new(@ARGV);
   $lock->parse(qw(c|cfile=s cquery|cqeach nc pname=s obsolete replace));
   die Msg('E', "cannot specify -nusers along with -allow or -deny")
@@ -1713,29 +1712,24 @@ sub lock {
   my @args = $lock->args;
   $ct = ClearCase::Argv->new({autochomp=>1});
   my (@lbt, @oth, %vob);
-  my $locvob = $ct->argv(qw(des -s vob:.))->stderr(0)->qx;
-  foreach my $t (@args) {
-    if ($ct->argv(qw(des -fmt), '%m\n', $t)->stderr(0)->qx eq 'label type') {
-      my ($t1,$v) = $t;
-      if ($t =~ /lbtype:(.*)@(.*)$/) {
-	$t = $1; $v = $2;
-      } else {
-	$t =~ s/^lbtype://;
-	$v = $locvob;
-      }
+  my $locvob = $ct->des(['-s'], 'vob:.')->stderr(0)->qx;
+  foreach my $t ($ct->des([qw(-fmt %Xn\n)], @args)->qx) {
+    if ($ct->des([qw(-fmt %m)], $t)->stderr(0)->qx eq 'label type') {
+      my ($t1, $v) = $t;
+      $v = $2 if $t =~ s/lbtype:(.*)@(.*)$/$1/;
       $vob{$t} = $v;
       push @lbt, $t;
       my @et = grep s/^-> lbtype:(.*)@.*$/$1/,
-	$ct->argv(qw(des -s -ahl), $eqhl, $t1)->qx;
+	$ct->des([qw(-s -ahl), $eqhl], $t1)->qx;
       if (@et) {
 	my ($e, $p) = ($et[0], '');
 	$vob{$e} = $vob{$t};
 	push @lbt, $e;
 	my @pt = grep s/^-> lbtype:(.*)@.*$/$1/,
-	  $ct->argv(qw(des -s -ahl), $prhl, "lbtype:$e\@$v")->qx;
+	  $ct->des([qw(-s -ahl), $prhl], "lbtype:$e\@$v")->qx;
 	if (@pt) {
 	  $p = $pt[0];
-	  if (!$ct->argv(qw(lslock -s), "lbtype:$p\@$v")->stderr(0)->qx) {
+	  if (!$ct->lslock(['-s'], "lbtype:$p\@$v")->stderr(0)->qx) {
 	    push @lbt, $p;
 	    $vob{$p} = $v;
 	  }
@@ -1782,25 +1776,19 @@ environment variable.
 =cut
 
 sub unlock() {
-  ClearCase::Argv->ipc(1);
   my $unlock = ClearCase::Argv->new(@ARGV);
   $unlock->parse(qw(c|cfile=s cquery|cqeach nc version=s pname=s));
   my @args = $unlock->args;
   $ct = ClearCase::Argv->new({autochomp=>1});
   my (@lbt, @oth, %vob);
-  my $locvob = $ct->argv(qw(des -s vob:.))->stderr(0)->qx;
-  foreach my $t (@args) {
-    if ($ct->argv(qw(des -fmt), '%m\n', $t)->stderr(0)->qx eq 'label type') {
+  my $locvob = $ct->des(['-s'], 'vob:.')->stderr(0)->qx;
+  foreach my $t ($ct->des([qw(-fmt %Xn\n)], @args)->qx) {
+    if ($ct->des([qw(-fmt %m)], $t)->stderr(0)->qx eq 'label type') {
       my $t1 = $t;
-      if ($t =~ /lbtype:(.*)@(.*)$/) {
-	$t = $1; $vob{$t} = $2;
-      } else {
-	$t =~ s/^lbtype://;
-	$vob{$t} = $locvob;
-      }
+      $vob{$t} = $2 if $t =~ s/lbtype:(.*?)@(.*)$/$1/;
       push @lbt, $t;
       my @et = grep s/^-> lbtype:(.*)@.*$/$1/,
-	$ct->argv(qw(des -s -ahl), $eqhl, $t1)->qx;
+	$ct->des([qw(-s -ahl), $eqhl], $t1)->qx;
       if (@et) {
 	push @lbt, $et[0];
 	$vob{$et[0]} = $vob{$t};
@@ -1813,7 +1801,7 @@ sub unlock() {
   my ($fl, $loaded) = $ENV{FORCELOCK};
   for my $lt (@lbt) {
     my $v = $vob{$lt};
-    if ($ct->argv(qw(lslock -s), "lbtype:$lt\@$v")->qx) {
+    if ($ct->lslock(['-s'], "lbtype:$lt\@$v")->qx) {
       my @out = $unlock->args("lbtype:$lt\@$v")->stderr(1)->qx;
       if (grep /^cleartool: Error/, @out) {
 	if ($fl and !$loaded) {
