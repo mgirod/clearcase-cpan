@@ -693,6 +693,32 @@ sub _FltType {
   $eq =~ s/^lbtype:(.*)\@.*$/$1/;
   return $eq;
 }
+sub _Recpath {
+  use File::Basename;
+  use File::Spec::Functions qw(rel2abs catfile);
+  use Cwd qw(abs_path);
+  my ($anc, $n) = @_;
+  my $tag = $ct->des(['-s'], "vob:$n")->qx;
+  my $pn = rel2abs($n);
+  my $stop = length($1) if $pn =~ m%^(.*?\Q$tag\E)%;
+  my $dad = dirname($pn);
+  while (!$stop or length($dad) >= $stop) {
+    if ($stop) {
+      $anc->{$dad}++;
+    } else {
+      if ($ct->des([qw(-fmt %m)], $dad)->qx eq 'symbolic link') {
+	my $path =
+	  catfile(dirname($dad), $ct->des([qw(-fmt %[slink_text]p)], $dad)->qx);
+   	_Recpath($anc, abs_path($path));
+   	$tag = $ct->des(['-s'], "vob:$dad")->qx;
+   	$stop = length($1) if $dad =~ m%^(.*?\Q$tag\E)%;
+      } else {
+	$anc->{$dad}++;
+      }
+    }
+    $dad = dirname($dad);
+  }
+}
 
 =head1 NAME
 
@@ -2026,20 +2052,8 @@ sub mklabel {
   }
   $mkl->opts(grep !/^-r(ec|$)/, @opt); # recurse handled already
   if ($opt{up}) {
-    my $dsc = ClearCase::Argv->new({-autochomp=>1});
     my %ancestors;
-    for (@elems) {
-      my $pname = rel2abs($_);
-      my $vobtag = $dsc->desc(['-s'], "vob:$pname")->qx;
-      my $vroot = $1 if $pname =~ m%^(.*?\Q$vobtag\E)%;
-      next unless $vroot; #there was a symlink to another vob in $pname
-      my $stop = length($vroot);
-      for (my $dad = dirname($pname);
-	   length($dad) >= $stop;
-	   $dad = dirname($dad)) {
-	$ancestors{$dad}++;
-      }
-    }
+    _Recpath(\%ancestors, $_) for @elems;
     if (@et) {
       push @elems, sort {$b cmp $a} keys %ancestors;
     } else {
