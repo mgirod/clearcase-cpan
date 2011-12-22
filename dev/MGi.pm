@@ -2028,13 +2028,15 @@ sub mklabel {
   if ($opt{up}) {
     my $dsc = ClearCase::Argv->new({-autochomp=>1});
     my %ancestors;
-    for my $pname (@elems) {
+    for (@elems) {
+      my $pname = rel2abs($_);
       my $vobtag = $dsc->desc(['-s'], "vob:$pname")->qx;
       my $vroot = $1 if $pname =~ m%^(.*?\Q$vobtag\E)%;
-      my $stop = length("$vroot");
-      for (my $dad = File::Basename::dirname(rel2abs($pname));
+      next unless $vroot; #there was a symlink to another vob in $pname
+      my $stop = length($vroot);
+      for (my $dad = dirname($pname);
 	   length($dad) >= $stop;
-	   $dad = File::Basename::dirname($dad)) {
+	   $dad = dirname($dad)) {
 	$ancestors{$dad}++;
       }
     }
