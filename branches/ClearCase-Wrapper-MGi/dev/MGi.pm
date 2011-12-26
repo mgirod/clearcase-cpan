@@ -734,7 +734,7 @@ sub _Recpath {
       $stop = 0;
     }
   } elsif ($type !~ /version$/) {
-    return; # Non reachable: only on entry, hence will give an error anyway
+    return; # Non reachable or dangling
   }
   my $pn = rel2abs($n); # if 'a/' with 'a' a symlink, yields 'a', but vob remote
   if (!$stop) {
