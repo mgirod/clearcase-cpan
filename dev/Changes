@@ -186,9 +186,10 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- rollout/rollback: global type support disabled for now
 	- lsgen -a, without -depth: parse lsvtree
 
-0.29 Sat Dec 17 18:03:19 GMTST 2011
+0.29 Mon Dec 26 18:54:57 GMTST 2011
         - mklbtype -config
 	- mklabel -config
-	- fixed mklabel -up to view extended path trying to label beyond the root
+	- fixed mklabel -up: view extended paths, and symlinks
 	- archive: convenience synonymous of mk(lb|br)type -arc
 	- lock/unlock: global types must be handled via their source vob
+	- fixed diff: one case of no predecessor
