@@ -693,31 +693,58 @@ sub _FltType {
   $eq =~ s/^lbtype:(.*)\@.*$/$1/;
   return $eq;
 }
+# Record the elements on the path to the argument, from 'mklabel -up'
+# Issues: symbolic links, esp. cross-vob, relative or absolute, view extended
+# path on UNIX or drive context on Windows/Cygwin; using -follow at entry
 sub _Recpath {
   use File::Basename;
   use File::Spec::Functions qw(rel2abs catfile);
-  use Cwd qw(abs_path);
-  my ($anc, $n) = @_;
-  my $tag = $ct->des(['-s'], "vob:$n")->qx;
-  my $pn = rel2abs($n);
-  my $stop = length($1) if $pn =~ m%^(.*?\Q$tag\E)%;
-  my $dad = dirname($pn);
-  while (!$stop or length($dad) >= $stop) {
-    if ($stop) {
-      $anc->{$dad}++;
-    } else {
-      if ($ct->des([qw(-fmt %m)], $dad)->qx eq 'symbolic link') {
-	my $path =
-	  catfile(dirname($dad), $ct->des([qw(-fmt %[slink_text]p)], $dad)->qx);
-   	_Recpath($anc, abs_path($path));
-   	$tag = $ct->des(['-s'], "vob:$dad")->qx;
-   	$stop = length($1) if $dad =~ m%^(.*?\Q$tag\E)%;
+  my ($anc, $follow, $n, $stop) = @_;
+  my $type = $ct->des([qw(-fmt %m)], $n)->qx;
+  if ($type eq 'symbolic link') {
+    if ($follow) {
+      my $path = $ct->des([qw(-fmt %[slink_text]p)], $n)->qx;
+      $path =~ y%\\%/% if MSWIN;
+      if ($path =~ m%^/%) {
+	if (MSWIN or CYGWIN) {
+	  my $tag = $ct->des(['-s'], "vob:$n")->qx;
+	  my $pfx = $1 if $n =~ m%^(.*?\Q$tag\E)%;
+	  $path = catfile($pfx, $path);
+	}
       } else {
-	$anc->{$dad}++;
+	my $p = dirname($n);
+	while ($path =~ /^\./) {
+	  $path =~ s%^\./(.*)$%$1%;
+	  $p = dirname($p) if $path =~ s%^\.\./(.*)$%$1%;
+	  if ($path eq '.') {
+	    $path = ''; last
+	  }
+	  if ($path eq '..') {
+	    $path = ''; $p = dirname($p); last;
+	  }
+	  last if $path =~ m%^\.[^/]%;
+	}
+	$path = $path? catfile($p, $path) : $p;
       }
+      if (!$stop) {
+	my $tag = $ct->des(['-s'], "vob:$path")->qx;
+	$stop = length($1) if $path =~ m%^(.*?\Q$tag\E)%;
+      }
+      _Recpath($anc, 1, $path, $stop);
+      $stop = 0;
     }
-    $dad = dirname($dad);
+  } elsif ($type !~ /version$/) {
+    return; # Non reachable: only on entry, hence will give an error anyway
   }
+  my $pn = rel2abs($n); # if 'a/' with 'a' a symlink, yields 'a', but vob remote
+  if (!$stop) {
+    my $tag = $ct->des(['-s'], "vob:$n")->qx;
+    $stop = length($1) if $pn =~ m%^(.*?\Q$tag\E)%;
+  }
+  my $dad = dirname($pn);
+  return if length($dad) < $stop;
+  $anc->{$dad}++;
+  _Recpath($anc, 1, $dad, $stop);
 }
 
 =head1 NAME
@@ -983,7 +1010,7 @@ sub diff {
     my %gen = _DepthGen($ele, $limit + 1, $ver);
     my $p = $gen{$ver}{'parents'};
     $p = $gen{$p->[0]}{'parents'} while $p and $limit--;
-    if (!$p) {
+    if (!($p and @{$p})) {
       warn Msg('E', "No predecessor version to compare to: $e");
       $rc = 1;
       next;
@@ -2053,7 +2080,8 @@ sub mklabel {
   $mkl->opts(grep !/^-r(ec|$)/, @opt); # recurse handled already
   if ($opt{up}) {
     my %ancestors;
-    _Recpath(\%ancestors, $_) for @elems;
+    my $follow = grep /^-f/, @opt;
+    _Recpath(\%ancestors, $follow, $_) for @elems;
     if (@et) {
       push @elems, sort {$b cmp $a} keys %ancestors;
     } else {
