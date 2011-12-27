@@ -19,3 +19,7 @@ User type managers bring their own quirks: they need to be installed on every cl
 Note that the same issue affects some other types than _text files_ e.g. when the source container is shared on a per branch basis.
 
 I analyzed the format of source containers for text file elements [http://www.cmcrossroads.com/cgi-bin/cmwiki/view/CM/FormatSrcCnt in the cm wiki].
+
+In the case of non-cascading branches off /main/0, the effect observed is twofold:
+- all the branches are marked as '0 0', i.e. spawn from /main/0
+- all the versions 1 start with an insersion record '^I n 1' which is a full copy
