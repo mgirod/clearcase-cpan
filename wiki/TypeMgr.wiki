@@ -17,3 +17,5 @@ In addition, it is likely that this wouldn't help: the base of every new branch 
 User type managers bring their own quirks: they need to be installed on every client, in a platform suitable way.
 
 Note that the same issue affects some other types than _text files_ e.g. when the source container is shared on a per branch basis.
+
+I analyzed the format of source containers for text file elements [http://www.cmcrossroads.com/cgi-bin/cmwiki/view/CM/FormatSrcCnt in the cm wiki].
