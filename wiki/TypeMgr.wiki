@@ -1,0 +1,19 @@
+#summary A new type manager for text files
+
+= Introduction =
+
+The source containers for elements of type _text file_ get bloated.
+Every new branch results in a full copy. This is only a minor nuisance but may eventually result in problems.
+
+Note that this may also have positive consequences, e.g. enhance the performance of version handling.
+
+Solving it is possible: via a special element type manager.
+
+= Details =
+
+One might think of branching off an intermediate branch, itself under /main/0. This would however need to be of a shared type (e.g. _m_), and shared branch types are not supported.
+In addition, it is likely that this wouldn't help: the base of every new branch would still be empty, and difference from it thus a full copy.
+
+User type managers bring their own quirks: they need to be installed on every client, in a platform suitable way.
+
+Note that the same issue affects some other types than _text files_ e.g. when the source container is shared on a per branch basis.
