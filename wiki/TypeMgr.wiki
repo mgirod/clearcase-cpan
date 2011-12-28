@@ -22,4 +22,6 @@ I analyzed the format of source containers for text file elements [http://www.cm
 
 In the case of non-cascading branches off /main/0, the effect observed is twofold:
 - all the branches are marked as '0 0', i.e. spawn from /main/0
-- all the versions 1 start with an insersion record '^I n 1' which is a full copy
+- all the versions 1 start with an insertion record '^I n 1' which is a full copy
+
+This gives a hope that modifying sligthly this header information might be sufficient!
