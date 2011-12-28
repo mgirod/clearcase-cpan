@@ -25,3 +25,86 @@ In the case of non-cascading branches off /main/0, the effect observed is twofol
 - all the versions 1 start with an insertion record '^I n 1' which is a full copy
 
 This gives a hope that modifying sligthly this header information might be sufficient!
+{{{
+bar> ct ls a
+a@@/main/mg-015/1                                        Rule: MG [-mkbranch mg]
+bar> cat a
+
+4444
+bar> ct dump a | grep cont=
+source cont="/cc/views07/emagiro/bar.vbs/s/sdft/13/32/0-b17e438b31a011e1961f00156004455c-f9"
+clrtxt cont="/cc/views07/emagiro/bar.vbs/c/cdft/2a/10/b17e438b31a011e1961f00156004455c"
+bar> cat /cc/views07/emagiro/bar.vbs/s/sdft/13/32/0-b17e438b31a011e1961f00156004455c-f9
+^S db1 2
+^V b17e438b.31a011e1.961f.00:15:60:04:45:5c 2 1 4efb93c2
+^V bc8e4889.319f11e1.87ca.00:01:84:2b:ec:ee 2 0 4efb9220
+^B bc8e4885.319f11e1.87ca.00:01:84:2b:ec:ee 2 1 1
+^V fa3e436f.319f11e1.961f.00:15:60:04:45:5c 1 1 4efb90f3
+^V 088e43df.31a011e1.8195.00:01:84:2b:ec:ee 1 0 4efb90f3
+^B 088e43db.31a011e1.8195.00:01:84:2b:ec:ee 1 0 0
+^V 088e43d7.31a011e1.8195.00:01:84:2b:ec:ee 0 0 4efb90f3
+^B 088e43d3.31a011e1.8195.00:01:84:2b:ec:ee 0 0 0
+^E 088e43cf.31a011e1.8195.00:01:84:2b:ec:ee
+^I 1 1 1
+
+^I 2 1 1
+4444
+bar> ct co -nc a
+Created branch "mg" from "a" version "/main/0".
+Checked out "a" from version "/main/mg/0".
+bar> cd -
+/cc/views07/emagiro/bar.vbs/s/sdft/13/32
+32> ls -l
+total 8
+-r--r--r--   1 emagiro  at1          619 Dec 28 22:16 0-a70e556531a111e19d2e0001842becee-f6
+32> head 0-a70e556531a111e19d2e0001842becee-f6
+^S db1 3
+^V a70e5565.31a111e1.9d2e.00:01:84:2b:ec:ee 3 0 4efb9558
+^B a70e5561.31a111e1.9d2e.00:01:84:2b:ec:ee 3 0 0
+^V b17e438b.31a011e1.961f.00:15:60:04:45:5c 2 1 4efb93c2
+^V bc8e4889.319f11e1.87ca.00:01:84:2b:ec:ee 2 0 4efb9220
+^B bc8e4885.319f11e1.87ca.00:01:84:2b:ec:ee 2 1 1
+^V fa3e436f.319f11e1.961f.00:15:60:04:45:5c 1 1 4efb90f3
+^V 088e43df.31a011e1.8195.00:01:84:2b:ec:ee 1 0 4efb90f3
+^B 088e43db.31a011e1.8195.00:01:84:2b:ec:ee 1 0 0
+^V 088e43d7.31a011e1.8195.00:01:84:2b:ec:ee 0 0 4efb90f3
+32> perl -pi -e 's/B a70e5561.31a111e1.9d2e.00:01:84:2b:ec:ee 3 0 0/B a70e5561.31a111e1.9d2e.00:01:84:2b:ec:ee 3 2 1/' 0-a70e556531a111e19d2e0001842becee-f6
+32> head -3 0-a70e556531a111e19d2e0001842becee-f6
+^S db1 3
+^V a70e5565.31a111e1.9d2e.00:01:84:2b:ec:ee 3 0 4efb9558
+^B a70e5561.31a111e1.9d2e.00:01:84:2b:ec:ee 3 2 1
+32> cd -
+/local/scratch/bar
+bar> echo 5555 >> a
+bar> ct ci -nc a
+Checked in "a" version "/main/mg/1".
+bar> cat a
+
+4444
+5555
+bar> ct dump a | grep cont=
+source cont="/cc/views07/emagiro/bar.vbs/s/sdft/13/32/0-f78e43a731a111e1961f00156004455c-6j"
+clrtxt cont="/cc/views07/emagiro/bar.vbs/c/cdft/37/42/f78e43a731a111e1961f00156004455c"
+bar> cat /cc/views07/emagiro/bar.vbs/s/sdft/13/32/0-f78e43a731a111e1961f00156004455c-6j
+^S db1 3
+^V f78e43a7.31a111e1.961f.00:15:60:04:45:5c 3 1 4efb95e6
+^V a70e5565.31a111e1.9d2e.00:01:84:2b:ec:ee 3 0 4efb9558
+^B a70e5561.31a111e1.9d2e.00:01:84:2b:ec:ee 3 2 1
+^V b17e438b.31a011e1.961f.00:15:60:04:45:5c 2 1 4efb93c2
+^V bc8e4889.319f11e1.87ca.00:01:84:2b:ec:ee 2 0 4efb9220
+^B bc8e4885.319f11e1.87ca.00:01:84:2b:ec:ee 2 1 1
+^V fa3e436f.319f11e1.961f.00:15:60:04:45:5c 1 1 4efb90f3
+^V 088e43df.31a011e1.8195.00:01:84:2b:ec:ee 1 0 4efb90f3
+^B 088e43db.31a011e1.8195.00:01:84:2b:ec:ee 1 0 0
+^V 088e43d7.31a011e1.8195.00:01:84:2b:ec:ee 0 0 4efb90f3
+^B 088e43d3.31a011e1.8195.00:01:84:2b:ec:ee 0 0 0
+^E 088e43cf.31a011e1.8195.00:01:84:2b:ec:ee
+^I 1 1 1
+
+^I 2 1 1
+4444
+^I 3 1 1
+5555
+}}}
+I.e. it works: only the diff, {{{5555}}} was added to the source container!
+Now, {{{annotate}}} gets confused...
