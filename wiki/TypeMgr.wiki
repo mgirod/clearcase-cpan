@@ -108,3 +108,12 @@ bar> cat /cc/views07/emagiro/bar.vbs/s/sdft/13/32/0-f78e43a731a111e1961f00156004
 }}}
 I.e. it works: only the diff, {{{5555}}} was added to the source container!
 Now, {{{annotate}}} gets confused...
+It seems it cannot match the version name corresponding to the oid, with the one it would construct from the dependency graph:
+{{{
+cleartool: Error: Unknown version "I b17e438b.31a011e1.961f.00:15:60:04:45:5c 4444
+}}}
+although:
+{{{
+bar> ct des -s oid:b17e438b.31a011e1.961f.00:15:60:04:45:5c
+/local/scratch/bar/a@@/main/mg-015/1
+}}}
