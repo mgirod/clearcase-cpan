@@ -9,6 +9,8 @@ Note that this may also have positive consequences, e.g. enhance the performance
 
 Solving it is possible: via a special element type manager.
 
+But this opens a can of worms in the context of poor support for managing user types on !ClearCase clients. Can one avoid it? The answer seems to be *yes*!
+
 = Details =
 
 One might think of branching off an intermediate branch, itself under /main/0. This would however need to be of a shared type (e.g. _m_), and shared branch types are not supported.
