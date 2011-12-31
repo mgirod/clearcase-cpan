@@ -156,6 +156,25 @@ bar> cat a@@/main/mg/1
 4444
 5555
 }}}
+==Other functions of the type manager==
+{{{
+text_file_delta> pwd
+/opt/rational/clearcase/lib/mgrs/text_file_delta
+text_file_delta> ls -l
+total 76
+lrwxrwxrwx   1 root     other          6 Aug  3  2007 annotate -> tfdmgr
+lrwxrwxrwx   1 root     other         22 Aug  3  2007 compare -> ../../../bin/cleardiff
+lrwxrwxrwx   1 root     other          6 Aug  3  2007 construct_version -> tfdmgr
+lrwxrwxrwx   1 root     other          6 Aug  3  2007 create_branch -> tfdmgr
+lrwxrwxrwx   1 root     other          6 Aug  3  2007 create_element -> tfdmgr
+lrwxrwxrwx   1 root     other          6 Aug  3  2007 create_version -> tfdmgr
+lrwxrwxrwx   1 root     other          6 Aug  3  2007 delete_branches_versions -> tfdmgr
+lrwxrwxrwx   1 root     other          6 Aug  3  2007 get_cont_info -> tfdmgr
+lrwxrwxrwx   1 root     other         22 Aug  3  2007 merge -> ../../../bin/cleardiff
+-r-xr-xr-x   1 root     sys        27368 Apr 30  2008 tfdmgr
+lrwxrwxrwx   1 root     other         23 Aug  3  2007 xcompare -> ../../../bin/xcleardiff
+lrwxrwxrwx   1 root     other         23 Aug  3  2007 xmerge -> ../../../bin/xcleardiff
+}}}
 =Other element types than text file=
 The {{{xml}}} element type is in the {{{binary_delta_file}}} hierarchy.
 For elements of this type, the source container is shared _per branch_ (at least in the case of branches spawn from {{{/main/0}}}).
