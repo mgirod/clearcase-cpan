@@ -211,4 +211,9 @@ d578cd12.2ef44dec.8480.f6:e9:f0:f4:f4:3a
 ^S
 ^U
 ^U
+aa> ct des -s oid:2eb25e4d.956541e4.82ee.c5:99:ef:04:b5:0c oid:3c8a4663.043848ac.a2ac.48:8c:27:eb:5d:f4 oid:66bae1df.67d54d2c.9817.5d:56:56:99:b4:bc oid:d578cd12.2ef44dec.8480.f6:e9:f0:f4:f4:3a 
+/foo/aa/a.xml@@/main/mg-006/0
+/foo/aa/a.xml@@/main/mg-006
+/foo/aa/a.xml@@/main/mg-006/2
+/foo/aa/a.xml@@/main/mg-006/1
 }}}
