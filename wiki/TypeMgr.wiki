@@ -23,9 +23,10 @@ Note that the same issue affects some other types than _text files_ e.g. when th
 I analyzed the format of source containers for text file elements [http://www.cmcrossroads.com/cgi-bin/cmwiki/view/CM/FormatSrcCnt in the cm wiki].
 
 In the case of non-cascading branches off /main/0, the effect observed is twofold:
-- all the branches are marked as '0 0', i.e. spawn from /main/0
-- all the versions 1 start with an insertion record '^I n 1' which is a full copy
+* all the branches are marked as '0 0', i.e. spawn from /main/0
+* all the versions 1 start with an insertion record '^I n 1' which is a full copy
 
+==Edit the previous version in the source container at checkout/mkbranch==
 This gives a hope that modifying sligthly this header information might be sufficient!
 {{{
 bar> ct ls a
@@ -109,6 +110,7 @@ bar> cat /cc/views07/emagiro/bar.vbs/s/sdft/13/32/0-f78e43a731a111e1961f00156004
 5555
 }}}
 I.e. it works: only the diff, {{{5555}}} was added to the source container!
+==Effect on annotate==
 Now, {{{annotate}}} gets confused...
 It seems it cannot match the version name corresponding to the oid, with the one it would construct from the dependency graph:
 {{{
@@ -119,6 +121,7 @@ although:
 bar> ct des -s oid:b17e438b.31a011e1.961f.00:15:60:04:45:5c
 /local/scratch/bar/a@@/main/mg-015/1
 }}}
+==Generating cleartext containers==
 But {{{annotate}}} is not critical. Especially, it can be fixed within the wrapper, i.e. without requiring a new type manager, and its installation on every single !ClearCase client.
 The critical operation is the generation of cleartext containers, and *it* works:
 {{{
@@ -152,4 +155,60 @@ bar> cat a@@/main/mg/1
 
 4444
 5555
+}}}
+=Other element types than text file=
+The {{{xml}}} element type is in the {{{binary_delta_file}}} hierarchy.
+For elements of this type, the source container is shared _per branch_ (at least in the case of branches spawn from {{{/main/0}}}).
+{{{
+aa> ct lsvtree -s -merge a.xml
+a.xml@@/main
+a.xml@@/main/0
+a.xml@@/main/mg-006
+a.xml@@/main/mg-006/2
+a.xml@@/main/mg-007
+a.xml@@/main/mg-007/1
+aa> ct dump a.xml@@/main/mg-006/1 | grep cont=
+source cont="\\EV68B599EABE1A\CC_STG\foo.vbs\s\sdft\19\4\yq-66bae1df67d54d2c98175d565699b4bc-ct"
+clrtxt cont="\\EV68B599EABE1A\CC_STG\foo.vbs\c\cdft\27\0\d578cd122ef44dec8480f6e9f0f4f43a"
+aa> ct dump a.xml@@/main/mg-006/2 | grep cont=
+source cont="\\EV68B599EABE1A\CC_STG\foo.vbs\s\sdft\19\4\yq-66bae1df67d54d2c98175d565699b4bc-ct"
+clrtxt cont="\\EV68B599EABE1A\CC_STG\foo.vbs\c\cdft\19\14\66bae1df67d54d2c98175d565699b4bc"
+aa> ct dump a.xml@@/main/mg-007/1 | grep cont=
+source cont="\\EV68B599EABE1A\CC_STG\foo.vbs\s\sdft\19\4\yq-fc8dac6b565641fa8974d7f579408c2c-3s"
+clrtxt cont="\\EV68B599EABE1A\CC_STG\foo.vbs\c\cdft\10\2b\fc8dac6b565641fa8974d7f579408c2c"
+}}}
+The duplication of data due to the non-cascading scheme takes thus place (if it does) in a new file, instead of as for text files, in the same one.
+The source container is compressed, and even uncompressed, contains binary data (some stripped from/converted to textual representation in the below transcript):
+{{{
+aa> file /cygdrive/c/CC_STG/foo.vbs/s/sdft/19/4/yq-66bae1df67d54d2c98175d565699b4bc-ct
+/cygdrive/c/CC_STG/foo.vbs/s/sdft/19/4/yq-66bae1df67d54d2c98175d565699b4bc-ct: gzip compressed data, was "<fd:1>", from NTFS filesystem (NT)
+aa> gunzip -cd /cygdrive/c/CC_STG/foo.vbs/s/sdft/19/4/yq-66bae1df67d54d2c98175d565699b4bc-ct > /tmp/foo
+aa> cat /tmp/foo | tr '\000' '\n' | egrep -v '^$'
+BR
+2c7618ca.caec44b2.aaf0.fc:76:25:1a:21:57
+4e9c601b
+<xml>
+1 2 3 4
+</xml>
+
+
+66bae1df.67d54d2c.9817.5d:56:56:99:b4:bc
+4e9c61d0
+2
+3c8a4663.043848ac.a2ac.48:8c:27:eb:5d:f4
+3c8a4663.043848ac.a2ac.48:8c:27:eb:5d:f4
+d578cd12.2ef44dec.8480.f6:e9:f0:f4:f4:3a
+1
+d578cd12.2ef44dec.8480.f6:e9:f0:f4:f4:3a
+4e9c601b
+1
+3c8a4663.043848ac.a2ac.48:8c:27:eb:5d:f4
+3c8a4663.043848ac.a2ac.48:8c:27:eb:5d:f4
+2eb25e4d.956541e4.82ee.c5:99:ef:04:b5:0c
+0
+
+	
+^S
+^U
+^U
 }}}
