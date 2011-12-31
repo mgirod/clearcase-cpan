@@ -1,4 +1,4 @@
-#summary A new type manager for text files
+#summary A new type manager for text files?
 
 = Introduction =
 
