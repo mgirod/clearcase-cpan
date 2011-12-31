@@ -117,3 +117,37 @@ although:
 bar> ct des -s oid:b17e438b.31a011e1.961f.00:15:60:04:45:5c
 /local/scratch/bar/a@@/main/mg-015/1
 }}}
+But {{{annotate}}} is not critical. Especially, it can be fixed within the wrapper, i.e. without requiring a new type manager, and its installation on every single !ClearCase client.
+The critical operation is the generation of cleartext containers, and *it* works:
+{{{
+bar> ct lsgen -d 3 -a a
+a@@/main/mg/1 
+ a@@/main/mg-015/1 (MG, MG_1.01)
+  a@@/main/mg-014/1 (MG_1.00)
+   a@@/main/0 
+bar> ct dump a@@/main/mg/1 | grep cont=
+source cont="/cc/views07/emagiro/bar.vbs/s/sdft/13/32/0-f78e43a731a111e1961f00156004455c-6j"
+clrtxt cont="/cc/views07/emagiro/bar.vbs/c/cdft/37/42/f78e43a731a111e1961f00156004455c"
+bar> ct dump a@@/main/mg-015/1 | grep cont=
+source cont="/cc/views07/emagiro/bar.vbs/s/sdft/13/32/0-f78e43a731a111e1961f00156004455c-6j"
+clrtxt cont="/cc/views07/emagiro/bar.vbs/c/cdft/2a/10/b17e438b31a011e1961f00156004455c"
+bar> ct dump a@@/main/mg-014/1 | grep cont=
+source cont="/cc/views07/emagiro/bar.vbs/s/sdft/13/32/0-f78e43a731a111e1961f00156004455c-6j"
+clrtxt cont="/cc/views07/emagiro/bar.vbs/c/cdft/a/25/fa3e436f319f11e1961f00156004455c"
+bar> ll /cc/views07/emagiro/bar.vbs/c/cdft/37/42/f78e43a731a111e1961f00156004455c /cc/views07/emagiro/bar.vbs/c/cdft/2a/10/b17e438b31a011e1961f00156004455c /cc/views07/emagiro/bar.vbs/c/cdft/a/25/fa3e436f319f11e1961f00156004455c
+-r--r--r--   1 emagiro  at1            6 Dec 28 22:10 /cc/views07/emagiro/bar.vbs/c/cdft/2a/10/b17e438b31a011e1961f00156004455c
+-r--r--r--   1 emagiro  at1           11 Dec 28 22:20 /cc/views07/emagiro/bar.vbs/c/cdft/37/42/f78e43a731a111e1961f00156004455c
+-r--r--r--   1 emagiro  at1            1 Dec 28 22:03 /cc/views07/emagiro/bar.vbs/c/cdft/a/25/fa3e436f319f11e1961f00156004455c
+bar> rm -f /cc/views07/emagiro/bar.vbs/c/cdft/a/25/fa3e436f319f11e1961f00156004455c
+bar> cat a@@/main/mg-014/1
+
+bar> rm -f /cc/views07/emagiro/bar.vbs/c/cdft/37/42/f78e43a731a111e1961f00156004455c
+bar> cat a@@/main/mg-015/1
+
+4444
+bar> rm -f /cc/views07/emagiro/bar.vbs/c/cdft/2a/10/b17e438b31a011e1961f00156004455c
+bar> cat a@@/main/mg/1
+
+4444
+5555
+}}}
