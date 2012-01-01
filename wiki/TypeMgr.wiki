@@ -240,7 +240,7 @@ This result was suprising, as differing in philosophy with the previous one. In 
 In any case, the important is once again that consistency of data is preserved, this time by _commenting away_ the critical version instead of really removing it. This possibility is documented in the excellent whitepaper on [http://www-01.ibm.com/support/docview.wss?uid=swg27009697&aid=1 type managers] (by Laurent Maréchal).
 =Other element types than text file=
 The {{{xml}}} element type is in the {{{binary_delta_file}}} hierarchy.
-For elements of this type, the source container is shared _per branch_ (at least in the case of branches spawn from {{{/main/0}}}).
+For elements of this type, the source container is shared _per branch_, in the case of branches spawn from {{{/main/0}}}, or maybe otherwise independent...
 {{{
 aa> ct lsvtree -s -merge a.xml
 a.xml@@/main
@@ -259,7 +259,7 @@ aa> ct dump a.xml@@/main/mg-007/1 | grep cont=
 source cont="\\EV68B599EABE1A\CC_STG\foo.vbs\s\sdft\19\4\yq-fc8dac6b565641fa8974d7f579408c2c-3s"
 clrtxt cont="\\EV68B599EABE1A\CC_STG\foo.vbs\c\cdft\10\2b\fc8dac6b565641fa8974d7f579408c2c"
 }}}
-The duplication of data due to the non-cascading scheme takes thus place (if it does) in a new file, instead of as for text files, in the same one.
+The duplication of data due to the non-cascading scheme takes thus place in a new file, instead of as for text files, in the same one.
 The source container is compressed, and even uncompressed, contains binary data (some stripped from/converted to textual representation in the below transcript):
 {{{
 aa> file /cygdrive/c/CC_STG/foo.vbs/s/sdft/19/4/yq-66bae1df67d54d2c98175d565699b4bc-ct
@@ -299,3 +299,48 @@ aa> ct des -s oid:2eb25e4d.956541e4.82ee.c5:99:ef:04:b5:0c oid:3c8a4663.043848ac
 /foo/aa/a.xml@@/main/mg-006/2
 /foo/aa/a.xml@@/main/mg-006/1
 }}}
+Checked what happens with a cascading branch:
+{{{
+aa> cto mkbranch -nc mg -ver a.xml@@/main/mg-006/2
+cleartool: Error: Pathname not found: "-ver".
+Created branch "mg" from "a.xml" version "\main\mg-006\2".
+Checked out "a.xml" from version "\main\mg-006\mg\0".
+aa> cat a.xml
+<xml>
+1 2 3 4
+</xml>
+aa> perl -pi -le 'print qq(<add>\n5 6 7 8\n</add>) if m%/xml%' a.xml
+aa> cat a.xml
+<xml>
+1 2 3 4
+<add>
+5 6 7 8
+</add>
+</xml>
+aa> ct ci -nc a.xml
+Checked in "a.xml" version "/main/mg-006/mg/1".
+aa> ct dump a.xml | grep 'source cont=' | cut -d= -f2 | tr -d \"
+\\EV68B599EABE1A\CC_STG\foo.vbs\s\sdft\19\4\yq-a2b7a4006f6a401aa5673dadc093c170-7p
+aa> gunzip -cd /cygdrive/c/CC_STG/foo.vbs/s/sdft/19/4/yq-a2b7a4006f6a401aa5673dadc093c170-7p >/tmp/out
+aa> cat /tmp/out | tr '\000' '\n' | egrep -v '^$'
+BR
+2c7618ca.caec44b2.aaf0.fc:76:25:1a:21:57
+4e9c601b
+*<xml>
+1 2 3 4
+<add>
+5 6 7 8
+</add>
+</xml>
+a2b7a400.6f6a401a.a567.3d:ad:c0:93:c1:70
+4f0052b1
+1
+8b314a87.188b493c.ac9f.d6:4d:2b:83:54:ca
+8b314a87.188b493c.ac9f.d6:4d:2b:83:54:ca
+0973ac0a.b9174924.b62e.4a:9e:7b:10:db:36
+0
+
+*
+*
+}}}
+Indeed: the source container is shared.
