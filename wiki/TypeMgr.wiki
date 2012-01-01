@@ -5,9 +5,9 @@
 The source containers for elements of type _text file_ get bloated.
 Every new branch results in a full copy. This is only a minor nuisance but may eventually result in problems.
 
-Note that this may also have positive consequences, e.g. enhance the performance of version handling.
+Note that this may also have positive consequences, e.g. enhance the performance of version handling (at the expense of wasting disk space, with extra considerations e.g. concerning the position of disk cluster boundaries).
 
-Solving it is possible: via a special element type manager.
+Solving it is possible in prinicple via a special element type manager.
 
 But this opens a can of worms in the context of poor support for managing user types on !ClearCase clients. Can one avoid it?
 The answer is *yes*!
