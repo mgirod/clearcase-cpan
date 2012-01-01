@@ -236,7 +236,7 @@ bar> cat /cc/views07/emagiro/bar.vbs/s/sdft/13/32/0-b17e438b31a011e1961f00156004
 ^I 3 1 1
 5555
 }}}
-This result was suprising, as differing in philosophy with the previous one. In fact, this behaviour is probably the same with cascading branches.
+This result was suprising, as differing in philosophy with the previous one. Note that this behaviour is *not* the same with cascading branches: then, the removal of _interesting versions_ must be explicitly enabled with the _-xbr_ flag, in which case the sub-branch gets really removed.
 In any case, the important is once again that consistency of data is preserved, this time by _commenting away_ the critical version instead of really removing it. This possibility is documented (_tag delete_) in the excellent whitepaper on [http://www-01.ibm.com/support/docview.wss?uid=swg27009697&aid=1 type managers] (by Laurent Maréchal).
 =Other element types than text file=
 The {{{xml}}} element type is in the {{{binary_delta_file}}} hierarchy.
