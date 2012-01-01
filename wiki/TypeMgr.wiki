@@ -9,7 +9,8 @@ Note that this may also have positive consequences, e.g. enhance the performance
 
 Solving it is possible: via a special element type manager.
 
-But this opens a can of worms in the context of poor support for managing user types on !ClearCase clients. Can one avoid it? The answer seems to be *yes*!
+But this opens a can of worms in the context of poor support for managing user types on !ClearCase clients. Can one avoid it?
+The answer is *yes*!
 
 = Details =
 
