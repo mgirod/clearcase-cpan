@@ -175,6 +175,69 @@ lrwxrwxrwx   1 root     other         22 Aug  3  2007 merge -> ../../../bin/clea
 lrwxrwxrwx   1 root     other         23 Aug  3  2007 xcompare -> ../../../bin/xcleardiff
 lrwxrwxrwx   1 root     other         23 Aug  3  2007 xmerge -> ../../../bin/xcleardiff
 }}}
+Of these, _delete_branches_versions_ is the one to investigate:
+===rmbranch===
+{{{
+bar> ct rmbranch -f a@@/main/mg-015
+text_file_delta: Error: Version 0x1 is still active on branch 0x2 in "/cc/views07/emagiro/bar.vbs/s/sdft/13/32/0-f78e43a731a111e1961f00156004455c-6j"
+cleartool: Error: Type manager "text_file_delta" failed delete_branches_versions operation.
+cleartool: Error: Unable to remove branch "a@@/main/mg-015".
+}}}
+This is excellent: _rmbranch_ is _safer_ in this scheme than in the usual one! To actually remove the branch, one would need to remove first and explicitly the 'sub'-branch. It may be disputed whether this is annoying or safe: all too often though, administrators would skip this thinking and implement a trigger to produce the above result.
+The important is that the operation does not result in loss of consistency.
+===rmver===
+{{{
+bar> ct rmver -f a@@/main/mg-015/1
+cleartool: Error: Removal of "interesting" versions must be explicitly enabled.
+Not removing these "interesting" versions of "a":
+  /main/mg-015/1 (has: labels, hyperlinks)
+cleartool: Error: No versions of "a" to remove.
+bar> ct rmver -f -xhl -xla a@@/main/mg-015/1
+Removing these versions of "a":
+  /main/mg-015/1 (has: labels, hyperlinks)
+Removed versions of "a".
+bar> ct lsvtree -a -s -merge a
+a@@/main
+a@@/main/0
+a@@/main/mg-014
+a@@/main/mg-014/0
+a@@/main/mg-014/1
+a@@/main/mg-015
+a@@/main/mg-015/0
+a@@/main/mg
+a@@/main/mg/0
+a@@/main/mg/1
+bar> ct ls a
+a@@/main/mg/1                                            Rule: .../mg/LATEST
+bar> cat a
+
+4444
+5555
+bar> ct dump a@@/main/mg/1 | grep 'source cont=' | cut -d= -f2 | tr -d \"
+/cc/views07/emagiro/bar.vbs/s/sdft/13/32/0-b17e438b31a011e1961f00156004455c-58
+bar> cat /cc/views07/emagiro/bar.vbs/s/sdft/13/32/0-b17e438b31a011e1961f00156004455c-58
+^S db1 3
+^V f78e43a7.31a111e1.961f.00:15:60:04:45:5c 3 1 4efb95e6
+^V a70e5565.31a111e1.9d2e.00:01:84:2b:ec:ee 3 0 4efb9558
+^B a70e5561.31a111e1.9d2e.00:01:84:2b:ec:ee 3 2 1
+^#^V b17e438b.31a011e1.961f.00:15:60:04:45:5c 2 1 4efb93c2
+^V bc8e4889.319f11e1.87ca.00:01:84:2b:ec:ee 2 0 4efb9220
+^B bc8e4885.319f11e1.87ca.00:01:84:2b:ec:ee 2 1 1
+^V fa3e436f.319f11e1.961f.00:15:60:04:45:5c 1 1 4efb90f3
+^V 088e43df.31a011e1.8195.00:01:84:2b:ec:ee 1 0 4efb90f3
+^B 088e43db.31a011e1.8195.00:01:84:2b:ec:ee 1 0 0
+^V 088e43d7.31a011e1.8195.00:01:84:2b:ec:ee 0 0 4efb90f3
+^B 088e43d3.31a011e1.8195.00:01:84:2b:ec:ee 0 0 0
+^E 088e43cf.31a011e1.8195.00:01:84:2b:ec:ee
+^I 1 1 1
+
+^I 2 1 1
+4444
+^I 3 1 1
+5555
+}}}
+This result was suprising, as differing in philosophy with the previous one. Obviously implemented by a different person, with loose requirements specifications (as is typically the case anyway: no blame to anybody--well... some refactoring could have taken place later...)
+Anyway: the important is once again that consistency of data is preserved, this time by _commenting away_ the critical version instead of really removing it. This possibility is however documented in the excellent whitepaper on [http://www-01.ibm.com/support/docview.wss?uid=swg27009697&aid=1 type managers] (by Laurent Maréchal).
 =Other element types than text file=
 The {{{xml}}} element type is in the {{{binary_delta_file}}} hierarchy.
 For elements of this type, the source container is shared _per branch_ (at least in the case of branches spawn from {{{/main/0}}}).
