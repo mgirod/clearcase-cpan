@@ -237,7 +237,7 @@ bar> cat /cc/views07/emagiro/bar.vbs/s/sdft/13/32/0-b17e438b31a011e1961f00156004
 5555
 }}}
 This result was suprising, as differing in philosophy with the previous one. In fact, this behaviour is probably the same with cascading branches.
-In any case, the important is once again that consistency of data is preserved, this time by _commenting away_ the critical version instead of really removing it. This possibility is documented in the excellent whitepaper on [http://www-01.ibm.com/support/docview.wss?uid=swg27009697&aid=1 type managers] (by Laurent Maréchal).
+In any case, the important is once again that consistency of data is preserved, this time by _commenting away_ the critical version instead of really removing it. This possibility is documented (_tag delete_) in the excellent whitepaper on [http://www-01.ibm.com/support/docview.wss?uid=swg27009697&aid=1 type managers] (by Laurent Maréchal).
 =Other element types than text file=
 The {{{xml}}} element type is in the {{{binary_delta_file}}} hierarchy.
 For elements of this type, the source container is shared _per branch_, in the case of branches spawn from {{{/main/0}}}, or maybe otherwise independent...
@@ -301,8 +301,7 @@ aa> ct des -s oid:2eb25e4d.956541e4.82ee.c5:99:ef:04:b5:0c oid:3c8a4663.043848ac
 }}}
 Checked what happens with a cascading branch:
 {{{
-aa> cto mkbranch -nc mg -ver a.xml@@/main/mg-006/2
-cleartool: Error: Pathname not found: "-ver".
+aa> cto mkbranch -nc mg a.xml@@/main/mg-006/2
 Created branch "mg" from "a.xml" version "\main\mg-006\2".
 Checked out "a.xml" from version "\main\mg-006\mg\0".
 aa> cat a.xml
