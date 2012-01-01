@@ -259,8 +259,8 @@ aa> ct dump a.xml@@/main/mg-007/1 | grep cont=
 source cont="\\EV68B599EABE1A\CC_STG\foo.vbs\s\sdft\19\4\yq-fc8dac6b565641fa8974d7f579408c2c-3s"
 clrtxt cont="\\EV68B599EABE1A\CC_STG\foo.vbs\c\cdft\10\2b\fc8dac6b565641fa8974d7f579408c2c"
 }}}
-The duplication of data due to the non-cascading scheme takes thus place in a new file, instead of as for text files, in the same one.
-The source container is compressed, and even uncompressed, contains binary data (some stripped from/converted to textual representation in the below transcript):
+Duplication of data takes thus place in a new file, instead of as for text files, in the same one.
+The source container is compressed, and even after being uncompressed, contains binary data (some stripped from/converted to textual representation in the below transcript):
 {{{
 aa> file /cygdrive/c/CC_STG/foo.vbs/s/sdft/19/4/yq-66bae1df67d54d2c98175d565699b4bc-ct
 /cygdrive/c/CC_STG/foo.vbs/s/sdft/19/4/yq-66bae1df67d54d2c98175d565699b4bc-ct: gzip compressed data, was "<fd:1>", from NTFS filesystem (NT)
@@ -341,5 +341,9 @@ a2b7a400.6f6a401a.a567.3d:ad:c0:93:c1:70
 
 *
 *
+aa> ct dump a.xml@@/main/mg-006/mg/1 | grep 'source cont=' | cut -d= -f2 | tr -d \"
+\\EV68B599EABE1A\CC_STG\foo.vbs\s\sdft\19\4\yq-a2b7a4006f6a401aa5673dadc093c170-7p
+aa> ct dump a.xml@@/main/mg-006/2 | grep 'source cont=' | cut -d= -f2 | tr -d \"
+\\EV68B599EABE1A\CC_STG\foo.vbs\s\sdft\19\4\yq-0973ac0ab9174924b62e4a9e7b10db36-qb
 }}}
-Indeed: the source container is shared.
+So, the source container is *not* shared either in the cascading branch case! It is not our non-cascading scheme which introduces the duplication of data!
