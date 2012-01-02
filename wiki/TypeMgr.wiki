@@ -348,3 +348,18 @@ aa> ct dump a.xml@@/main/mg-006/2 | grep 'source cont=' | cut -d= -f2 | tr -d \"
 \\EV68B599EABE1A\CC_STG\foo.vbs\s\sdft\19\4\yq-0973ac0ab9174924b62e4a9e7b10db36-qb
 }}}
 So, the source container is *not* shared either in the cascading branch case! It is not our non-cascading scheme which introduces the duplication of data!
+=Implementation=
+There are unfortunately several issues with the implementation.
+
+The root cause of the problem is that editing the container must be done as _vob owner_, whereas the checkout/mkbranch command triggering it is a user operation.
+
+This means that I may use a similar technology as the one used for locking/unlocking label types.
+
+This will work fine for vobs served on UNIX, but is more troublesome for ones served on Windows. There are various schemes offered: using _sudo_ or _ssh_, and involving a _suid_ enabled script and a common account.
+Of those, only _ssh_ is potentially relevant (unless a _sudo_ Perl module is available with a port on Windows...) One needs to install an _ssh_ server on Windows (e.g. on cygwin), or to use a proxy.
+
+Then, one'll meet the maintenance issue of authorizing the users to passwordlessly run a specific command as vob owner. This is what the _suid_ enabled script allows to bypass, hence requiring a UNIX proxy.
+
+Finally (for Windows), vob storage is protected with ACL, which make it impossible to edit files _in-place_. One needs to make a copy, hence to take care of the end-of-line conventions and of preserving the ACL.
+
+On UNIX, the only issue is one of performance: what is acceptable for _lock/unlock_ may be disputable for _checkout_...
