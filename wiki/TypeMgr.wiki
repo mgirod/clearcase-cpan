@@ -363,3 +363,10 @@ Then, one'll meet the maintenance issue of authorizing the users to passwordless
 Finally (for Windows), vob storage is protected with ACL, which make it impossible to edit files _in-place_. One needs to make a copy, hence to take care of the end-of-line conventions and of preserving the ACL.
 
 On UNIX, the only issue is one of performance: what is acceptable for _lock/unlock_ may be disputable for _checkout_...
+
+==One anticipated issue==
+The ability to remove a version from the _genealogy_ of another one may be part of a scheme to _rollback_ a change, while preserving later fixes or enhancements.
+
+This event would be akin to a functionality termed in Git as _rebase_.
+
+Obviously, this ability is simpler to implement if one doesn't have to alter the source container afterwards.
