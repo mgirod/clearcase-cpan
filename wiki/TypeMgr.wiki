@@ -369,4 +369,4 @@ The ability to remove a version from the _genealogy_ of another one may be part 
 
 This event would be akin to a functionality termed in Git as _rebase_.
 
-Obviously, this ability is simpler to implement if one doesn't have to alter the source container afterwards.
+Obviously, this rollback functionality is simpler to implement if one doesn't have to alter the source container.
