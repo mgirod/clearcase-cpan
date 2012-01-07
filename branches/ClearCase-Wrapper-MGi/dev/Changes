@@ -193,3 +193,7 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- archive: convenience synonymous of mk(lb|br)type -arc
 	- lock/unlock: global types must be handled via their source vob
 	- fixed diff: one case of no predecessor
+
+0.30 Sat Jan  7 19:34:49 GMTST 2012
+        - reverted the cmwiki links in the doc to cmcrossroads.../cgi-bin/...
+	- cptype: fix for remote copy of a global type

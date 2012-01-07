@@ -7,7 +7,7 @@ This is an overlay module for ClearCase::Wrapper. See the POD for that
 module. It is built following the example of ClearCase::Wrapper::DSB.
 The extensions contained here are meant to support a consistent
 branching policy, advocated in:
- http://www.cmwiki.com/BranchYesMergeNo
+ http://www.cmcrossroads.com/cgi-bin/cmwiki/view/CM/BranchYesMergeNo
 It also offers a port of cleartool over cygwin.
 Beyond this module, changes were also made to ClearCase::SyncTree,
 which closely relate to the same purpose.
@@ -71,14 +71,14 @@ application of labels cheaper than it currently is.
 An other 'view attribute' is supported:
 '##:IncrementalLabels: LBTYPE@/vob/tag'.
 Preliminary documentation can be found at:
-  http://www.cmwiki.com/LabelFamily
-  http://www.cmwiki.com/IncrementalTypesImp
+  http://www.cmcrossroads.com/cgi-bin/cmwiki/view/CM/LabelFamily
+  http://www.cmcrossroads.com/cgi-bin/cmwiki/view/CM/IncrementalTypesImp
 See also collaborative maintenance site:
   http://code.google.com/p/clearcase-cpan/
 
 COPYRIGHT AND LICENCE
 
 Copyright (c) 2007 IONA Technologies PLC until v 0.05.
-Copyright (c) 2008-2011 Marc Girod (marc.girod@gmail.com) for later changes.
+Copyright (c) 2008-2012 Marc Girod (marc.girod@gmail.com) for later changes.
 All rights reserved. This Perl program is free software; you may
 redistribute it and/or modify it under the same terms as Perl itself.
