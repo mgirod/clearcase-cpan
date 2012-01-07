@@ -1,6 +1,6 @@
 package ClearCase::Wrapper::MGi;
 
-$VERSION = '0.29';
+$VERSION = '0.30';
 
 use warnings;
 use strict;
@@ -848,7 +848,7 @@ sub lsgenealogy {
 Supports the BranchOff feature, which you can set up via an attribute
 in the config spec.  The rationale and the design are documented in:
 
- http://www.cmwiki.com/BranchOffMain0
+ http://www.cmcrossroads.com/cgi-bin/cmwiki/view/CM/BranchOffMain0
 
 Instead of branching off the selected version, the strategy is to
 branch off the root of the version tree, copy-merging there from the
@@ -2555,6 +2555,10 @@ sub _CpType {
   my $glb = $ct->des([qw(-fmt %[type_scope]p)], $src)->qx;
   $glb = 0 if $glb and $glb eq 'ordinary';
   my ($eqt) = grep s/^->\s+(.*)$/$1/, $ct->des([qw(-s -ahl), $eqhl], $src)->qx;
+  if ($glb) { #Get the real source
+    $src = $ct->des([qw(-fmt %Xn)], $src)->qx;
+    $cpt->args($src, $dst);
+  }
   my $ret = $cpt->system;
   return $ret if $ret or !($glb or $eqt);
   if ($eqt) {
@@ -3362,7 +3366,7 @@ sub archive {
 =head1 COPYRIGHT AND LICENSE
 
 Copyright (c) 2007 IONA Technologies PLC (until v0.05),
-2008-2011 Marc Girod (marc.girod@gmail.com) for later versions.
+2008-2012 Marc Girod (marc.girod@gmail.com) for later versions.
 All rights reserved.
 This Perl program is free software; you may redistribute it
 and/or modify it under the same terms as Perl itself.
