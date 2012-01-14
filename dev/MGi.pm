@@ -741,6 +741,7 @@ sub _Recpath {
     my $tag = $ct->des(['-s'], "vob:$n")->qx;
     $stop = length($1) if $pn =~ m%^(.*?\Q$tag\E)%;
   }
+  $pn = $ct->des([(qw(-fmt %En))], $pn)->qx if $pn =~ /@/; #version ext. name
   my $dad = dirname($pn);
   return if length($dad) < $stop;
   $anc->{$dad}++;
