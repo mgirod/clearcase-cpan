@@ -1,6 +1,6 @@
 package ClearCase::Argv;
 
-$VERSION = '1.51';
+$VERSION = '1.52';
 
 use Argv 1.26;
 
@@ -369,7 +369,7 @@ sub unixpath {
 		  s%^//view%/view%;
 		}
 	    } grep { $_ && m%\S% } @bit;
-	    $line = join '', grep {$_} @bit;
+	    $line = join '', grep {defined($_)} @bit;
 	    $line .= '\\' if $bs;
 	    $line .= "\n" if $nl;
 	}
@@ -1209,9 +1209,9 @@ versions. It's currently maintained on Solaris 9 and Windows XP with CC
 versions is untestable by me.
 
 Marc Girod's testing environment: Solaris 10 (sparc and i386), and
-Windows Vista, with CtCmd on Windows, without IPC::ChildSafe, with
-Clone. Perl 5.8.8 and 5.10.x. Tatyana Shpichko's testing environment:
-RedHat Linux 4, with and without CtCmd, and Windows XP without CtCmd.
+Windows Vista, without IPC::ChildSafe, with Clone. Perl 5.8.8 and
+5.10.x. Tatyana Shpichko's testing environment: RedHat Linux 4, with
+and without CtCmd, and Windows XP without CtCmd.
 
 =head1 FILES
 
@@ -1230,7 +1230,7 @@ David Boyce <dsbperl AT boyski.com>
 
 =head1 COPYRIGHT
 
-Copyright (c) 1999-2007 David Boyce. All rights reserved.  This Perl
+Copyright (c) 1999-2012 David Boyce. All rights reserved.  This Perl
 program is free software; you may redistribute it and/or modify it
 under the same terms as Perl itself.
 
