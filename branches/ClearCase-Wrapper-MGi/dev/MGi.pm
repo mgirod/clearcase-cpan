@@ -5,8 +5,8 @@ $VERSION = '0.30';
 use warnings;
 use strict;
 use constant CYGWIN => $^O =~ /cygwin/i ? 1 : 0;
-use vars qw($ct $eqhl $prhl $sthl);
-($eqhl, $prhl, $sthl) = qw(EqInc PrevInc StBr);
+use vars qw($ct $eqhl $prhl $sthl $fchl);
+($eqhl, $prhl, $sthl, $fchl) = qw(EqInc PrevInc StBr FullCpy);
 
 sub _Compareincs($$) {
   my ($t1, $t2) = @_;
@@ -18,6 +18,7 @@ sub _Compareincs($$) {
   }
   return ($M1 <=> $M2 or (defined($m1) and defined($m2) and $m1 <=> $m2));
 }
+# Note: only wrapper supported functionality--possible fallback to cleartool
 sub _wrap {
   local @ARGV = @_;
   ClearCase::Wrapper::Extension($ARGV[0]);
@@ -33,6 +34,8 @@ sub _wrap {
     } else {
       $rc = 0;
     }
+  } else {
+    $rc = ClearCase::Argv->new(@ARGV)->system unless $rc; # fallback!
   }
   return $rc;			# Completed, successful or not
 }
@@ -51,7 +54,8 @@ use AutoLoader 'AUTOLOAD';
     "$z [-short] [-all] [-obsolete] [-depth gen-depth] pname ...";
   $mkbrtype = "\n* [-archive]";
   $mklabel = "\n* [-up] [-force] [-over type [-all]]";
-  $mklbtype = "\n* [-family] [-increment] [-archive] [-config cr]";
+  $mklbtype = "\n* [-family] [-increment] [-archive] [-fullcopy type] \n"
+    . "[-config cr [-exclude vobs]]";
   $rmtype = "\n* [-family] [-increment]";
   $setcs = "\n* [-clone view-tag] [-expand] [-sync|-needed]";
   $mkview = "\n* [-clone view-tag [-equiv lbtype,timestamp]]";
@@ -372,17 +376,19 @@ sub _Mkbco {
   }
   return $rc;
 }
-sub _Ensuretypes($@) {
-  my ($glb, @vob) = @_;
+sub _Ensuretypes {
+  my @typ = ($eqhl, $prhl); # Default value
+  @typ = @{shift @_} if ref $_[0] eq 'ARRAY';
+  my @vob = @_;
   my %cmt = ($eqhl => q(Equivalent increment),
-	     $prhl => q(Previous increment in a type chain));
+	     $prhl => q(Previous increment in a type chain),
+	     $fchl => q(Full Copy of increment));
   my $silent = $ct->clone({stdout=>0, stderr=>0});
   my $die = $ct->clone({autofail=>1});
-  my $gflg = $glb? '-glo' : '-ord';
-  for my $t ($eqhl, $prhl) {
+  for my $t (@typ) {
     for my $v (@vob) {
       my $t2 = "$t\@$v";
-      $die->mkhltype([qw(-shared -c), $cmt{$t}, $gflg], $t2)->system
+      $die->mkhltype([qw(-shared -c), $cmt{$t}], $t2)->system
 	if $silent->des(['-s'], "hltype:$t2")->system;
     }
   }
@@ -676,7 +682,6 @@ sub _EqLbTypeList {
   } while ($_);
   return @list;
 }
-
 sub _FltType {
   use strict;
   use warnings;
@@ -746,6 +751,28 @@ sub _Recpath {
   return if length($dad) < $stop;
   $anc->{$dad}++;
   _Recpath($anc, 1, $dad, $stop);
+}
+sub _RecLock {
+  my $obj = shift;
+  my (@lock) = $ct->lslock([qw(-fmt %d\n%u\n%Nc)], $obj)->qx;
+  my @args = ();
+  if (@lock) {
+    my $date = shift @lock;
+    my $user = shift @lock;
+    my @cmt;
+    for (@lock) {
+      if (m%^Locked except for users:\s+(.*)%) {
+	push @args, '-nusers', grep{s/ /,/g} $1;
+      } elsif (/^Locked for all users( \(obsolete\))?\.$/) {
+	push @args, '-obs' if $1;
+      } else {
+	push @cmt, $_;
+      }
+    }
+    unshift @cmt, "Relocked to mkhlink. Locked on $date by $user";
+    push @args, '-c', join('\n',@cmt), $obj;
+  }
+  return @args;
 }
 
 =head1 NAME
@@ -993,7 +1020,7 @@ sub diff {
   my $pred = grep /^-(pred)/, @opts;
   my $auto = grep /^-(?:dir|rec|all|avo)/, @args;
   my @elems = AutoCheckedOut(0, @args);
-  return 0 unless $pred or $auto or (scalar @elems == 1);
+  return 0 unless $pred or $auto or (scalar @elems == 1); #fallback!
   $diff->opts(grep !/-pred/, @opts) if $pred;
   $diff->args(@elems);
   $ct = $diff->clone();
@@ -1175,6 +1202,20 @@ Make or increment lbtypes in all vobs used by a config record.
 When using a config record, exclude comma separated vobs for label
 type creation.
 
+=item B<-full/copy>
+
+Create a new type, while is applied to all versions which bore labels
+of a floating type, at the time of a given increment.
+
+The type is created and applied only in one vob, even if the original
+type was global.
+
+This option is only compatible, among the extensions, with the
+B<-family> flag (optional).
+
+It is also incompatible with B<-replace> (the implementation was not
+considered worth the while).
+
 =back
 
 =cut
@@ -1182,6 +1223,7 @@ type creation.
 sub _GenMkTypeSub {
   use strict;
   use warnings;
+  use Cwd;
   my ($type, $Name, $name) = @_;
   return sub {
     my ($ntype, @cmt) = @_;
@@ -1190,9 +1232,29 @@ sub _GenMkTypeSub {
     my @args = $ntype->args;
     my %opt = %{$ntype->{fopts}};
     my $silent = $ct->clone({stdout=>0});
-    my (%vob, $unkvob);
+    my (%vob, $unkvob, %fcpy);
     /\@(.*)$/? $vob{$1}++ : $vob{'.'}++ for @args;
     my @vob = keys %vob;
+    if (my $inc = $opt{fullcopy}) { #if fail, fail early
+      $inc =~ s/^lbtype://;
+      my $lbinc = "lbtype:$inc";
+      die Msg('E', "'$inc' must be an incremental fixed label type")
+	unless grep /^<-/, $ct->des([qw(-s -ahl), "$eqhl,$prhl"], $lbinc)->qx;
+      die Msg('E', 'Only one lbtype for full copy') if @args > 1;
+      my ($base, $nr, $vob) = $inc =~ /^(.*)_(.*?)(?:@(.*))?$/;
+      if ($vob) {
+	die Msg('E', "Conflicting vob specifications: '$vob[0]' and '$vob'")
+	  if $vob[0] ne '.' and $vob[0] ne $vob;
+	$fcpy{vob} = $vob;
+	$vob[0] = $vob;
+	$args[0] .= "\@$vob" unless $args[0] =~ /@/;
+      } else {
+	$fcpy{vob} = $vob[0] if $vob[0] ne '.';
+      }
+      $fcpy{base} = $base;
+      $fcpy{nr} = $nr;
+      $fcpy{lbinc} = $lbinc;
+    }
     if ($opt{config}) {
       die Msg('E', 'Only one lbtype per config record') if @args > 1;
       die Msg('E', 'Incompatible flags: "-config" and "-archive"')
@@ -1239,7 +1301,8 @@ sub _GenMkTypeSub {
 	warn Msg('W', "making global type(s) @args");
       }
     }
-    if (%opt) {
+    my $rc = 0;
+    if (%opt and grep !/^fullcopy$/, keys %opt) {
       map { s/^$type://; $_ } @args;
       if ($opt{increment}) { # lbtypes only
 	my @t = @args;
@@ -1277,7 +1340,7 @@ sub _GenMkTypeSub {
 	  @vob = (); #The types were already created
 	}
       }
-      _Ensuretypes((grep /^-glo/, $ntype->opts), @vob);
+      _Ensuretypes(@vob);
       if ($rep) {
 	@args = grep { $_ = $ct->des([qw(-fmt %Xn)], "$type:$_")->qx } @args;
 	exit 1 unless @args;
@@ -1304,7 +1367,7 @@ sub _GenMkTypeSub {
 	  _Findfreeinc(\%pair);
 	  $ntype->args(values %pair);
 	  $ntype->opts(@cmt, $ntype->opts);
-	  $ntype->system;
+	  $rc = $ntype->system;
 	  map {
 	    if (defined($pair{$_})) {
 	      my $inc = "$type:$pair{$_}";
@@ -1317,7 +1380,6 @@ sub _GenMkTypeSub {
 	    }
 	  } keys %pair;
 	} elsif ($opt{archive}) {
-	  my $rc = 0;
 	  $ntype->opts('-nc', $ntype->opts);
 	  foreach my $t (@args) {
 	    my ($pfx, $vob) = $t =~ /^$type:(.*?)(@.*)$/;
@@ -1371,7 +1433,6 @@ sub _GenMkTypeSub {
 	      $ct->lock(@arg)->stderr(0)->system;
 	    }
 	  }
-	  exit $rc;
 	} else {		# increment
 	  die Msg('E', "Incompatible flags: replace and incremental");
 	}
@@ -1380,7 +1441,7 @@ sub _GenMkTypeSub {
 	if ($opt{family}) {
 	  map { $_ = "$type:$_" } @a;
 	  die Msg('E', "Some types already exist among @args")
-	    unless $silent->argv(qw(des -s), @a)->stderr(0)->system;
+	    unless $silent->des(['-s'], @a)->stderr(0)->system;
 	  my @opts = $ntype->opts();
 	  my (%pair, @skip, %glo) = ();
 	  if ($opt{config}) {
@@ -1392,7 +1453,7 @@ sub _GenMkTypeSub {
 	      my ($pfx, $sfx) = ($1, $2?$2:'');
 	      if ($type eq 'lbtype') {
 		my $t0 = "lbtype:${pfx}_0$sfx";
-		if ($ct->argv(qw(des -s), $t0)->stderr(0)->qx) {
+		if ($ct->des(['-s'], $t0)->stderr(0)->qx) {
 		  my $g0 =
 		    $ct->des([qw(-fmt %[type_scope]p)], $t0)->qx eq 'global';
 		  # test before unlocking, and record the vobs where linked
@@ -1403,7 +1464,7 @@ sub _GenMkTypeSub {
 		  }
 		  $ct->argv('unlock', $t0)->system;
 		  my $lbt = "lbtype:$t";
-		  $ct->argv('rename', $t0, $lbt)->stderr(0)->system
+		  $ct->rename($t0, $lbt)->stderr(0)->system
 		    and die Msg('E', qq(Failed to restore "$t0" into "$t".));
 		  if ($opt{config}) {
 		    my %already;
@@ -1578,26 +1639,27 @@ sub _GenMkTypeSub {
 	  }
 	}
       }
-      exit 0;
     } else {			# no inc/arc/fam option
+      if ($fcpy{vob}) {
+	$args[0] .= "\@$fcpy{vob}" if $args[0] !~ /@/; #one single arg
+      }
       if ($rep) {
 	$ntype->opts(@cmt, '-replace', $ntype->opts);
 	map { $_ = "$type:$_" unless /^$type:/ } @args;
-	my @a = $ct->argv(qw(des -fmt %Xn), @args)->stderr(0)->qx;
+	my @a = $ct->des([qw(-fmt %Xn)], @args)->stderr(0)->qx;
 	if (@a) {
 	  my @link;
 	  if ($ntype->flag('global')) { # replace also the equivalent types
 	    my @eq = grep s/^-> (.*)$/$1/,
-	      $ct->argv(qw(des -s -ahl), $eqhl, @a)->qx;
+	      $ct->des([qw(-s -ahl)], $eqhl, @a)->qx;
 	    push @args, @eq;
 	    $ntype->args(@args);
 	  } else { # remove the hyperlinks, i.e. make the types 'non-family'
 	    @link = grep s/^\s*(.*) -> .*$/$1/,
-	      $ct->argv(qw(des -l -ahl), "$eqhl,$prhl", @a)->qx;
+	      $ct->des([qw(-l -ahl)], "$eqhl,$prhl", @a)->qx;
 	  }
-	  my $ret = $ntype->system; # may fail because of restrictions: first
-	  $ret = $ct->argv('rmhlink', @link)->system if @link and !$ret;
-	  return $ret;
+	  $rc = $ntype->system; # may fail because of restrictions: first
+	  $rc = $ct->rmhlink(@link)->system if @link and !$rc;
 	} else {
 	  foreach (@args) {
 	    s/^$type://;
@@ -1608,9 +1670,35 @@ sub _GenMkTypeSub {
       } else {
 	$ntype->args(@args);
 	$ntype->opts(@cmt, $ntype->opts);
-	return $ntype->system;
+	$rc = $ntype->system;
       }
+      return $rc if $rc; #only in error, so no fallback
     }
+    if (%fcpy) {	#full copy: type already created; now apply it
+      my @eqlst = _EqLbTypeList($fcpy{lbinc});
+      my $lbt = $args[0];
+      $lbt =~ s/@.*$//;
+      my $qry = '&&!attr_sub(Rm' . "$fcpy{base},<=,$fcpy{nr})";
+      my @lbargs = ($lbt);
+      push @lbargs, '-replace' if $rep;
+      my $vob = ($fcpy{vob} or $ct->des(['-s'], 'vob:.')->qx);
+      my @findopts;
+      push @findopts, $vob if $fcpy{vob};
+      push @findopts, qw(-a -ele), '!lbtype_sub(' . $lbt . ')', '-ver';
+      my $lbtv = "lbtype:$lbt";
+      $lbtv .= "\@$vob" if $fcpy{vob};
+      for my $inc (@eqlst) {
+	my @ver = $ct->find(@findopts, "lbtype($inc)$qry", '-print')->qx;
+	next unless @ver;
+	$rc |= _wrap('mklabel', @lbargs, @ver);
+      }
+      _Ensuretypes([$fchl], $vob);
+      my @lckargs = _RecLock $fcpy{lbinc};
+      _wrap('unlock', $fcpy{lbinc}) if @lckargs;
+      $rc |= $ct->mkhlink([$fchl], $fcpy{lbinc}, $lbtv)->system;
+      _wrap('lock', @lckargs) if @lckargs;
+    }
+    exit $rc;
   };
 }
 sub _GenExTypeSub {
@@ -1628,11 +1716,18 @@ sub mklbtype {
   use strict;
   use warnings;
   my (%opt, $rep);
-  GetOptions(\%opt, qw(family increment archive config=s c99=s exclude=s));
+  GetOptions(\%opt,
+	     qw(family increment archive config=s c99=s exclude=s fullcopy=s));
   GetOptions('replace' => \$rep);
   die Msg('E', 'Incompatible options: family increment archive')
-    if (keys %opt > 1 and !$opt{config}) or (keys %opt > 2 and !$opt{exclude})
+    if (keys %opt > 1 and !($opt{config} or $opt{fullcopy}))
+      or (keys %opt > 2 and !$opt{exclude})
       or keys %opt > 3;
+  die Msg('E', 'Incompatible options: fullcopy and '
+	    . join', ', grep !/^(?:fullcopy|family)$/, keys %opt)
+    if $opt{fullcopy} and keys %opt > 1 and !$opt{family};
+  die Msg('E', 'Incompatible options: fullcopy and replace')
+    if $opt{fullcopy} and $rep;
   my $ntype = ClearCase::Argv->new(@ARGV);
   $ntype->parse(qw(global|ordinary vpelement|vpbranch|vpversion
 		   pbranch|shared gt|ge|lt|le|enum|default|vtype=s
@@ -1987,7 +2082,7 @@ sub mklabel {
     }
     push @ARGV, '-config', $opt{config}, reverse @tail;
   }
-  return 0 unless $opt{up} or $opt{over} or @et;
+  return 0 unless $opt{up} or $opt{over} or @et; # fallback!
   $fail->argv(qw(des -s), @elems)->stdout(0)->system if @elems; #-over & -con ok
   my %con = (cr => rel2abs($opt{config})) if $opt{config}; # scope globals
   if (%con) {
@@ -2460,7 +2555,7 @@ sub rmtype {
   my ($fl, $loaded) = $ENV{FORCELOCK};
  LBT:for my $t (@lbt) {
     my ($eq) = grep s/^-> (lbtype:.*)/$1/,
-      $ct->des([qw(-s -ahl), $eqhl], $t)->qx;
+      $ct->des([qw(-s -ahl), $eqhl], $t)->stderr(0)->qx;
     if ($eq) {
       my ($base, $vob) = ($1, $2?$2:'') if $t =~ /^lbtype:(.*?)(\@.*)?$/;
       if ($opt{family} or $eq =~ /_1.00(\@.*)?$/) {
@@ -2561,7 +2656,7 @@ sub _CpType {
     $cpt->args($src, $dst);
   }
   my $ret = $cpt->system;
-  return $ret if $ret or !($glb or $eqt);
+  return $ret if $ret or !($glb or $eqt); # no fallback!
   if ($eqt) {
     my ($deq) = ($eqt =~ /^(.*?)\@/);
     my ($dvb) = ($dst =~ /^.*?(\@.*)$/);
@@ -2579,7 +2674,7 @@ sub _CpType {
     $dst = "$1$dst" if $src =~ /^(.*?:)/;
   }
   $ret += $ct->mkhlink(['GlobalDefinition'], $dst, $src)->system if $glb;
-  return $ret unless $src =~ /^lbtype:/;
+  return $ret unless $src =~ /^lbtype:/; #no fallback!
   my $rmat = $src;
   $rmat =~ s/lbtype:/attype:Rm/;
   if (!$ct->des(['-s'], $rmat)->stdout(0)->stderr(0)->system) {
@@ -2730,7 +2825,7 @@ sub setcs {
   close $fh;
   my $rc = $setcs->args($cs)->system;
   unlink $cs;
-  exit $rc;
+  exit $rc; # avoid fallback!
 }
 
 =item * DESCRIBE
@@ -2795,7 +2890,7 @@ sub describe {
       }
       push(@nargs, @p) if @p;
     }
-    scalar @nargs? $desc->args(@nargs) : exit 0;
+    scalar @nargs? $desc->args(@nargs) : exit 0; # avoid fallback!
   } else {
     my $nr;
     if (defined($desc->flagWRAPPER('family')) or grep /^-fam/, @args) {
@@ -2817,11 +2912,11 @@ sub describe {
 	  $rc = 1;
 	}
       }
-      @nargs? $desc->args(@nargs) : exit $rc;
+      @nargs? $desc->args(@nargs) : exit $rc; # avoid fallback!
     }
   }
   $rc |= $desc->system('CC');
-  exit $rc;
+  exit $rc; # avoid fallback!
 }
 
 =item * MKVIEW
@@ -2848,7 +2943,7 @@ sub mkview {
 		   stgloc=s host=s hpath=s gpath=s
 		   colocated_server vws=s));
   $mkv->parseWRAPPER(qw(clone=s equiv=s quiet));
-  return 0 unless $mkv->flagWRAPPER('clone');
+  return 0 unless $mkv->flagWRAPPER('clone'); # fallback!
   my $tag = $mkv->flagCC('tag');
   if (!$tag) {
     warn Msg('E', 'View tag must be specified.');
@@ -3131,7 +3226,7 @@ sub rollout {
     $ct->cd($v)->system;
     $rc += _wrap(qw(mklabel -over), $la, $bl, $v);
   }
-  exit $rc if $rc;
+  exit $rc if $rc; #nothing to fallback to, so avoid
   $ct->cd($cwd)->system;
   if ($bt) {
     $rc = _wrap(qw(mkbrtype -nc -arc), $arg);
@@ -3300,9 +3395,7 @@ sub rollback {
   _wrap('rmlabel', @cmt, $flt1, @rm) if @rm;
   _wrap('lock', $flt);
   $ct->cd($cwd)->system if $chdir;
-  if (!(MSWIN or CYGWIN)) {
-    $ct->setview($tag)->system;
-  }
+  $ct->setview($tag)->system unless MSWIN or CYGWIN;
   $rmv->();
   exit 0; #FIXME: return code
 }
@@ -3352,7 +3445,7 @@ sub archive {
       }
       my $rc = _wrap('mklbtype', @opt, @lbt) if @lbt;
       $rc   += _wrap('mkbrtype', @opt, @brt) if @brt;
-      exit $rc;
+      exit $rc; #avoid fallback!
     }
   } else {
     warn Msg('E', 'Type name required.');
