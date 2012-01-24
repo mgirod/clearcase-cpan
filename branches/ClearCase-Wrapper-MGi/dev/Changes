@@ -200,3 +200,4 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- mklabel -up: fix for version extended names
 	- mklabel -fullcopy
 	- _Ensuretypes: back to local in every case.
+	- lstype fix: do not abort for sync errors unless in presence of admin vob
