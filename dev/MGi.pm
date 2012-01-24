@@ -3457,6 +3457,92 @@ sub archive {
 
 =back
 
+=item * LSTYPE
+
+This function is provided to work around a bug in ClearCase which IBM
+does not admit as a bug.
+
+I<lstype> will issue errors (not warnings) in two scenarios related to
+I<GlobalDefinition> hyperlinks. In one case, it will abort,
+i.e. return an incomplete list of types.
+
+The wrapper function will convert the errors into warnings in case no
+admin vob is concerned, i.e. when the issue detected has in fact a
+lighter impact than the effect of aborting I<lstype>.
+
+The condition under which I<lstype> would abort on error related to
+MultiSite synchronization, and cannot be avoided. The resulting
+behaviour will thus appear to happen randomly, and for transient
+periods of time.
+
+The behaviour of I<lstype> is thus both inconsistent and unpredictable.
+
+The fix offers an informative warning instead of an error.
+It is restricted to I<lbtype>s, and skipped in presence of admin vobs.
+
+=cut
+
+sub lstype {
+  use strict;
+  use warnings;
+  my $lst = ClearCase::Argv->new(@ARGV);
+  $lst->parse(qw(local long|short|nostatus fmt=s obsolete kind=s invob=s
+		 unsorted));
+  return 0 if $lst->flag('local') or $lst->flag('long') and $lst->flag('fmt')
+    or !$lst->flag('kind') or $lst->flag('kind') ne 'lbtype';
+  $ct = new ClearCase::Argv({autochomp=>1});
+  my $v = $lst->flag('invob') || '.';
+  return 0 if $ct->des([qw(-s -ahl AdminVOB)], "vob:$v")->qx;
+  my (@lopts, @dopts) = ();
+  push @lopts, qw(-local -kind lbtype -nostatus),
+    grep{defined} ($lst->flag('obsolete') and '-obs'),
+      ($lst->flag('invob') and ('-invob', $lst->flag('invob'))),
+	($lst->flag('unsorted') and '-uns');
+  my $sil = $ct->clone({stderr=>0});
+  my $err = $ct->clone({stdout=>0, stderr=>1});
+  $lst->opts(@lopts);
+  push @dopts, grep{defined} grep(/^-(long|short)/, $lst->opts),
+    ($lst->flag('fmt') and ('-fmt', $lst->flag('fmt')));
+  my $ext = $lst->flag('invob')? '@' . $lst->flag('invob') : '';
+  my $cb = sub {
+    my $t = shift; $t =~ y/\r//d; chomp $t;
+    my $lbt = "lbtype:${t}$ext";
+    if (my $e = $err->des(['-s'], $lbt)->qx) {
+      if (my @l = grep{s/^\s+(G.*?)\s.*$/hlink:$1/}
+	    $ct->des([qw(-l -local -ahl GlobalDefinition)], $lbt)->qx) {
+	my %oid;
+	for ($ct->dump($l[0])->qx) {
+	  $oid{$1} = $2 if /^\s+to (\w+)=(.*)$/;
+	}
+	if ($oid{vob} and $oid{obj}) {
+	  my $vob = $sil->lsvob([qw(-s -fam), $oid{vob}])->qx;
+	  if ($vob) {
+	    my $obj = $sil->des(['-s'], "oid:$oid{obj}\@$vob")->qx;
+	    if (!$obj) {
+	      warn Msg('W', "Could not find the global definition of "
+			 . "'$t' in '$vob'. Synchronization issue?");
+	    return 1;
+	    }
+	  } else {
+	    warn Msg('W', "Could not find the vob containing the "
+		       . "global definition for '$t': $oid{vob}");
+	    return 1;
+	  }
+	}
+      }
+      print STDERR "$e\n";
+    } else {
+      $ct->des([@dopts], $lbt)->system;
+    }
+    return 1;			#continue
+  };
+  $lst->pipecb($cb);
+  $lst->pipe; # no fallback!
+  exit 0;
+}
+
+=back
+
 =head1 COPYRIGHT AND LICENSE
 
 Copyright (c) 2007 IONA Technologies PLC (until v0.05),
