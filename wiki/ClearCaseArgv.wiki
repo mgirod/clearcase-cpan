@@ -4,7 +4,7 @@
 
 This is a module by David Boyce,
 published and documented in [http://search.cpan.org/perldoc?ClearCase::Argv CPAN],
-currently there as [http://search.cpan.org/~dsb/ClearCase-Argv-1.50/Argv.pm 1.50].
+currently there as [http://search.cpan.org/~dsb/ClearCase-Argv-1.51/Argv.pm 1.51].
 
 This site aims only at coordinating contributed work on this module,
 with a bias toward using it within and as a basis for some other modules
