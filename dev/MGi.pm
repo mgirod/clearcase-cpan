@@ -3480,6 +3480,9 @@ The behaviour of I<lstype> is thus both inconsistent and unpredictable.
 The fix offers an informative warning instead of an error.
 It is restricted to I<lbtype>s, and skipped in presence of admin vobs.
 
+Note: the result is significantly (~5x) slower, when the standard
+command works.
+
 =cut
 
 sub lstype {
@@ -3500,9 +3503,10 @@ sub lstype {
 	($lst->flag('unsorted') and '-uns');
   my $sil = $ct->clone({stderr=>0});
   my $err = $ct->clone({stdout=>0, stderr=>1});
+  my $lock = !grep /-nst/, $lst->opts;
+  my $fmt = $lst->flag('fmt');
+  push @dopts, grep{defined} grep(/^-[sl]/, $lst->opts), $fmt && ('-fmt', $fmt);
   $lst->opts(@lopts);
-  push @dopts, grep{defined} grep(/^-(long|short)/, $lst->opts),
-    ($lst->flag('fmt') and ('-fmt', $lst->flag('fmt')));
   my $ext = $lst->flag('invob')? '@' . $lst->flag('invob') : '';
   my $cb = sub {
     my $t = shift; $t =~ y/\r//d; chomp $t;
@@ -3532,7 +3536,9 @@ sub lstype {
       }
       print STDERR "$e\n";
     } else {
-      $ct->des([@dopts], $lbt)->system;
+      my @opts = ($lock and $ct->lslock(['-s'], $lbt)->qx)?
+	('-fmt', '%n (%[locked]p)\n') : @dopts;
+      $ct->des([@opts], $lbt)->system;
     }
     return 1;			#continue
   };
