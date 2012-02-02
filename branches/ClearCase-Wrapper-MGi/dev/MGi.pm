@@ -3158,7 +3158,7 @@ sub rollout {
     unless $opt{to};
   my $bl = $opt{to}; $bl =~ s/^lbtype://;
   my $lbl = "lbtype:$bl";
-  my @cmt = $opt{comment}? (-c, $opt{comment}) : '-nc';
+  my @cmt = $opt{comment}? ('-c', $opt{comment}) : '-nc';
   $ct = ClearCase::Argv->new({autochomp=>1});
   my $sil = $ct->clone({stdout=>0, stderr=>0});
   my $fail = $ct->clone({autochomp=>1, autofail=>1});
