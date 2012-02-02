@@ -194,10 +194,11 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- lock/unlock: global types must be handled via their source vob
 	- fixed diff: one case of no predecessor
 
-0.30 Sun Jan 15 19:41:27 GMTST 2012
+0.30 Thu Feb  2 17:55:09 GMTST 2012
         - reverted the cmwiki links in the doc to cmcrossroads.../cgi-bin/...
 	- cptype: fix for remote copy of a global type
 	- mklabel -up: fix for version extended names
 	- mklabel -fullcopy
 	- _Ensuretypes: back to local in every case.
 	- lstype fix: do not abort for sync errors unless in presence of admin vob
+	- rollout: fix to comment handling (bug report by Andy Walshe)
