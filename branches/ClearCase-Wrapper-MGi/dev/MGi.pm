@@ -3492,7 +3492,8 @@ sub lstype {
   $lst->parse(qw(local long|short|nostatus fmt=s obsolete kind=s invob=s
 		 unsorted));
   return 0 if $lst->flag('local') or $lst->flag('long') and $lst->flag('fmt')
-    or !$lst->flag('kind') or $lst->flag('kind') ne 'lbtype';
+    or !$lst->flag('kind') or $lst->flag('kind') ne 'lbtype'
+      or (grep/^-[ls]|nos/, $lst->opts) > 1;
   $ct = new ClearCase::Argv({autochomp=>1});
   my $v = $lst->flag('invob') || '.';
   return 0 if $ct->des([qw(-s -ahl AdminVOB)], "vob:$v")->qx;
@@ -3503,9 +3504,10 @@ sub lstype {
 	($lst->flag('unsorted') and '-uns');
   my $sil = $ct->clone({stderr=>0});
   my $err = $ct->clone({stdout=>0, stderr=>1});
-  my $lock = !grep /-nst/, $lst->opts;
+  my $lock = !grep /-nos/, $lst->opts;
   my $fmt = $lst->flag('fmt');
   push @dopts, grep{defined} grep(/^-[sl]/, $lst->opts), $fmt && ('-fmt', $fmt);
+  push @dopts, '-s' unless $lock; #i.e. if -nostatus
   $lst->opts(@lopts);
   my $ext = $lst->flag('invob')? '@' . $lst->flag('invob') : '';
   my $cb = sub {
