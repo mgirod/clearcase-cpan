@@ -1,6 +1,6 @@
 package ClearCase::Wrapper::MGi;
 
-$VERSION = '0.30';
+$VERSION = '0.31';
 
 use warnings;
 use strict;
@@ -296,6 +296,7 @@ sub _DepthGen {
   return %gen;
 }
 sub _Mkbco {
+  use File::Copy;
   my ($cmd, @cmt) = @_;
   my $rc = 0;
   my %pbrt = ();
@@ -352,14 +353,24 @@ sub _Mkbco {
 	qr([\\/]${main}[\\/]$bt[\\/]\d+$) : qr([\\/]$bt[\\/]\d+$);
       if ($ver =~ m%$re%) {
 	push @opts, @cmt, $e;
-	$rc |= $ct->argv('co', @opts)->system;
+	$rc |= $ct->co(@opts)->system;
       } else {
 	my @mkbcopt = @cmt? @cmt : qw(-nc);
+	my $out = $cmd->flag('out');
+	my $nda = $cmd->flag('ndata');
+	copy($e, $out) or die Msg('E', "Failed to create $out: $!") if $out;
+	push @mkbcopt, '-nco' if $out or $nda;
 	if ($ct->mkbranch([@mkbcopt, '-ver', "/$main/0", $bt], $e)->system) {
 	  $rc = 1;
 	} else {
+	  if ($out or $nda) {
+	    my $e0 = "$e\@\@/$main/$bt/0";
+	    $rc = $ct->co(['-nda', @cmt? @cmt : '-nc'], $e0)->system;
+	  }
 	  if ($ver !~ m%\@\@[\\/]${main}[\\/]0$%) {
-	    my $lrc = $ct->merge(['-to', $e], $ver)->stdout(0)->system;
+	    my @o = ('-to', $e);
+	    push @o, '-nda' if $out or $nda;
+	    my $lrc = $ct->merge([@o], $ver)->stdout(0)->system;
 	    unlink glob("$e.contrib*");
 	    $rc |= $lrc;
 	  }
@@ -370,8 +381,7 @@ sub _Mkbco {
       push @args, @opts, @cmt;
       push @args, $bt if $bt;
       push @args, $e; # Ensure non empty array
-      $rc |= $bt? $ct->argv('mkbranch', @args)->system
-	: $ct->argv('co', @args)->system;
+      $rc |= $bt? $ct->mkbranch(@args)->system : $ct->co(@args)->system;
     }
   }
   return $rc;

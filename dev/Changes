@@ -202,3 +202,6 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- _Ensuretypes: back to local in every case.
 	- lstype fix: do not abort for sync errors unless in presence of admin vob
 	- rollout: fix to comment handling (bug report by Andy Walshe)
+
+0.31 Tue Feb  7 15:28:15 GMTST 2012
+        - co: implemented the -out and -nda functionalities
