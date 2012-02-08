@@ -205,3 +205,5 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 
 0.31 Tue Feb  7 15:28:15 GMTST 2012
         - co: implemented the -out and -nda functionalities
+	- rb: fixed the help string (-to changeset)
+	- mklabel: disambiguated -c(comment) from -con(fig)

@@ -61,7 +61,7 @@ use AutoLoader 'AUTOLOAD';
   $mkview = "\n* [-clone view-tag [-equiv lbtype,timestamp]]";
   $describe = "\n* [-par/ents <n>] [-fam/ily <n>]";
   $rollout = "$z [-force] [-c comment] -to baseline brype|lbtype";
-  $rollback = "$z [-force] [-c comment] changeset";
+  $rollback = "$z [-force] [-c comment] -to increment";
   $archive = "$z [-c comment|-nc] brtype|lbtype ...";
 }
 
@@ -2041,11 +2041,11 @@ sub mklabel {
   use File::Spec::Functions qw(rel2abs);
   File::Spec->VERSION(0.82);
   my %opt;
-  GetOptions(\%opt, qw(up force over=s all config=s));
+  GetOptions(\%opt, qw(up force over=s all config=s c99=s));
   ClearCase::Argv->ipc(1);
   my $mkl = ClearCase::Argv->new(@ARGV);
   $mkl->parse(qw(replace|recurse|follow|ci|cq|nc
-		 version=s c|cfile|select|type|name));
+		 version=s c|cfile|select|type|name=s));
   my @opt = $mkl->opts();
   die Msg('E', 'all is only supported in conjunction with over')
     if $opt{all} and !$opt{over};
