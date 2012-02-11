@@ -33,3 +33,6 @@ Logging now various concerns and ideas, in prevision of future critique, so as t
       * branch off/checkout
       * subtractive merge
       * alter the merge arrows to skip the removed version from the contributing path
+= Bugs/Glitches =
+   * rolling out requires mastership of the type one rolls out (from).
+   * one can roll out only once, since the type gets archived.
