@@ -36,3 +36,4 @@ Logging now various concerns and ideas, in prevision of future critique, so as t
 = Bugs/Glitches =
    * rolling out requires mastership of the type one rolls out (from).
    * one can roll out only once, since the type gets archived.
+   * the current rollback functionality only applies to the topmost increment(s).
