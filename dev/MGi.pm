@@ -1,6 +1,6 @@
 package ClearCase::Wrapper::MGi;
 
-$VERSION = '0.31';
+$VERSION = '0.32';
 
 use warnings;
 use strict;
@@ -76,6 +76,7 @@ use AutoLoader 'AUTOLOAD';
 *unco           = *uncheckout;
 *ro             = *rollout;
 *rb             = *rollback;
+*ar             = *archive;
 
 1;
 
@@ -730,7 +731,7 @@ sub _Recpath {
 	my $p = dirname($n);
 	while ($path =~ /^\./) {
 	  $path =~ s%^\./(.*)$%$1%;
-	  $p = dirname($p) if $path =~ s%^\.\./(.*)$%$1%;
+	  $p = dirname($p) while $path =~ s%^\.\./(.*)$%$1%;
 	  if ($path eq '.') {
 	    $path = ''; last
 	  }
