@@ -207,3 +207,9 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
         - co: implemented the -out and -nda functionalities
 	- rb: fixed the help string (-to changeset)
 	- mklabel: disambiguated -c(comment) from -con(fig)
+
+0.32 Fri Mar 23 17:50:23 GMT 2012
+        - ar: as alias to archive
+	- extra/fixsrccnt: fix the previous version in the source container,
+          after branching off the root of the version tree.
+	- mklabel -up -follow: fixed a bug for symlink to ../../xxx
