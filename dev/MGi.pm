@@ -298,6 +298,7 @@ sub _DepthGen {
 }
 sub _Mkbco {
   use File::Copy;
+  use ClearCase::FixSrcCont qw(runfix); #optional fix of source container
   my ($cmd, @cmt) = @_;
   my $rc = 0;
   my %pbrt = ();
@@ -373,6 +374,7 @@ sub _Mkbco {
 	    push @o, '-nda' if $out or $nda;
 	    my $lrc = $ct->merge([@o], $ver)->stdout(0)->system;
 	    unlink glob("$e.contrib*");
+	    runfix($ver) if $ENV{FSCBROKER};
 	    $rc |= $lrc;
 	  }
 	}
