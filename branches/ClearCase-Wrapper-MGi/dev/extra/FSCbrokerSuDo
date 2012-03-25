@@ -1,4 +1,3 @@
-#!/vobs/cello/cade_struct/bin/perl -w
 #!/usr/bin/perl -w
 
 use strict;
@@ -7,9 +6,7 @@ use Sudo;
 # This is meant to be suid enabled
 # This is the version using sudo. There is an alternative version using ssh.
 
-# my $fsc = '/vobs/atcctest/ClearCase-Wrapper-MGi/extra/echo';
-my $fsc = '/vobs/atcctest/ClearCase-Wrapper-MGi/extra/fixsrccnt'; #Ericsson!
-# my $fsc ='/usr/bin/fixsrccont';
+my $fsc ='/usr/local/bin/fixsrccont';
 
 my $rc = 0;
 my %batch;
