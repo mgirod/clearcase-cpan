@@ -240,7 +240,10 @@ bar> cat /cc/views07/emagiro/bar.vbs/s/sdft/13/32/0-b17e438b31a011e1961f00156004
 This result was suprising, as differing in philosophy with the previous one. Note that this behaviour is *not* the same with cascading branches: then, the removal of _interesting versions_ must be explicitly enabled, in this case with the _-xbr_ flag, and the sub-branch gets *really* removed.
 In any case, the important is once again that consistency of data is preserved, this time by _commenting away_ the critical version instead of really removing it. This possibility is documented (_tag delete_) in the excellent whitepaper on [http://www-01.ibm.com/support/docview.wss?uid=swg27009697&aid=1 type managers] (by Laurent Maréchal).
 === merge ===
-I decided, maybe a bit fast, that merging would only concern cleartext containers. I ought to test the actual effect.
+I decided, maybe a bit fast, that merging would only concern cleartext containers. I now successfully tested the actual effect.
+=== synchronization ===
+Export and import work fine.
+Of course, the new source container layout is not replicated...
 =Other element types than text file=
 The {{{xml}}} element type is in the {{{binary_delta_file}}} hierarchy.
 For elements of this type, the source container is shared _per branch_, in the case of branches spawn from {{{/main/0}}}, or maybe otherwise independent...
@@ -351,13 +354,16 @@ aa> ct dump a.xml@@/main/mg-006/2 | grep 'source cont=' | cut -d= -f2 | tr -d \"
 }}}
 So, the source container is *not* shared either in the cascading branch case! It is not our non-cascading scheme which introduces the duplication of data!
 =Implementation=
-There are unfortunately several issues with the implementation.
+I did one tentative implementation (coming as part of 0.32--will be in 0.32c).
+As far as I can tell, based on tests more than on real use yet, it works fine.
+
+There are several issues.
 
 The root cause of the problem is that editing the container must be done as _vob owner_, whereas the checkout/mkbranch command triggering it is a user operation.
 
 This means that I may use a similar technology as the one used for locking/unlocking label types.
 
-This will work fine for vobs served on UNIX, but is more troublesome for ones served on Windows. There are various schemes offered: using _sudo_ or _ssh_, and involving a _suid_ enabled script and a common account.
+This works fine for vobs served on UNIX, but is more troublesome for ones served on Windows. There are various schemes offered: using _sudo_ or _ssh_, and involving a _suid_ enabled script and a common account.
 Of those, only _ssh_ is potentially relevant (unless a _sudo_ Perl module is available with a port on Windows...) One needs to install an _ssh_ server on Windows (e.g. on cygwin), or to use a proxy.
 
 Then, one'll meet the maintenance issue of authorizing the users to passwordlessly run a specific command as vob owner. This is what the _suid_ enabled script allows to bypass, hence requiring a UNIX proxy.
@@ -370,6 +376,6 @@ One must consider spawing one process in the background, and using it for multip
 ==One anticipated issue==
 The ability to remove a version from the _genealogy_ of another one may be part of a scheme to _rollback_ a change, while preserving later fixes or enhancements.
 
-This event would be akin to a functionality termed in Git as _rebase_.
+This event would be akin to a functionality termed in Git as _rebase_ (oh well... maybe not quite).
 
 Obviously, this rollback functionality is simpler to implement if one doesn't have to alter the source container.
