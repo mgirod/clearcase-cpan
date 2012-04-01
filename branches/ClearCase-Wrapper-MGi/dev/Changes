@@ -208,8 +208,11 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- rb: fixed the help string (-to changeset)
 	- mklabel: disambiguated -c(comment) from -con(fig)
 
-0.32 Fri Mar 23 17:50:23 GMT 2012
+0.32 Sat Mar 31 11:53:04 IST 2012
         - ar: as alias to archive
 	- extra/fixsrccnt: fix the previous version in the source container,
           after branching off the root of the version tree.
 	- mklabel -up -follow: fixed a bug for symlink to ../../xxx
+	- added fix source container instructions to extra/Configuration.pod
+	- renamed FSCbroker to FSCbrokeSsh
+	- annotate: fixes, in conjunction with new options: -line and -grep
