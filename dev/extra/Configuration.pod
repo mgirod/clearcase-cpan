@@ -23,6 +23,94 @@ Four methods, to configure different aspects:
 The I<extra> directory contains files which can be used to configure
 the wrapper for specific needs, either on a site on a user basis.
 
+The features described here are not enabled by default.
+
+One functionality is highly experimental: fixing the layout of source
+containers for elements of text_file and derivate types, in
+conjunction with the I<BranchOff> mechanism.
+
+=head2 BranchOff
+
+The I<BranchOff> mechanism is one of the two driving forces of this
+wrapper (the other one being I<incremental type families>.
+
+The intention is to make it possible to always branch off a version
+not on a branch one created oneself, and this without ending up
+cascading 'forever', i.e. until meeting system limits.
+
+The setup is simple, and per view. Start your config spec with a
+meta-comment such as:
+
+  ##:BranchOff: root
+
+The effect will be to interpret C<mkbranch> directives (in the config
+spec) as injonctions to branch off the root of the version tree for
+every element (usually C</main/0>).
+
+The relation to the predecessor version is not lost: it is
+reestablished with a C<Merge> hyperlink.
+
+=head3 fixsrccnt, FixSrcCont.pm, FSCbrokerSuDo, FSCbrokerSsh
+
+These files implement the experimental feature: I<fix source containers>.
+
+The rationale is documented in:
+
+L<http://code.google.com/p/clearcase-cpan/wiki/TypeMgr>
+
+These files are not installed by C<make install>, and are largely
+provided as templates for you to configure according to yourown
+environment.
+
+=head4 fixsrccnt
+
+This should be installed in a path accessible from every client,
+possibly in a vob. The path to C<perl> is the only part I changed
+myself.
+
+=head4 FixSrcCont.pm
+
+This must be installed as C<ClearCase::FixSrcCont> in a path in C<$INC>.
+
+Note that installing the file (e.g. for one user) is not enough to
+enable its use (e.g. for others).
+
+Remember to set there the path to the previous script, unless the
+default is suitable (unlikely since host local):
+
+ my $fxsc = '/usr/local/bin/fixsrccnt';
+
+=head4 FSCbrokerSuDo and/or FSCbrokerSsh
+
+These two scripts implement alternatives to make it possible to run
+C<fixsrccnt> as vob owner, for every possible argument (hence
+potentially multiple vob owner accounts).
+
+The C<sudo> alternative is preferred on UNIX, but the C<ssh> one is
+needed from Windows or Cygwin (note: that the current implementation
+is restricted to UNIX vob servers!)
+
+Install in a path reachable from every client, and setuid to an
+account trusted by every vob server account in the appropriate way
+(i.e. using C<sudo>, this may be restricted to using C<fixsrccnt> but
+in a passwordless way).
+
+Adjust the paths to C<perl> and to C<fixsrccnt>.
+
+In addition, check the path to C<sudo> for C<FSCbrokerSuDo>,
+which uses the C<Sudo> CPAN package (which you have to install).
+
+For C<FSCbrokerSsh>, the C<$sshhost> must be set.
+The template also assumes an installation in a vob, hence uses a C<$view>.
+Otherwise, it uses the same C<Net::SSH::Perl> CPAN package as does
+C<ForceLock> (see below).
+
+To enable the functionality, you must select the variant of the script
+suitable for your system, and set the environment variable
+accordingly:
+
+ FSCBROKER=ClearCase::FSCbrokerSuDo
+
 =head2 VobPathConv.pm
 
 I<VobPathConv.pm> (and its pod file) does however not require any
@@ -150,8 +238,16 @@ types (including the metadata types) in vobs having an admin vob.
 
 This used to be the default with I<ClearCase::Wrapper::DSB>.
 
+Note that one might e.g. add there code such as:
+
+  umask(002);
+
+This ensures that under cleartool (from the wrapper), group members
+are granted write access e.g. to directory elements being created.
+
 =head2 environment variables
 
-Currently, only one such variable (see earlier):
+Two variables to consider (see earlier):
 
   FORCELOCK
+  FSCBROKER

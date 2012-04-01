@@ -63,6 +63,7 @@ use AutoLoader 'AUTOLOAD';
   $rollout = "$z [-force] [-c comment] -to baseline brype|lbtype";
   $rollback = "$z [-force] [-c comment] -to increment";
   $archive = "$z [-c comment|-nc] brtype|lbtype ...";
+  $annotate = "\n* [-line|-grep regexp]";
 }
 
 #############################################################################
@@ -77,6 +78,7 @@ use AutoLoader 'AUTOLOAD';
 *ro             = *rollout;
 *rb             = *rollback;
 *ar             = *archive;
+*ann            = *annotate;
 
 1;
 
@@ -298,7 +300,6 @@ sub _DepthGen {
 }
 sub _Mkbco {
   use File::Copy;
-  use ClearCase::FixSrcCont qw(runfix); #optional fix of source container
   my ($cmd, @cmt) = @_;
   my $rc = 0;
   my %pbrt = ();
@@ -374,7 +375,10 @@ sub _Mkbco {
 	    push @o, '-nda' if $out or $nda;
 	    my $lrc = $ct->merge([@o], $ver)->stdout(0)->system;
 	    unlink glob("$e.contrib*");
-	    runfix($ver) if $ENV{FSCBROKER};
+	    if ($ENV{FSCBROKER}) {
+	      require ClearCase::FixSrcCont; #optional fix of source container
+	      ClearCase::FixSrcCont::runfix($ver);
+	    }
 	    $rc |= $lrc;
 	  }
 	}
@@ -889,7 +893,7 @@ sub lsgenealogy {
 Supports the BranchOff feature, which you can set up via an attribute
 in the config spec.  The rationale and the design are documented in:
 
- http://www.cmcrossroads.com/cgi-bin/cmwiki/view/CM/BranchOffMain0
+L<http://www.cmcrossroads.com/cgi-bin/cmwiki/view/CM/BranchOffMain0>
 
 Instead of branching off the selected version, the strategy is to
 branch off the root of the version tree, copy-merging there from the
@@ -987,12 +991,10 @@ sub mkbranch {
   if ($bt =~ /\@/) {
     $v{''} = 1;
   } else {
-    for my $a (@args) {
-      $v{$ct->argv(qw(des -fmt), '@%n', "vob:$a")->stderr(0)->qx}++;
-    }
+    $v{$ct->des([qw(-fmt @%n)], "vob:$_")->stderr(0)->qx}++ for @args;
   }
   for (keys %v) {
-    die "\n" if $ct->argv(qw(des -s), "brtype:$bt$_")->stdout(0)->system;
+    die "\n" if $ct->des(['-s'], "brtype:$bt$_")->stdout(0)->system;
   }
   $mkbranch->args(@args);
   $mkbranch->{bt} = $bt;
@@ -2871,7 +2873,7 @@ sub describe {
   $desc->parseWRAPPER(qw(parents|par9999=i family=i));
   my $generations = abs($desc->flagWRAPPER('parents') || 0);
   my @args = $desc->args;
-  if (grep /^--?par/, @args) {
+  if (grep /^-par/, @args) {
     @args = grep !/^-par/, @args;
     $generations = 1;
   }
@@ -2907,7 +2909,7 @@ sub describe {
   } else {
     my $nr;
     if (defined($desc->flagWRAPPER('family')) or grep /^-fam/, @args) {
-      if (grep /^--?fam/, @args) {
+      if (grep /^-fam/, @args) {
 	@args = grep !/^-fam/, @args;
 	$nr = 0;
       } else {
@@ -3560,6 +3562,183 @@ sub lstype {
   $lst->pipecb($cb);
   $lst->pipe; # no fallback!
   exit 0;
+}
+
+=back
+
+=item * ANNOTATE
+
+This implementation serves two purposes:
+
+=over 2
+
+=item - fix some errors resulting from our breaking a tool assumption
+
+=item - provide a greppable standard output
+
+=back
+
+The default behaviour assumes that related changes all took place
+within the same I<line of descent> (i.e. physical branch hierarchy).
+
+This assumption is defeated in the case of the I<BranchOff> strategy,
+with which ancestors are typically merged from branches outside this
+line of descent.
+
+The C<-all> flag allows to examine changes beyond the line of descent,
+but results in spurious C<UNRELATED> annotations (C<Merge> arrows are
+ignored at large, although they clearly I<relate> changes...)
+
+In the context of the I<source container layout fixing>, the
+assumption results in spurious errors, when the version referenced is
+outside the line of descent, even if otherwise perfectly valid.
+
+The wrapper forces the injection of the C<-all> flag for files, and
+resorts to lshistory for directories.
+
+As C<Merge> arrows are ignored, the reference version for a new branch
+spawned off the root of the tree is systematically empty (unless
+fixing the layout of source containers).
+
+This is the reference towards which changes are reported. It results
+that the same lines are reported as added multiple times.
+
+Better fixing of the problems described above is only provided in the
+context of the additional options below.
+
+The default behaviour of C<annotate> is file oriented. The file
+produced is of a verbose format, which would contain long lines. These
+ones are thus truncated.
+
+This defeats most of the usefulness of the tool.
+
+One offers two alternative new flags to produce line oriented output:
+
+=over 2
+
+=item -line: line oriented output suitable for grepping, with no truncation
+
+=item -grep: use Perl to grep the output of I<annotate>
+
+=back
+
+=cut
+
+sub annotate {
+  use strict;
+  use warnings;
+  my (%opt, %ignore, %out);
+  GetOptions(\%out, qw(line grep=s));
+  GetOptions(\%ignore, qw(all rm));
+  GetOptions(\%opt, qw(nco out=s));
+  my $ann = ClearCase::Argv->new(@ARGV);
+  $ann->parse(qw(short|long fmt=s rmfmt=s nheader ndata force));
+  my $fout = ($opt{out} and $opt{out} ne '-')? $opt{out} : '';
+  die Msg('E', "Incompatible options.") if keys %out and ($ann->opts or $fout);
+  my @args = $ann->args;
+  die Msg('E', "$fout must be a directory") if $fout and @args>1 and !-d $fout;
+  my @dirs = grep {-d $_} @args;
+  if (@dirs) {
+    @args = grep {!-d $_} @args;
+    if (!$ann->flag('ndata') and !keys %out) {
+      warn Msg('E', "Version has no data $_") for @dirs;
+      die "\n" unless @args;
+    }
+  }
+  $ct = new ClearCase::Argv({autochomp=>1});
+  my $re = $out{grep}? qr/$out{grep}/ : '';
+  if (@dirs) {
+    my $rc = 0;
+    if (keys %out) {
+      for my $d (@dirs) {
+	my %t;
+	for ($ct->lshis([qw(-d -fmt), '%Nd %Vn %u %o:%Nc\n'], $d)->qx) {
+	  if(/^([^:]+):(.*)$/) {
+	    push @{$t{$1}}, $2;
+	  } else {
+	    push @{$t{$1}}, $_;
+	  }
+	}
+	if ($re) {
+	  for my $k (reverse sort keys %t) {
+	    print "$k $_\n" for grep /$re/, @{$t{$k}};
+	  }
+	} else {
+	  for my $k (reverse sort keys %t) {
+	    print "$k $_\n" for @{$t{$k}};
+	  }
+	}
+      }
+    } else {
+      my @opts = $ann->opts;
+      $ann->opts('-out', $opt{out}, @opts) if $opt{out};
+      $rc = $ann->args(@dirs)->system;
+      $ann->opts(@opts);
+    }
+    exit $rc unless @args;
+  }
+  if (!$opt{nco}) {
+    my @co = $ct->lsco([qw(-cview -s)], @args)->qx;
+    if (@co) {
+      @args = grep {!$ct->lsco([qw(-cview -s)], $_)->qx} @args;
+      warn Msg('E',
+	       "You may not annotate a checked-out version (use -nco flag): $_")
+	for @co;
+      die "\n" unless @args;
+    }
+  }
+  if (keys %out) {
+    $ENV{CLEARCASE_TAB_SIZE} = 2;
+    no warnings qw(qw);
+    $ann->opts(qw(-all -out - -nhe -rmf), ' D ', '-fmt',
+	       '%Sd %25.-25Vn %-8.8u,|,%Sd %25.-25Vn %-8.8u');
+    $opt{out} = '-';
+  } else {
+    $ann->opts(qw(-all -out -), $ann->opts);
+  }
+  $ann->opts('-nco', $ann->opts) if $opt{nco};
+  my $dir = -d $fout? $fout : '';
+  my $rc = 0;
+  for my $a (@args) {
+    my @out = $ann->args($a)->qx;
+    map {s/ U /   /} @out;
+    map {s/ UNRELATED /           /} @out;
+    my @mver = grep{s%^\s+-> (\S+)$%$1%} $ct->lsvtree([qw(-s -merge)], $a)->qx;
+    my %add;
+    for my $v (@mver) { #versions merged to
+      my $ev = "$a\@\@$v";
+      my ($prd) = grep{s/^<- (.*)/$1/} $ct->des([qw(-s -ahl Merge)], $ev)->qx;
+      my @new = grep{s%^>\s+(.*)$%$1%} $ct->diff(['-diff'], $prd, $ev)->qx;
+      $add{$v}->{$_}++ for @new;
+    }
+    if (keys %out) {
+      my @prune = @out;
+      @out = ();
+      for (@prune) {
+	if (/^\S+\s+(\S+) \S+\s+D?\s+(.*)$/) {
+	  push @out, $_ if !defined($add{$1}) or $add{$1}->{$2};
+	} else {
+	  push @out, $_;
+	}
+      }
+    }
+    if ($opt{out} and $opt{out} eq '-') {
+      if ($re) {
+	print for grep /$re/, @out;
+      } else {
+	print for @out;
+      }
+    } else {
+      require File::Slurp;
+      require File::Basename;
+      File::Basename->import('basename');
+      require File::Spec;
+      my $f = "$a.ann";
+      $f = ($dir? File::Spec->catfile($dir, basename($f)): $fout) if $fout;
+      $rc |= File::Slurp::write_file($f, @out);
+    }
+  }
+  exit $rc;
 }
 
 =back
