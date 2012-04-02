@@ -3701,8 +3701,6 @@ sub annotate {
   my $rc = 0;
   for my $a (@args) {
     my @out = $ann->args($a)->qx;
-    map {s/ U /   /} @out;
-    map {s/ UNRELATED /           /} @out;
     my @mver = grep{s%^\s+-> (\S+)$%$1%} $ct->lsvtree([qw(-s -merge)], $a)->qx;
     my %add;
     for my $v (@mver) { #versions merged to
@@ -3712,6 +3710,7 @@ sub annotate {
       $add{$v}->{$_}++ for @new;
     }
     if (keys %out) {
+      map {s/^(\d\S+\s+\S+ \S+\s+)U /$1  /} @out;
       my @prune = @out;
       @out = ();
       for (@prune) {
@@ -3721,6 +3720,8 @@ sub annotate {
 	  push @out, $_;
 	}
       }
+    } else {
+      map {s/ UNRELATED /           /} @out;
     }
     if ($opt{out} and $opt{out} eq '-') {
       if ($re) {
@@ -3736,6 +3737,7 @@ sub annotate {
       my $f = "$a.ann";
       $f = ($dir? File::Spec->catfile($dir, basename($f)): $fout) if $fout;
       $rc |= File::Slurp::write_file($f, @out);
+      print qq(Annotated result written to "$f".\n);
     }
   }
   exit $rc;
