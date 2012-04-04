@@ -260,4 +260,4 @@ The default annotate format is:
 
 This means: a short date, a 25 chars right aligned, possibly truncated
 field for the version specification, a 9 chars left aligned field for
-the author. The same format is used for elisons as for additions.
+the author. The same format is used for elisions as for additions.
