@@ -3688,10 +3688,10 @@ sub annotate {
     }
   }
   if (keys %out) {
-    $ENV{CLEARCASE_TAB_SIZE} = 2;
+    $ENV{CLEARCASE_TAB_SIZE} = 2 unless $ENV{CLEARCASE_TAB_SIZE};
     no warnings qw(qw);
-    $ann->opts(qw(-all -out - -nhe -rmf), ' D ', '-fmt',
-	       '%Sd %25.-25Vn %-8.8u,|,%Sd %25.-25Vn %-8.8u');
+    my $fmt = $ENV{CCMGI_ANNF} || '%Sd %25.-25Vn %-9.9u,|,%Sd %25.-25Vn %-9.9u';
+    $ann->opts(qw(-all -out - -nhe -rmf), ' D ', '-fmt', $fmt);
     $opt{out} = '-';
   } else {
     $ann->opts(qw(-all -out -), $ann->opts);

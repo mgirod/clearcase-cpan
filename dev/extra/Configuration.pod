@@ -247,7 +247,17 @@ are granted write access e.g. to directory elements being created.
 
 =head2 environment variables
 
-Two variables to consider (see earlier):
+Four variables to consider (see earlier for the two first):
 
   FORCELOCK
   FSCBROKER
+  CLEARCASE_TAB_SIZE: affects the annotate format (default: 2)
+  CCMGI_ANNF: annotate format
+
+The default annotate format is:
+
+  %Sd %25.-25Vn %-9.9u,|,%Sd %25.-25Vn %-9.9u
+
+This means: a short date, a 25 chars right aligned, possibly truncated
+field for the version specification, a 9 chars left aligned field for
+the author. The same format is used for elisons as for additions.
