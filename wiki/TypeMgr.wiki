@@ -122,6 +122,7 @@ although:
 bar> ct des -s oid:b17e438b.31a011e1.961f.00:15:60:04:45:5c
 /local/scratch/bar/a@@/main/mg-015/1
 }}}
+The confusion is however very limited, and arguably not introduced by our change. Annotate works on the assumption that (unless the -all flag is given), all contributors belong to the same _line of descent_. This assumption is defeated by any merge (not only ones in the context of our branching strategy). The glitch is fixed by injecting the -all flag, and pruning the spurious _UNRELATED_ tags produced.
 ==Generating cleartext containers==
 But {{{annotate}}} is not critical. Especially, it can be fixed within the wrapper, i.e. without requiring a new type manager, and its installation on every single !ClearCase client.
 The critical operation is the generation of cleartext containers, and *it* works:
