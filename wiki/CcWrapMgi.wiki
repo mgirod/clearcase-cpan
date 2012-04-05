@@ -35,6 +35,6 @@ The code on this site is developed in a _dev_ branch.
     * support for incremental types:
       * support for [GlobalTypes global types] (using admin vobs or not)
       * folding config specs (automatic generation of the cascading rules)
-    * [WmgArc mkxxtype -arc]
+    * [WmgArc mkxxtype -arc, and/or archive (br|lb)type:xxx]
   * Under work:
     * [RollOutBack rollout/rollback] to rollback versions (faster than through generating view equivalent to previous state)
