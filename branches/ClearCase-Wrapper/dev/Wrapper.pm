@@ -711,14 +711,6 @@ sub checkin {
 
     $ci->args(@elems);
 
-# Turned off - on further review this feature seems too intrusive.
-=pod
-    # Default to -nc if checking in directories only.
-    if (!grep(/^-c$|^-cq|^-nc$|^-cfi/, @ARGV)) {
-	$ci->opts('-nc', $ci->opts) if !grep {!-d} @elems;
-    }
-=cut
-
     # Give a warning if the file is open for editing by vim.
     # (I know, there are lots of other editors but it just happens
     # to be easy to detect vim by its .swp file)
@@ -973,9 +965,10 @@ sub _helpmsg {
 	    if (my $msg = $$op) {
 		chomp $msg;
 		my $indent;
-                if (! @text or $text[0] eq 'Usage: help [command-name]') {
+                if (! @text or $text[0] =~ 'Usage: help ') {
 	            @text = ("Usage: * ");
                     $indent = "Usage: * $op ";
+		    $msg =~ s/^help/$op/;
                 } else {
 		    ($indent) = ($text[-1] =~ /^(\s*)/);
                     if (!$indent) {
