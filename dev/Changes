@@ -165,5 +165,5 @@ Revision history for Perl extension ClearCase::Wrapper.
 	- Tweaked indenting in show usage function
 	- Thanks to Marc Girod and Stephen Rauch for these changes
 
-1.17 Sun Jul 10 19:01:19 GMTDT 2011
+1.17 Sun Apr 15 16:50:06 IST 2012
         - help for new commands: skip the cleartool error text.

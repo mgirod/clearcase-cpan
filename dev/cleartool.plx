@@ -1,6 +1,7 @@
 #!/usr/local/bin/perl -w
 
 use strict;
+use warnings;
 use vars qw($prog $dieexit $dieexec $diemexec);
 
 # The bulk of the code comes from ClearCase::Wrapper ...
@@ -25,11 +26,11 @@ BEGIN {
     if (!$ENV{CLEARCASE_WRAPPER_NATIVE}) {
         *ClearCase::Wrapper::exit = $dieexit;
 	*ClearCase::Wrapper::exec = $dieexec;
-	eval {
-	    require ClearCase::Wrapper;
-	    no warnings qw(redefine);
-	    *Argv::exec = $diemexec;
-	};
+        require ClearCase::Wrapper;
+        {
+            no warnings qw(redefine);
+            *Argv::exec = $diemexec;
+        }
 	if ($@) {
 	    (my $msg = $@) =~ s%\s*\(.*%!%;
 	    warn "$prog: Warning: $msg";
@@ -40,13 +41,15 @@ BEGIN {
 sub one_cmd {
     # If Wrapper.pm defines an AutoLoad-ed subroutine to handle $ARGV[0],
     # call it.
-    # That subroutine should return.
-    if (@ARGV && !$ENV{CLEARCASE_WRAPPER_NATIVE} &&
-	  (defined($ClearCase::Wrapper::{$ARGV[0]}) || $ARGV[0] eq 'help')) {
+    if (!$ENV{CLEARCASE_WRAPPER_NATIVE} && 
+            ClearCase::Wrapper::Extension($ARGV[0])) {
 	# This provides support for writing extensions.
-	local $^W = 0;
+#	local $^W = 0;
 	require ClearCase::Argv;
-	*Argv::exec = $diemexec;
+        {
+            no warnings qw(redefine);
+            *Argv::exec = $diemexec;
+        }
 	ClearCase::Argv->VERSION(1.07);
 	ClearCase::Argv->attropts; # this is what parses -/dbg=1 et al
 	{
@@ -94,8 +97,11 @@ sub one_cmd {
 	if (grep !m%^-/%, @ARGV) {
 	    local $^W = 0;
 	    require ClearCase::Argv;
-	    *Argv::exec = $diemexec;
-	    ClearCase::Argv->VERSION(1.43);
+            {
+                no warnings qw(redefine);
+                *Argv::exec = $diemexec;
+            }
+            ClearCase::Argv->VERSION(1.43);
 	    ClearCase::Argv->attropts;
 	    # The -ver flag/cmd is a special case - must be exec-ed.
 	    return system('cleartool', @ARGV) if $ARGV[0] =~ /^-ver/i;
