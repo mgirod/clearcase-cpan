@@ -20,10 +20,6 @@ described below (with respect to preserving timestamps, which wasn't implemented
 
 = Details =
 
-We consider here only incremental label types, because archiving
-is not implemented yet, and may be simpler (even not require 
-anything related to the current topic).
-
 We consider two kinds of locking:
    # _logical_ (or high-level) locking
    # _physical_ (or low-level, _silent_) locking
