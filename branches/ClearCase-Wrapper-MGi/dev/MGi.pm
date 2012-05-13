@@ -1,6 +1,6 @@
 package ClearCase::Wrapper::MGi;
 
-$VERSION = '0.32';
+$VERSION = '1.00';
 
 use warnings;
 use strict;
@@ -8,18 +8,8 @@ use constant CYGWIN => $^O =~ /cygwin/i ? 1 : 0;
 use vars qw($ct $eqhl $prhl $sthl $fchl);
 ($eqhl, $prhl, $sthl, $fchl) = qw(EqInc PrevInc StBr FullCpy);
 
-sub _Compareincs($$) {
-  my ($t1, $t2) = @_;
-  my ($p1, $M1, $m1, $s1) = pfxmajminsfx($t1);
-  my ($p2, $M2, $m2, $s2) = pfxmajminsfx($t2);
-  if (!(defined($p1) and defined($p2) and ($p1 eq $p2) and ($s1 eq $s2))) {
-    warn Msg('W', "$t1 and $t2 not comparable\n");
-    return 1;
-  }
-  return ($M1 <=> $M2 or (defined($m1) and defined($m2) and $m1 <=> $m2));
-}
 # Note: only wrapper supported functionality--possible fallback to cleartool
-sub _wrap {
+sub _Wrap {
   local @ARGV = @_;
   ClearCase::Wrapper::Extension($ARGV[0]);
   no strict 'refs';
@@ -39,59 +29,24 @@ sub _wrap {
   }
   return $rc;			# Completed, successful or not
 }
-use AutoLoader 'AUTOLOAD';
-
-#############################################################################
-# Usage Message Extensions
-#############################################################################
-{
-  local $^W = 0;
-  no strict 'vars';
-
-  my $z = $ARGV[0] || '';
-  $checkin = "\n* [-dir|-rec|-all|-avobs] [-ok] [-diff [diff-opts]] [-revert]";
-  $lsgenealogy =
-    "$z [-short] [-all] [-obsolete] [-depth gen-depth] pname ...";
-  $mkbrtype = "\n* [-archive]";
-  $mklabel = "\n* [-up] [-force] [-over type [-all]]";
-  $mklbtype = "\n* [-family] [-increment] [-archive] [-fullcopy type] \n"
-    . "[-config cr [-exclude vobs]]";
-  $rmtype = "\n* [-family] [-increment]";
-  $setcs = "\n* [-clone view-tag] [-expand] [-sync|-needed]";
-  $mkview = "\n* [-clone view-tag [-equiv lbtype,timestamp]]";
-  $describe = "\n* [-par/ents <n>] [-fam/ily <n>]";
-  $rollout = "$z [-force] [-c comment] -to baseline brype|lbtype";
-  $rollback = "$z [-force] [-c comment] -to increment";
-  $archive = "$z [-c comment|-nc] brtype|lbtype ...";
-  $annotate = "\n* [-line|-grep regexp]";
-}
-
-#############################################################################
-# Command Aliases
-#############################################################################
-*co             = *checkout;
-*ci		= *checkin;
-*des            = *describe;
-*desc           = *describe;
-*lsgen		= *lsgenealogy;
-*unco           = *uncheckout;
-*ro             = *rollout;
-*rb             = *rollback;
-*ar             = *archive;
-*ann            = *annotate;
-
-1;
-
-__END__
-
 ## Internal service routines, undocumented.
-sub _Samebranch($$) {		# same branch
+sub _Compareincs {
+  my ($t1, $t2) = @_;
+  my ($p1, $M1, $m1, $s1) = pfxmajminsfx($t1);
+  my ($p2, $M2, $m2, $s2) = pfxmajminsfx($t2);
+  if (!(defined($p1) and defined($p2) and ($p1 eq $p2) and ($s1 eq $s2))) {
+    warn Msg('W', "$t1 and $t2 not comparable\n");
+    return 1;
+  }
+  return ($M1 <=> $M2 or (defined($m1) and defined($m2) and $m1 <=> $m2));
+}
+sub _Samebranch {		# same branch
   my ($cur, $prd) = @_;
   $cur =~ s:/[0-9]+$:/:; # Treat CHECKEDOUT as other branch
   $prd =~ s:/[0-9]+$:/:;
   return ($cur eq $prd);
 }
-sub _Sosbranch($$) {		# same or sub- branch
+sub _Sosbranch {		# same or sub- branch
   my ($cur, $prd) = @_;
   $cur =~ s:/[0-9]+$:/:;
   $prd =~ s:/[0-9]+$:/:;
@@ -157,7 +112,7 @@ sub _Printparents {
     }
   }
 }
-sub _Findpredinstack($$) {
+sub _Findpredinstack {
   my ($g, $stack) = @_;
   while ($$stack[-1]) {
     return $$stack[-1] if _Sosbranch($g, $$stack[-1]);
@@ -246,8 +201,6 @@ sub _Parsevtree {
   return %gen;
 }
 sub _DepthGen {
-  use strict;
-  use warnings;
   my ($ele, $dep, $sel, $verbose) = @_;
   my %gen;
   my $parents = sub {
@@ -298,7 +251,154 @@ sub _DepthGen {
   }
   return %gen;
 }
+sub _Ensuretypes {
+  my @typ = ($eqhl, $prhl); # Default value
+  @typ = @{shift @_} if ref $_[0] eq 'ARRAY';
+  my @vob = @_;
+  my %cmt = ($eqhl => q(Equivalent increment),
+	     $prhl => q(Previous increment in a type chain),
+	     $fchl => q(Full Copy of increment));
+  my $silent = $ct->clone({stdout=>0, stderr=>0});
+  my $die = $ct->clone({autofail=>1});
+  for my $t (@typ) {
+    for my $v (@vob) {
+      my $t2 = "$t\@$v";
+      $die->mkhltype([qw(-shared -c), $cmt{$t}], $t2)->system
+	if $silent->des(['-s'], "hltype:$t2")->system;
+    }
+  }
+}
+sub _Pfxmajminsfx {
+  my $t = shift;
+  if ($t =~ /^([\w.-]+[-_])(\d+)(?:\.(\d+))?(\@.*)?$/) {
+    my $min = ($3 or '');
+    my $sfx = ($4 or '');
+    return ($1, $2, $min, $sfx);
+  } else {
+    warn Msg(
+      'W', "$t doesn't match the pattern expected for an incremental type\n");
+  }
+}
+sub _Nextinc {
+  my $inc = shift;
+  my ($pfx, $maj, $min, $sfx) = _Pfxmajminsfx($inc);
+  return '' unless $pfx and $maj;
+  my $count = defined($min)? $maj . q(.) . ++$min : ++$maj;
+  return $pfx . $count . $sfx;
+}
+sub _Findnext {		# on input, the type exists
+  my $c = shift;
+  my @int = grep { s/^<- lbtype:(.*)$/$1/ }
+    $ct->argv(qw(des -s -ahl), $prhl, "lbtype:$c")->qx;
+  if (@int) {
+    my @i = ();
+    for (@int) {
+      push @i, _Findnext($_);
+    }
+    return @i;
+  } else {
+    return ($c);
+  }
+}
+sub _Findfreeinc {	   # on input, the values may or may not exist
+  my ($nxt, %n) = shift;
+  while (my ($k, $v) = each %{$nxt}) {
+    while ($ct->argv(qw(des -s), "lbtype:$v")->stderr(0)->qx) { #exists
+      my @cand = sort _Compareincs _Findnext($v);
+      $v = _Nextinc($cand[$#cand]);
+    }
+    $n{$k} = $v;
+  }
+  while (my ($k, $v) = each %n) { $$nxt{$k} = $v }
+}
+sub _Yesno {
+  my ($cmd, $fn, $yn, $test, $errmsg) = @_;
+  my $ret = 0;
+  my @opts = $cmd->opts;
+  for my $arg ($cmd->args) {
+    $cmd->opts(@opts); #reset
+    if ($test) {
+      my $res = $test->($arg);
+      if (!$res) {
+	warn ($res or Msg('E', $errmsg . '"' . $arg . "\".\n"));
+	next;
+      } elsif ($res == -1) { # Skip interactive part
+	$ret |= $fn->($cmd);
+	next;
+      }
+    }
+    printf $yn->{format}, $arg;
+    my $ans = <STDIN>; chomp $ans; $ans = lc($ans);
+    $ans = $yn->{default} unless $ans;
+    while ($ans !~ $yn->{valid}) {
+      print $yn->{instruct};
+      $ans = <STDIN>; chomp $ans; $ans = lc($ans);
+      $ans = $yn->{default} unless $ans;
+    }
+    if ($yn->{opt}->{$ans}) {
+      $cmd->opts(@opts, $yn->{opt}->{$ans});
+      $cmd->args($arg);
+      $ret |= $fn->($cmd);
+    } else {
+      $ret = 1;
+    }
+  }
+  exit $ret;
+}
+use AutoLoader 'AUTOLOAD';
+
+#############################################################################
+# Usage Message Extensions
+#############################################################################
+{
+  local $^W = 0;
+  no strict 'vars';
+
+  my $z = $ARGV[0] || '';
+  $checkin = "\n* [-dir|-rec|-all|-avobs] [-ok] [-diff [diff-opts]] [-revert]";
+  $lsgenealogy =
+    "$z [-short] [-all] [-obsolete] [-depth gen-depth] pname ...";
+  $mkbrtype = "\n* [-archive]";
+  $mklabel = "\n* [-up] [-force] [-over type [-all]]";
+  $mklbtype = "\n* [-family] [-increment] [-archive] [-fullcopy type] \n"
+    . "[-config cr [-exclude vobs]]";
+  $rmtype = "\n* [-family] [-increment]";
+  $setcs = "\n* [-clone view-tag] [-expand] [-sync|-needed]";
+  $mkview = "\n* [-clone view-tag [-equiv lbtype,timestamp]]";
+  $describe = "\n* [-par/ents <n>] [-fam/ily <n>]";
+  $rollout = "$z [-force] [-c comment] -to baseline brtype|lbtype";
+  $rollback = "$z [-force] [-c comment] -to increment";
+  $archive = "$z [-c comment|-nc] brtype|lbtype ...";
+  $annotate = "\n* [-line|-grep regexp]";
+}
+
+#############################################################################
+# Command Aliases
+#############################################################################
+*co             = *checkout;
+*ci		= *checkin;
+*des            = *describe;
+*desc           = *describe;
+*lsg		= *lsgenealogy;
+*lsge		= *lsgenealogy;
+*lsgen		= *lsgenealogy;
+*unco           = *uncheckout;
+*ro             = *rollout;
+*rb             = *rollback;
+*ar             = *archive;
+*arc            = *archive;
+*arch           = *archive;
+*an             = *annotate;
+*ann            = *annotate;
+*anno           = *annotate;
+
+1;
+
+__END__
+
 sub _Mkbco {
+  use strict;
+  use warnings;
   use File::Copy;
   my ($cmd, @cmt) = @_;
   my $rc = 0;
@@ -392,66 +492,6 @@ sub _Mkbco {
     }
   }
   return $rc;
-}
-sub _Ensuretypes {
-  my @typ = ($eqhl, $prhl); # Default value
-  @typ = @{shift @_} if ref $_[0] eq 'ARRAY';
-  my @vob = @_;
-  my %cmt = ($eqhl => q(Equivalent increment),
-	     $prhl => q(Previous increment in a type chain),
-	     $fchl => q(Full Copy of increment));
-  my $silent = $ct->clone({stdout=>0, stderr=>0});
-  my $die = $ct->clone({autofail=>1});
-  for my $t (@typ) {
-    for my $v (@vob) {
-      my $t2 = "$t\@$v";
-      $die->mkhltype([qw(-shared -c), $cmt{$t}], $t2)->system
-	if $silent->des(['-s'], "hltype:$t2")->system;
-    }
-  }
-}
-sub _Pfxmajminsfx($) {
-  my $t = shift;
-  if ($t =~ /^([\w.-]+[-_])(\d+)(?:\.(\d+))?(\@.*)?$/) {
-    my $min = ($3 or '');
-    my $sfx = ($4 or '');
-    return ($1, $2, $min, $sfx);
-  } else {
-    warn Msg(
-      'W', "$t doesn't match the pattern expected for an incremental type\n");
-  }
-}
-sub _Nextinc($) {
-  my $inc = shift;
-  my ($pfx, $maj, $min, $sfx) = _Pfxmajminsfx($inc);
-  return '' unless $pfx and $maj;
-  my $count = defined($min)? $maj . q(.) . ++$min : ++$maj;
-  return $pfx . $count . $sfx;
-}
-sub _Findnext($) {		# on input, the type exists
-  my $c = shift;
-  my @int = grep { s/^<- lbtype:(.*)$/$1/ }
-    $ct->argv(qw(des -s -ahl), $prhl, "lbtype:$c")->qx;
-  if (@int) {
-    my @i = ();
-    for (@int) {
-      push @i, _Findnext($_);
-    }
-    return @i;
-  } else {
-    return ($c);
-  }
-}
-sub _Findfreeinc($) {	   # on input, the values may or may not exist
-  my ($nxt, %n) = shift;
-  while (my ($k, $v) = each %{$nxt}) {
-    while ($ct->argv(qw(des -s), "lbtype:$v")->stderr(0)->qx) { #exists
-      my @cand = sort _Compareincs _Findnext($v);
-      $v = _Nextinc($cand[$#cand]);
-    }
-    $n{$k} = $v;
-  }
-  while (my ($k, $v) = each %n) { $$nxt{$k} = $v }
 }
 sub _PreCi {
   use strict;
@@ -617,42 +657,6 @@ sub _Unco {
     }
   }
   return $rc;
-}
-sub _Yesno {
-  my ($cmd, $fn, $yn, $test, $errmsg) = @_;
-  use warnings;
-  use strict;
-  my $ret = 0;
-  my @opts = $cmd->opts;
-  for my $arg ($cmd->args) {
-    $cmd->opts(@opts); #reset
-    if ($test) {
-      my $res = $test->($arg);
-      if (!$res) {
-	warn ($res or Msg('E', $errmsg . '"' . $arg . "\".\n"));
-	next;
-      } elsif ($res == -1) { # Skip interactive part
-	$ret |= $fn->($cmd);
-	next;
-      }
-    }
-    printf $yn->{format}, $arg;
-    my $ans = <STDIN>; chomp $ans; $ans = lc($ans);
-    $ans = $yn->{default} unless $ans;
-    while ($ans !~ $yn->{valid}) {
-      print $yn->{instruct};
-      $ans = <STDIN>; chomp $ans; $ans = lc($ans);
-      $ans = $yn->{default} unless $ans;
-    }
-    if ($yn->{opt}->{$ans}) {
-      $cmd->opts(@opts, $yn->{opt}->{$ans});
-      $cmd->args($arg);
-      $ret |= $fn->($cmd);
-    } else {
-      $ret = 1;
-    }
-  }
-  exit $ret;
 }
 sub _Checkin {
   use strict;
@@ -1543,7 +1547,7 @@ sub _GenMkTypeSub {
 		for my $v (@tvob) {
 		  my ($cpy) = ($inc =~ /^(.*?\@)/);
 		  $cpy .= $v;
-		  _wrap('cptype', $inc, $cpy);
+		  _Wrap('cptype', $inc, $cpy);
 		}
 	      }
 	      unshift @o, q(Deleted in increment);
@@ -1554,7 +1558,7 @@ sub _GenMkTypeSub {
 		my $src = "lbtype:$a";
 		for my $v (@vob) {
 		  my $cpy =  (split /\@/, $src)[0] . "\@$v";
-		  _wrap('cptype', $src, $cpy);
+		  _Wrap('cptype', $src, $cpy);
 		}
 	      }
 	    }
@@ -1572,7 +1576,8 @@ sub _GenMkTypeSub {
 	    my $cvob = $ct->des(['-s'], 'vob:.')->stderr(0)->qx;
 	    for (@args) {
 	      my $mvob = $1 if /\@(.*)$/;
-	      my $lvob = (shift(@a) =~ /\@(.*)$/)? $1: $cvob;
+	      my $lvob = (shift(@a) =~ /\@(.*)$/)?
+		$ct->des(['-s'], "vob:$1")->qx : $cvob;
 	      $targ{$_} = $lvob if $lvob and $lvob ne $mvob;
 	    }
 	  }
@@ -1596,7 +1601,7 @@ sub _GenMkTypeSub {
 	    if ($ct->lslock(['-s'], $lbt)->stderr(0)->qx) {
 	      $lck = 1; #remember to lock the previous equivalent back
 	       #This should happen as vob owner, to retain the timestamp
-	      _wrap('unlock', $lbt); # Will unlock both types
+	      _Wrap('unlock', $lbt); # Will unlock both types
 	    }
 	    if ($opt{config} and @vob) {
 	      $silent->mklbtype([qw(-rep -glo)], $t)->system
@@ -1608,7 +1613,7 @@ sub _GenMkTypeSub {
 	      for my $v (@vob) {
 		next if $already{$v};
 		my $cpy =  "$t1\@$v";
-		_wrap('cptype', $lbt, $cpy);
+		_Wrap('cptype', $lbt, $cpy);
 	      }
 	      if (grep !/^-glo/, $ntype->opts) {
 		my @opts = $ntype->opts;
@@ -1642,11 +1647,11 @@ sub _GenMkTypeSub {
 		my $lbt1 = "lbtype:$1" if $new =~ /^(.*?\@)/;
 		for my $v (@vob) {
 		  my $cpy =  "$lbt1$v";
-		  _wrap('cptype', $lbt, $cpy);
+		  _Wrap('cptype', $lbt, $cpy);
 		}
 	      }
 	      if ($lck) {
-		_wrap('lock', "lbtype:$prev\@$vob") and die "\n";
+		_Wrap('lock', "lbtype:$prev\@$vob") and die "\n";
 	      }
 	    } else {
 	      warn Msg('W',qq(Previous increment non suitable in $t: "$prev"));
@@ -1705,13 +1710,13 @@ sub _GenMkTypeSub {
       for my $inc (@eqlst) {
 	my @ver = $ct->find(@findopts, "lbtype($inc)$qry", '-print')->qx;
 	next unless @ver;
-	$rc |= _wrap('mklabel', @lbargs, @ver);
+	$rc |= _Wrap('mklabel', @lbargs, @ver);
       }
       _Ensuretypes([$fchl], $vob);
       my @lckargs = _RecLock $fcpy{lbinc};
-      _wrap('unlock', $fcpy{lbinc}) if @lckargs;
+      _Wrap('unlock', $fcpy{lbinc}) if @lckargs;
       $rc |= $ct->mkhlink([$fchl], $fcpy{lbinc}, $lbtv)->system;
-      _wrap('lock', @lckargs) if @lckargs;
+      _Wrap('lock', @lckargs) if @lckargs;
     }
     exit $rc;
   };
@@ -2213,7 +2218,7 @@ sub mklabel {
   if (%con) {
     for (@{$con{rmall}}) {
       my @ver = $ct->find($_, qw(-a -ver), "lbtype($lbtype)", '-print')->qx;
-      _wrap('rmlabel', $lbtype, @ver) if @ver;
+      _Wrap('rmlabel', $lbtype, @ver) if @ver;
     }
     my $chkalias = sub {
       local $_;
@@ -2250,7 +2255,7 @@ sub mklabel {
     for (@{$con{vob}}) {
       my @ver = grep { !$con{ver}{$_} and !$chkalias->($_) }
 	$ct->find($_, qw(-a -ver), "lbtype($lbtype)", '-print')->qx;
-      _wrap('rmlabel', $lbtype, @ver) if @ver;
+      _Wrap('rmlabel', $lbtype, @ver) if @ver;
     }
     my $cr = $con{cr};
     $ct->winkin($cr)->system;
@@ -3186,6 +3191,8 @@ sub rollout {
     $lbl .= "\@$vob";
   }
   my $bt = $sil->des(['-s'], "lbtype:$arg")->system; #branch or label type
+  die Msg('E', "$arg not found")
+    if $bt and $sil->des(['-s'], "brtype:$arg")->system;
   my $targ = $bt? "brtype:$arg" : "lbtype:$arg";
   my @vobs;
   if ($fail->des([qw(-fmt %[type_scope]p)], $targ)->qx eq 'global') {
@@ -3220,15 +3227,17 @@ sub rollout {
   if ($sil->des(['-s'], $lbl)->system) {
     my @opt = @cmt;
     push @opt, '-glo' if @vobs;
-    _wrap(qw(mklbtype -fam), @opt, $lbl) and die "\n";
+    _Wrap(qw(mklbtype -fam), @opt, $lbl) and die "\n";
     for (@vobs) {
       my $dst = $lbl;
       $dst =~ s/@\Q$vob\E$/\@$_/;
-      _wrap('cptype', $lbl, $dst); #Fails if the type existed in one vob
+      _Wrap('cptype', $lbl, $dst); #Fails if the type existed in one vob
     }
   } else {
     if ($ct->des([qw(-s -ahl), $eqhl], $lbl)->qx) {
-      _wrap(qw(mklbtype -inc), @cmt, $lbl) and die "\n";
+      die Msg('E', 'The baseline is not locked: conflicting rollout pending?')
+	if $ClearCase::Wrapper::MGi::lockbl and !$ct->lslock(['-s'], $lbl)->qx;
+      _Wrap(qw(mklbtype -inc), @cmt, $lbl) and die "\n";
     } else {
       die Msg('E', 'The baseline type must be a family type');
     }
@@ -3239,12 +3248,13 @@ sub rollout {
   my $rc = 0;
   for my $v ($vob, @vobs) {
     $ct->cd($v)->system;
-    $rc += _wrap(qw(mklabel -over), $la, $bl, $v);
+    $rc += _Wrap(qw(mklabel -over), $la, $lb, $v);
   }
+  _Wrap('lock', $lbl) if $ClearCase::Wrapper::MGi::lockbl;
   exit $rc if $rc; #nothing to fallback to, so avoid
   $ct->cd($cwd)->system;
   if ($bt) {
-    $rc = _wrap(qw(mkbrtype -nc -arc), $arg);
+    $rc = _Wrap(qw(mkbrtype -nc -arc), $arg);
   } else {
     my @bt = grep s/^-> //, $ct->des([qw(-s -ahl), $sthl], "lbtype:$arg")->qx;
     if (@bt) {
@@ -3260,9 +3270,9 @@ sub rollout {
 	my $t = $1 if $bt =~ /^brtype:(.*?)(\@.*)?$/;
 	push @abt, $bt if grep /\b\Q$t\E\b/, @cs;
       }
-      _wrap(qw(mkbrtype -nc -arc), @abt) if @abt;
+      _Wrap(qw(mkbrtype -nc -arc), @abt) if @abt;
     }
-    $rc = _wrap(qw(mklbtype -nc -arc), $arg);
+    $rc = _Wrap(qw(mklbtype -nc -arc), $arg);
   }
   exit $rc;
 }
@@ -3360,9 +3370,9 @@ sub rollback {
   } else {
     $ct->cd($vob)->system if $chdir;
   }
-  _wrap(qw(mkview -quiet -tag), $tmptag, '-clone', $tag, '-equiv', $tinc)
+  _Wrap(qw(mkview -quiet -tag), $tmptag, '-clone', $tag, '-equiv', $tinc)
     and die "\n";
-  if (_wrap('mklbtype', @cmt, '-inc', $flt)) {
+  if (_Wrap('mklbtype', @cmt, '-inc', $flt)) {
     $rmv->();
     die Msg('E', "Failed to increment $flt1: aborting");
   }
@@ -3398,6 +3408,7 @@ sub rollback {
     }
   } else {
     $ct->setview($tmptag)->system;
+    $ct->cd($vob)->system if $chdir;
   }
   my $qry = "lbtype_sub($flt1)||attype_sub(Rm$flt1)";
   my @targ;
@@ -3406,9 +3417,9 @@ sub rollback {
     push @targ, $ver unless $ver eq $ct->des(['-s'], "$_\@\@/$flt1")->qx
   }
   my @rm = $ct->find(qw(-a -nvis -ver), "lbtype($flt1)", '-print')->qx;
-  _wrap('mklabel', @cmt, $flt1, @targ) if @targ;
-  _wrap('rmlabel', @cmt, $flt1, @rm) if @rm;
-  _wrap('lock', $flt);
+  _Wrap('mklabel', @cmt, $flt1, @targ) if @targ;
+  _Wrap('rmlabel', @cmt, $flt1, @rm) if @rm;
+  _Wrap('lock', $flt);
   $ct->cd($cwd)->system if $chdir;
   $ct->setview($tag)->system unless MSWIN or CYGWIN;
   $rmv->();
@@ -3458,8 +3469,8 @@ sub archive {
 	my ($k, $v) = each %opt;
 	unshift @opt, "-$k", $v;
       }
-      my $rc = _wrap('mklbtype', @opt, @lbt) if @lbt;
-      $rc   += _wrap('mkbrtype', @opt, @brt) if @brt;
+      my $rc = _Wrap('mklbtype', @opt, @lbt) if @lbt;
+      $rc   += _Wrap('mkbrtype', @opt, @brt) if @brt;
       exit $rc; #avoid fallback!
     }
   } else {

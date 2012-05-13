@@ -2,6 +2,9 @@
 
 use strict;
 use Sudo;
+BEGIN {
+  delete @ENV{qw(IFS CDPATH PATH ENV BASH_ENV)};
+}
 
 # This is meant to be suid enabled
 # This is the version using sudo. There is an alternative version using ssh.
