@@ -4,6 +4,7 @@ Makefile.PL
 README
 Wrapper.pm
 cleartool.plx
+wrapdebug
 lib/ClearCase/Wrapper/clearcase_profile
 test.pl
 README.GUI

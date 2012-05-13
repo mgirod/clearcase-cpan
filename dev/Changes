@@ -165,5 +165,8 @@ Revision history for Perl extension ClearCase::Wrapper.
 	- Tweaked indenting in show usage function
 	- Thanks to Marc Girod and Stephen Rauch for these changes
 
-1.17 Sun Apr 15 16:50:06 IST 2012
+1.17 Sun May 13 12:09:17 IST 2012
         - help for new commands: skip the cleartool error text.
+	- wrapdebug: an alternative driver, preloading modules for ease of debugging.
+	  This enhancement owes to Stephen Rauch for the original idea, and uses code
+	  he contributed. Instructions of use in README.

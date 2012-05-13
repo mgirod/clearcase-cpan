@@ -200,6 +200,21 @@ all cleartool commands as executed by exporting ARGV_DBGLEVEL=1 or
 passing -/dbg=1 on the command line. See "perldoc ClearCase::Argv" and
 "perldoc Argv" for (lots of) details.
 
+The use of AutoSplit/AutoLoad makes debugging under the Perl debugger
+(-d option) somewhat cumbersome, especially when developing other
+modules than ClearCase::Wrapper itself. An alternative driver,
+wrapdebug, is provided to allow to place breakpoints to arbitrary
+positions in the code without having to first navigate to the right
+function. This driver loads all .al files at startup. One must however
+use the 'f' function of the debugger to select the right file, before
+creating the breakpoint (with the original line number). This function
+takes a regexp, which can be used here. Example:
+
+  DB<4> f autosplit.*rollout.al
+Choosing blib/lib/ClearCase/Wrapper/MGi.pm (autosplit into blib/lib/auto/ClearCase/Wrapper/MGi/rollout.al) matching `autosplit.*rollout.al':
+1 	2 	3 	4 	5 	6 	7 	8 	9 	10 	
+
+
 TESTED PLATFORMS
 ----------------
 
@@ -210,6 +225,31 @@ CC platform.
 Note that while the module itself works on Windows, the sample
 enhancements haven't all been well exercised there. Some have,
 some haven't.
+
+UPGRADING
+--------
+As with all autoloaded modules, each subroutine is "exploded" out
+into a separate file within the install area. One consequence of
+this is that when a new version removes or renames old subroutines,
+cruft may build up in the autoload area in the form of unused
+files.  This is generally harmless but you may prefer to keep
+things clean.
+
+In practice this simply means you should go into the site-lib
+area of your perl installation, look for a path like one of these:
+
+    <inst-prefix>/lib/site_perl/5.xx.yy/auto/ClearCase/Wrapper	(Unix)
+    <inst-prefix>\site\lib\auto\ClearCase\Wrapper		(Windows)
+
+and remove the 'Wrapper' subdirectory. It might be best to
+save it for a little while in case you have a customization that's
+not in source control, e.g.
+
+    % mv .../Wrapper /var/tmp
+
+And then install the new version. If you've already installed
+before reading this, don't worry. Just remove and reinstall
+as above.
 
 FEEDBACK
 --------
