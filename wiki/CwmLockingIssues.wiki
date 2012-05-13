@@ -80,3 +80,5 @@ One way could be via an {{{-unlock}}} option to {{{mklbtype -inc}}}.
 Otherwise, one doesn't know at {{{unlock}}} time what is the purpose
 of this operation, i.e. whether unlocking the current fixed type is
 logical or physical.
+
+Ideally, implicit locking should preserve the timestamps of locks, since the unlocking is only transient, for the purpose of updating hyperlinks, and immediately followed with a new (identical) lock.
