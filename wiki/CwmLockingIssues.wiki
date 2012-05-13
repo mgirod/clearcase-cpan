@@ -16,7 +16,7 @@ This brings a problem if the different types are not owned by the
 same account.
 
 The current implementation differs slightly from the intention
-described below.
+described below (with respect to preserving timestamps, which wasn't implemented).
 
 = Details =
 
