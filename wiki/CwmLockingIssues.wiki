@@ -1,9 +1,10 @@
 #summary With incremental types, lock one type means in fact locking two...
 = Introduction =
 
-We consider two kinds of types _sets_: label type _families_,
-with one floating type and a chain of fixed, incremental types,
-and chains of successive (_archived_) branch or label types.
+We consider two kinds of type _sets_:
+  # label type _families_, with one floating type and a chain of fixed, incremental types,
+  # chains of successive (_archived_) branch or label types.
+Note that floating types of a family may be archived, so that successive archived types are chained.
 
 In any case, different types in the set are _linked_ with
 hyperlinks of two types: _!EqInc_ or _!PrevInc_.
