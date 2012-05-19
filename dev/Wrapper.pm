@@ -89,14 +89,14 @@ for my $subdir (qw(ClearCase/Wrapper ClearCase/Wrapper/Site)) {
 	    # in order to import them to our own namespace.
 	    {
 		eval qq(package $pkg); # default the pkg correctly
-		local $^W = 0;	  # in case a function is redefined
+		no warnings qw(redefine);
 		eval {
-		    local @INC = ($dir);  # make %INC come out right
 		    eval "require $pkg";
+		    warn $@ if $@;
 		};
-		warn $@, next if $@;
+		next if $@;
 		my $ix = "auto/$pm/autosplit.ix";
-		if (-e $ix) {
+		if (-e "$dir/$ix") {
 		    eval { require $ix };
 		    warn $@ if $@;
 		}

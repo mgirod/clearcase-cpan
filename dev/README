@@ -214,6 +214,8 @@ takes a regexp, which can be used here. Example:
 Choosing blib/lib/ClearCase/Wrapper/MGi.pm (autosplit into blib/lib/auto/ClearCase/Wrapper/MGi/rollout.al) matching `autosplit.*rollout.al':
 1 	2 	3 	4 	5 	6 	7 	8 	9 	10 	
 
+Let's add that using wrapdebug will report errors and warnings (if
+used) on the whole module instead of only per autoloaded function.
 
 TESTED PLATFORMS
 ----------------
