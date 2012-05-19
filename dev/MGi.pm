@@ -54,27 +54,26 @@ sub _Sosbranch {		# same or sub- branch
 }
 sub _Printparents {
   no warnings 'recursion';
-  my ($id, $gen, $seen, $ind) = @_;
+  my ($id, $gen, $seen, $opt, $ind) = @_;
   if ($$seen{$id}++) {
-    printf("%${ind}s\[alternative path: ${id}\]\n", '')
-      unless $opt{short};
+    printf("%${ind}s\[alternative path: ${id}\]\n", '') unless $opt->{short};
     return;
   }
-  my @p = defined($$gen{$id}{parents}) ? @{ $$gen{$id}{parents} } : ();
-  my @c = defined($$gen{$id}{children}) ? @{ $$gen{$id}{children} } : ();
-  my $l = defined($$gen{$id}{labels}) ? " $$gen{$id}{labels}" : '';
+  my @p = defined($gen->{$id}{parents}) ? @{ $gen->{$id}{parents} } : ();
+  my @c = defined($gen->{$id}{children}) ? @{ $gen->{$id}{children} } : ();
+  my $l = defined($gen->{$id}{labels}) ? " $gen->{$id}{labels}" : '';
   my (@s, @u) = ();
   foreach my $c (@c) {
-    if ($$seen{$c}) {
+    if ($seen->{$c}) {
       push @s, $c;
     } else {
       push @u, $c;
     }
   }
-  if (scalar(@u) and !$opt{short}) {
+  if (scalar(@u) and !$opt->{short}) {
     my $cprinted = 0;
     for my $c (@s) {
-      $cprinted++ if $$gen{$c}{printed};
+      $cprinted++ if $gen->{$c}{printed};
     }
     if ($cprinted or !$ind) {
       my $plural = @u>1? 's' : '';
@@ -87,28 +86,27 @@ sub _Printparents {
       print join(' ', @u), "\]\n";
     }
   }
-  my $yes = ($opt{all} or (scalar(@p) != 1) or (scalar(@s) != 1)
+  my $yes = ($opt->{all} or (scalar(@p) != 1) or (scalar(@s) != 1)
 	       or !_Samebranch($id, $s[0]) or !_Sosbranch($p[0], $id));
   if ($l or $yes) {
-    if ($opt{short}) {
+    if ($opt->{short}) {
       if ($yes) {
 	printf("%${ind}s${id}\n", '');
-	$$gen{$id}{printed}++;
+	$gen->{$id}{printed}++;
 	${ind}++;
       }
     } else {
       printf("%${ind}s${id}${l}\n", '');
-      $$gen{$id}{printed}++;
+      $gen->{$id}{printed}++;
       ${ind}++;
     }
   }
-  return if (defined($opt{depth})) and ($opt{depth} < $ind);
+  return if (defined($opt->{depth})) and ($opt->{depth} < $ind);
   foreach my $p (@p) {
-    if ($$gen{$id}{depth} < $$gen{$p}{depth}) {
-      _Printparents($p, $gen, $seen, $ind);
+    if ($gen->{$id}{depth} < $gen->{$p}{depth}) {
+      _Printparents($p, $gen, $seen, $opt, $ind);
     } else {
-      printf("%${ind}s\[alternative path: ${p}\]\n", '')
-	unless $opt{short};
+      printf("%${ind}s\[alternative path: ${p}\]\n", '') unless $opt->{short};
     }
   }
 }
@@ -863,6 +861,9 @@ the element.
 =cut
 
 sub lsgenealogy {
+  use warnings;
+  use strict;
+  my %opt;
   GetOptions(\%opt, qw(short all obsolete depth=i));
   Assert(@ARGV > 1);		# die with usage msg if untrue
   shift @ARGV;
@@ -887,7 +888,7 @@ sub lsgenealogy {
       : _Parsevtree($ele, $opt{obsolete}, $ver);
     _Setdepths($ver, 0, \%gen);
     my %seen = ();
-    _Printparents($ver, \%gen, \%seen, 0);
+    _Printparents($ver, \%gen, \%seen, \%opt, 0);
   }
   exit 0;
 }
@@ -923,6 +924,8 @@ as a branch may always be spawn.
 =cut
 
 sub checkout {
+  use warnings;
+  use strict;
   map { $_ = readlink if -l && defined readlink } @ARGV[1..$#ARGV];
   # Duplicate the base Wrapper checkout functionality.
   my @agg = grep /^-(?:dir|rec|all|avo)/, @ARGV;
@@ -970,6 +973,8 @@ as this cannot reasonably be served in a new branch under BranchOff
 =cut
 
 sub mkbranch {
+  use warnings;
+  use strict;
   map { $_ = readlink if -l && defined readlink } @ARGV[1..$#ARGV];
   my @agg = grep /^-(?:dir|rec|all|avo)/, @ARGV;
   die Msg('E', "mutually exclusive flags: @agg") if @agg > 1;
@@ -1019,6 +1024,8 @@ argument is given.
 =cut
 
 sub diff {
+  use warnings;
+  use strict;
   for (@ARGV[1..$#ARGV]) {
     $_ = readlink if -l && defined readlink;
   }
@@ -1078,6 +1085,8 @@ no remaining versions, while unchecking out version number 0.
 =cut
 
 sub uncheckout {
+  use warnings;
+  use strict;
   my %opt;
   GetOptions(\%opt, qw(ok)) if grep /^-(dif|ok)/, @ARGV;
   for (@ARGV[1..$#ARGV]) {
@@ -1840,6 +1849,8 @@ See the documentation for examples of implementation.
 =cut
 
 sub lock {
+  use warnings;
+  use strict;
   my (%opt, $nusers);
   GetOptions(\%opt, qw(allow=s deny=s iflocked));
   GetOptions('nusers=s' => \$nusers);
@@ -1944,7 +1955,9 @@ environment variable.
 
 =cut
 
-sub unlock() {
+sub unlock {
+  use warnings;
+  use strict;
   my $unlock = ClearCase::Argv->new(@ARGV);
   $unlock->parse(qw(c|cfile=s cquery|cqeach nc version=s pname=s));
   my @args = $unlock->args;
@@ -3043,8 +3056,13 @@ sub mkview {
     $nr = $1 if $eqlst[0] =~ /^.*_(\d+\.\d+)$/;
     die Msg('E', qq("$lb" is not the top of a label type family)) unless $nr;
     if ($ts) {
+      my $ots = $ts;
       $rt = str2time($ts);
-      die Msg('E', qq(Failed to parse "$ts" as a timestamp)) unless $rt;
+      if (!$rt) {
+	$ts =~ tr/-./  /;
+	$rt = str2time($ts);
+      }
+      die Msg('E', qq(Failed to parse "$ots" as a timestamp)) unless $rt;
       die Msg('E', qq("$lb" is not a floating label type))
 	unless grep /^->/, $ct->des([qw(-s -ahl), $eqhl], $lbt)->qx;
       my $v = $lb =~ /(@.*)$/? $1 : '';
