@@ -35,10 +35,17 @@ generate a warning you should be ok.
 DEPENDENCIES
 
   ClearCase::Wrapper
+  Date::Format
+  Date::Parse
+  File::Slurp
 
   Even if ClearCase::Wrapper::DSB is not a dependency, the extension
 to catcs developed in it is compatible with the extension of config
 specs presented here, and can be used to display it.
+
+These modules are non standard and used by at least one function.
+Note that the optional configuration files in the 'extra' directory
+have more dependencies. Consult the Configuration.pod there
 
 KNOWN BUGS AND MISSING FEATURES
 
@@ -55,7 +62,6 @@ Many more functions need to be modified in order to support the
   - ls: should mention '-off /{root}' if 'BranchOff: root' is set
   - lsgen: should support a -graphical option
   - synctree: should be added as an operation, with a -from syntax.
-  - annotate
 
 I don't intend (for now) to modify findmerge, on the following
 grounds:
@@ -64,16 +70,16 @@ grounds:
   - the purpose of branching off the root of the version tree is to
     avoid cascading far away; few levels of cascading are innocuous.
 
-An other functionality is needed to support in-place publication,
+A type family functionality is offered to support in-place publication,
 directly from the development branches, in order to make the
 application of labels cheaper than it currently is.
 
-An other 'view attribute' is supported:
+Another 'view attribute' is supported, although seldom needed:
 '##:IncrementalLabels: LBTYPE@/vob/tag'.
-Preliminary documentation can be found at:
+The initial documentation can be found at:
   http://www.cmcrossroads.com/cgi-bin/cmwiki/view/CM/LabelFamily
   http://www.cmcrossroads.com/cgi-bin/cmwiki/view/CM/IncrementalTypesImp
-See also collaborative maintenance site:
+See also the collaborative maintenance site:
   http://code.google.com/p/clearcase-cpan/
 
 COPYRIGHT AND LICENCE
