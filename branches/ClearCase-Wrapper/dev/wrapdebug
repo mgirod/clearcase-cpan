@@ -41,10 +41,10 @@ BEGIN {
 	$pkg{$_}++ for values %ClearCase::Wrapper::ExtMap;
 	for (reverse sort keys %pkg) {
 	    s%::%/%g;
-	    my $as = catfile($_, 'autosplit.ix');
+	    my $as = catfile('auto', $_, 'autosplit.ix');
 	    my ($fas) = grep /\Q$as\E$/, keys %INC;
 	    die "Could not find $as in \%INC" unless $fas;
-	    my $dir = dirname($fas);
+	    my $dir = dirname($INC{$fas});
 	    opendir DIR, $dir or die "Could not open $dir";
 	    for (grep /\.al$/, readdir DIR) {
 		next if $seen{$_}++;
@@ -62,7 +62,6 @@ sub one_cmd {
     if (!$ENV{CLEARCASE_WRAPPER_NATIVE} && 
             ClearCase::Wrapper::Extension($ARGV[0])) {
 	# This provides support for writing extensions.
-#	local $^W = 0;
 	require ClearCase::Argv;
         {
             no warnings qw(redefine);
