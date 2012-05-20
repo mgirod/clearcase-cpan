@@ -5,7 +5,8 @@ $VERSION = '1.00';
 use warnings;
 use strict;
 use constant CYGWIN => $^O =~ /cygwin/i ? 1 : 0;
-use vars qw($ct $eqhl $prhl $sthl $fchl);
+use vars qw($ct $eqhl $prhl $sthl $fchl %xfer $benchstart);
+use File::Find;
 ($eqhl, $prhl, $sthl, $fchl) = qw(EqInc PrevInc StBr FullCpy);
 
 # Note: only wrapper supported functionality--possible fallback to cleartool
@@ -309,6 +310,32 @@ sub _Findfreeinc {	   # on input, the values may or may not exist
   }
   while (my ($k, $v) = each %n) { $$nxt{$k} = $v }
 }
+sub _Wanted {
+  my $path = File::Spec->rel2abs($File::Find::name);
+  $path =~ s%\\%/%g if $^O =~ /MSWin32|Windows_NT/i;
+  if (-f $_ || -l $_) {
+    if (-r _) {
+      # Passed all tests, put it on the list.
+      $xfer{$path} = $path;
+    } else {
+      warn Msg('E', "permission denied: $path");
+    }
+  } elsif (-d _) {
+    if ($_ eq 'lost+found') {
+      $File::Find::prune = 1;
+      return;
+    }
+    # Keep directories in the list only if they're empty.
+    opendir(DIR, $_) || warn Msg('E', "$_: $!");
+    my @entries = readdir DIR;
+    closedir(DIR);
+    $xfer{$path} = $path if @entries == 2;
+  } elsif (! -e _) {
+    die Msg('E', "no such file or directory: $path");
+  } else {
+    warn Msg('E', "unsupported file type: $path");
+  }
+}
 sub _Yesno {
   my ($cmd, $fn, $yn, $test, $errmsg) = @_;
   my $ret = 0;
@@ -368,6 +395,8 @@ use AutoLoader 'AUTOLOAD';
   $rollback = "$z [-force] [-c comment] -to increment";
   $archive = "$z [-c comment|-nc] brtype|lbtype ...";
   $annotate = "\n* [-line|-grep regexp]";
+  $synctree = "$z -from sbase [-c comment] [-quiet] [-force] [-summary]"
+    . "\n[-label type] [pname ...]";
 }
 
 #############################################################################
@@ -389,6 +418,10 @@ use AutoLoader 'AUTOLOAD';
 *an             = *annotate;
 *ann            = *annotate;
 *anno           = *annotate;
+*st             = *synctree;
+*sy             = *synctree;
+*syn            = *synctree;
+*sync           = *synctree;
 
 1;
 
@@ -3769,6 +3802,150 @@ sub annotate {
       print qq(Annotated result written to "$f".\n);
     }
   }
+  exit $rc;
+}
+
+=back
+
+=item * SYNCTREE
+
+This function offers an alternative interface, somewhat simplified,
+with different flags and default options, to the standalone
+I<synctree> script from I<ClearCase::SyncTree>.
+
+The implementation is however imported from the module.
+
+This is used to update a directory tree or a list of colocated elements.
+
+To create a tree in place, use preferably C<mkelem -rec>.
+
+The supported flags are:
+
+=over 1
+
+=item B<-from>
+
+=item B<-lab/el>
+
+=item B<-sum/mary>
+
+=item B<-c/omment>
+
+=item B<-quiet>
+
+=item B<-force>
+
+=back
+
+The default options used are (with respect to the standalone script):
+
+=over 1
+
+=item ci/checkin
+
+=item yes: no preview option, no prompting for confirmation
+
+=item rmname, if only one argument, and a directory
+
+=item rellinks: turn absolute symlinks within sbase into relative ones
+
+=item reuse: attempt to avoid creating evil twins
+
+=item vreuse, if label: do not create identical versions if can label old ones
+
+=item cr: config records are respected -- using "checkin -from"
+
+=back
+
+=cut
+
+sub synctree {
+  use strict;
+  use warnings;
+  use ClearCase::SyncTree 0.60; #warning: sort interpreted as function
+  use Benchmark;
+  use Cwd;
+  my %opt;
+  GetOptions(\%opt, qw(from=s summary label=s comment=s force));
+  Assert(@ARGV > 1);		# die with usage msg if untrue
+  shift @ARGV;
+  my @argv = ();
+  for (@ARGV) {
+    $_ = readlink if -l && defined readlink;
+    push @argv, MSWIN ? glob($_) : $_;
+  }
+  ClearCase::Argv->inpathnorm(0);
+  if ($opt{summary}) {
+    $benchstart = new Benchmark;
+    ClearCase::Argv->summary;	# start keeping stats
+    END {
+      if ($benchstart) {
+	# print out the stats we kept
+	print STDERR ClearCase::Argv->summary;
+	# show timing data
+	my $timing = timestr(timediff(new Benchmark, $benchstart));
+	print "Elapsed time: $timing\n";
+      }
+    }
+  }
+  my $sync = ClearCase::SyncTree->new;
+  if (@argv == 1 and -d $argv[0]) {
+    $opt{dbase} = $sync->dstbase($argv[0]);
+    @argv = ();
+  } else {
+    $opt{dbase} = $sync->dstbase(dirname($argv[0]));
+  }
+  die Msg('E', "no such directory $opt{from}") unless -f $opt{from};
+  $opt{sbase} = Cwd::realpath($opt{from});
+  $opt{sbase} =~ s%\\%/%g if MSWIN;
+  ClearCase::Argv->quiet(1) if $opt{quiet};
+  if ($opt{label}) {
+    my $ct = $sync->clone_ct({autofail=>0, stderr=>0});
+    my $dvob = $ct->desc(['-s'], "vob:$opt{dbase}")->qx;
+    my $lbtype = "lbtype:$opt{label}\@$dvob";
+    $sync->lblver($opt{label}) if $opt{vreuse} && $ct->desc(['-s'], $lbtype)->qx;
+    my ($inclb) = grep s/-> (lbtype:.*)$/$1/,
+      $ct->desc([qw(-s -ahl EqInc)], $lbtype)->qx;
+    if ($inclb) {
+      die "$prog: Error: incremental label types must be unlocked\n"
+	if $ct->lslock(['-s'], $lbtype, $inclb)->qx;
+      $inclb =~ s/^lbtype:(.*)@.*$/$1/;
+      $sync->inclb($inclb);
+    }
+  }
+  {
+    my @src;
+    if (@argv) {
+      die "List of arguments: not implemented yet";
+    } else {
+      push @src, $opt{sbase};
+    }
+    local $SIG{__WARN__} = sub { die Msg('E', @_) };
+    my %cfg;
+    $cfg{wanted} = \&_Wanted;
+    find(\%cfg, $_) for @src;
+  }
+  $sync->reuse(1);
+  $sync->vreuse(1) if $opt{label};
+  $sync->dstcheck;
+  my $rc = 0;
+  $sync->err_handler(\$rc) if $opt{force};
+  $opt{comment} = 'imported with "ct synctree"' unless $opt{comment};
+  $sync->comment($opt{comment});
+  $sync->srcbase($opt{sbase});
+  $sync->srcmap(%xfer);
+  $sync->remove(1) unless @argv;
+  $sync->rellinks(1);
+  $sync->analyze;
+  $sync->rmdirlinks;
+  $sync->add;
+  $sync->modify;
+  $sync->subtract unless @argv;
+  $sync->label($opt{label}) if $opt{label};
+  exit $rc unless $sync->get_addhash || $sync->get_modhash
+		                     || $sync->get_sublist || $sync->_lsco;
+  $sync->err_handler(\$rc);
+  $sync->checkin;
   exit $rc;
 }
 
