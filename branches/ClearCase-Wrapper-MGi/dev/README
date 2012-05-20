@@ -61,7 +61,6 @@ Many more functions need to be modified in order to support the
     direct parent is found on the same branch
   - ls: should mention '-off /{root}' if 'BranchOff: root' is set
   - lsgen: should support a -graphical option
-  - synctree: should be added as an operation, with a -from syntax.
 
 I don't intend (for now) to modify findmerge, on the following
 grounds:
