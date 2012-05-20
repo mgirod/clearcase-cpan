@@ -1,6 +1,6 @@
 package ClearCase::SyncTree;
 
-$VERSION = '0.59';
+$VERSION = '0.60';
 
 require 5.004;
 
@@ -947,8 +947,8 @@ sub add {
 	    $ct->failm("$src: no such file or directory");
 	}
     }
-    my @candidates = sort ($self->_lsprivate(1),
-			   map { $_->{dst} } values %{$self->{ST_CI_FROM}});
+    my @candidates = sort $self->_lsprivate(1),
+			  map { $_->{dst} } values %{$self->{ST_CI_FROM}};
     return if !@candidates;
     # We'll be separating the elements-to-be into files and directories.
     my(%files, @symlinks, %dirs);
