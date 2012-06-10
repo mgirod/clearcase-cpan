@@ -6,8 +6,10 @@ require 5.006;
 
 use AutoLoader 'AUTOLOAD';
 use B;
+use strict;
+use warnings;
 
-use vars qw(%Packages %ExtMap $libdir $diemexec);
+use vars qw(%Packages %ExtMap $libdir $prog $dieexit $dieexec $diemexec);
 
 # Inherit some symbols from the main package. We will later "donate"
 # these to all overlay packages as well.
@@ -22,7 +24,7 @@ BEGIN {
 use constant MSWIN => $^O =~ /MSWin|Windows_NT/i ? 1 : 0;
 
 # This is the list of functions we want to export to overlay pkgs.
-@exports = qw(MSWIN GetOptions Assert Burrow Msg Pred ViewTag
+my @exports = qw(MSWIN GetOptions Assert Burrow Msg Pred ViewTag
 		    AutoCheckedOut AutoNotCheckedOut AutoViewPrivate);
 
 # Hacks for portability with Windows env vars.
@@ -107,6 +109,7 @@ for my $subdir (qw(ClearCase/Wrapper ClearCase/Wrapper/Site)) {
 	    # newly-created symbol table, determine which functions
 	    # it defined, and import them here. The same basic thing is
 	    # done for the base package later.
+	    no strict 'refs';
 	    my %names = %{"${pkg}::"};
 	    for (keys %names) {
 		my $tglob = "${pkg}::$_";
@@ -145,13 +148,11 @@ for my $subdir (qw(ClearCase/Wrapper ClearCase/Wrapper/Site)) {
 
 $Packages{'ClearCase::Wrapper'} = __FILE__;
 
-use strict;
-
 # Piggyback on the -ver flag to show our version too.
 if (@ARGV && $ARGV[0] =~ /^-ver/i) {
     my $fmt = "*%-32s %s (%s)\n";
     local $| = 1;
-    for (keys %Packages) {
+    for (sort keys %Packages) {
 	my $ver = eval "\$$_\::VERSION" || '????';
 	my $mtime = localtime((stat $Packages{$_})[9]);
 	printf $fmt, $_, $ver, $mtime || '----';
@@ -225,7 +226,6 @@ if (my $pflag = _FirstIndex('-P', @ARGV)) {
 # Usage Message Extensions
 #############################################################################
 {
-   local $^W = 0;
    no strict 'vars';
 
    # Extended messages for actual cleartool commands that we extend.
@@ -241,9 +241,7 @@ if (my $pflag = _FirstIndex('-P', @ARGV)) {
    $uncheckout	= " * [-nc]";
 
    # Extended messages for pseudo cleartool commands that we implement here.
-   # Note: we used to localize $0 but that turns out to trigger a bug
-   # in perl 5.6.1.
-   my $z = (($ARGV[0] eq 'help') ? $ARGV[1] : $ARGV[0]) || '';
+   my $z = $ARGV[0] || '';
    $edit	= "$z <co-flags> [-ci] <ci-flags> pname ...";
    $extensions	= "$z [-long]";
 }
@@ -378,27 +376,25 @@ or entirely new commands to be synthesized.
 
 # Function to read through include files recursively, used by
 # config-spec parsing meta-commands. The first arg is a
-# "magic incrementing string", the second a filename,
-# the third an "action" which is eval-ed
+# filename, the second an "action" which is eval-ed
 # for each line.  It can be as simple as 'print' or as
 # complex a regular expression as desired. If the action is
 # null, only the names of traversed files are printed.
 sub Burrow {
-    local $input = shift;
+    # compatibility with old call signature, throw away uneeded param
+    shift if (@_ && $_[0] eq 'CATCS_00');
+
     my($filename, $action) = @_;
     print $filename, "\n" if !$action;
-    $input++;
-    if (!open($input, $filename)) {
-	warn "$filename: $!";
-	return 1;
-    }
-    while (<$input>) {
+    open($filename, $filename) || die Msg('E', "$filename: $!");
+    while (<$filename>) {
 	if (/^include\s+(.*)/) {
-	    Burrow($input, $1, $action);
+	    Burrow($1, $action);
 	    next;
 	}
 	eval $action if $action;
     }
+    close($filename);
     return 0;
 }
 
@@ -413,7 +409,6 @@ sub Msg {
 	$msg = "$prog: @_";
     }
     chomp $msg;
-    die $msg if !defined(wantarray);
     return "$msg\n";
 }
 

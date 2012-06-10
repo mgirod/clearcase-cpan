@@ -165,7 +165,7 @@ Revision history for Perl extension ClearCase::Wrapper.
 	- Tweaked indenting in show usage function
 	- Thanks to Marc Girod and Stephen Rauch for these changes
 
-1.17 Sat May 19 17:03:12 IST 2012
+1.17 Sun Jun 10 20:21:49 IST 2012
         - help for new commands: skip the cleartool error text.
 	- wrapdebug: an alternative driver, preloading modules for ease of debugging.
 	  Instructions of use in README.
@@ -173,5 +173,6 @@ Revision history for Perl extension ClearCase::Wrapper.
 	  packages, under the full @INC (to allow them to use modules).
 	- fixed the test of existence of the autosplit.ix file.
 	- fixed the filter for package symbols after require
-	These enhancements owe to Stephen Rauch for the original idea and some code,
-	as well as to Ben Morrow for assistance.
+	Several enhancements contributed by Stephen Rauch, together with the
+	original impulse to better support strict/warnings and debugging.
+	Thanks as well to Ben Morrow for assistance.

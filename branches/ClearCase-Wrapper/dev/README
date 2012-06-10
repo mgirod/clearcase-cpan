@@ -191,6 +191,25 @@ them in your own enhancements, though it's recommended you do. For
 performance reasons, the code is designed to load them only if and when
 they're used.
 
+FUNCTION NAME CONVENTIONS
+-------------------------
+
+sub mysub
+  'NORMAL' : 'op' which executes from command line, and help will work.
+
+sub _mysub
+  'HIDDEN' : 'op' which executes from command line, but no help as not
+      	   intended for the user.
+sub Mysub
+  'PUBLIC' : not an 'op', but expected to be shared with other extensions so
+      	    is exported to submodules
+sub _Mysub
+  'PRIVATE': not an 'op', and not expected to be shared with other extensions.
+
+sub MYSUB
+  'CONST'  : So don't do this, instead do this -> use constant MYSUB => ...
+
+
 DEBUGGING
 --------
 
