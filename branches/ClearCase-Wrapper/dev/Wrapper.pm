@@ -1179,11 +1179,9 @@ sub mkelem {
     # If the parent directories of any of the candidates are already
     # versioned elements we may need to check them out.
     require File::Basename;
-    my %seen;
     for (@vps) {
 	my $d = File::Basename::dirname($_);
 	next if ! $d || $dirs{$d};
-	next if $seen{$d}++;
 	my $lsd = $ct->ls(['-d'], $d)->qx;
 	# If no version selector was given it's a view-private dir and
 	# will be handled below.
