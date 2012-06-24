@@ -114,14 +114,14 @@ for my $subdir (qw(ClearCase/Wrapper ClearCase/Wrapper/Site)) {
 	    for (keys %names) {
 		my $tglob = "${pkg}::$_";
 		# Skip functions that can't be names of valid cleartool ops.
-		next if m%^_?[A-Z]%;
+		next if m%^(?:_?[A-Z]|__)%;
 		# Skip typeglobs that don't involve functions.
 	        my $coderef = \&{$tglob};
 	        ref $coderef or next;
 	        my $cv = B::svref_2object($coderef);
 		$cv->isa('B::CV') or next;
 		$cv->GV->isa('B::SPECIAL') and next;
-		my $p=$cv->GV->STASH->NAME;
+		my $p = $cv->GV->STASH->NAME;
 		next unless $p eq $pkg;
 
 		# Take what survives the above tests and create a hash
@@ -270,7 +270,7 @@ if (-r "$ENV{HOME}/.clearcase_profile.pl" && ! -e "$libdir/NO_OVERRIDES") {
 # Add to ExtMap the names of extensions defined in the base package.
 for (keys %ClearCase::Wrapper::) {
     # Skip functions that can't be names of valid cleartool ops.
-    next if m%^_?[A-Z]%;
+    next if m%^(?:_?[A-Z]|__)%;
     # Skip typeglobs that don't involve functions. We can only
     # do this test under >=5.6.0 since exists() on a coderef
     # is a new feature. The eval is needed to avoid a compile-
@@ -1179,9 +1179,11 @@ sub mkelem {
     # If the parent directories of any of the candidates are already
     # versioned elements we may need to check them out.
     require File::Basename;
+    my %seen;
     for (@vps) {
 	my $d = File::Basename::dirname($_);
 	next if ! $d || $dirs{$d};
+	next if $seen{$d}++;
 	my $lsd = $ct->ls(['-d'], $d)->qx;
 	# If no version selector was given it's a view-private dir and
 	# will be handled below.
