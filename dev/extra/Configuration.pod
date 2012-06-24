@@ -25,18 +25,20 @@ the wrapper for specific needs, either on a site on a user basis.
 
 The features described here are not enabled by default.
 
-One functionality is highly experimental: fixing the layout of source
+One functionality is highly experimental
+(the C<FSCBROKER> environment variable): fixing the layout of source
 containers for elements of text_file and derivate types, in
-conjunction with the I<BranchOff> mechanism.
+conjunction with the I<BranchOff> mechanism
 
 =head2 BranchOff
 
 The I<BranchOff> mechanism is one of the two driving forces of this
-wrapper (the other one being I<incremental type families>.
+wrapper (the other one being I<incremental type families).
 
-The intention is to make it possible to always branch off a version
-not on a branch one created oneself, and this without ending up
-cascading 'forever', i.e. until meeting system limits.
+The intention is to make it possible to always branch off,
+when checking out a version not already on a branch one created oneself;
+this without ending up cascading 'forever',
+i.e. until meeting system limits.
 
 The setup is simple, and per view. Start your config spec with a
 meta-comment such as:
@@ -49,6 +51,10 @@ every element (usually C</main/0>).
 
 The relation to the predecessor version is not lost: it is
 reestablished with a C<Merge> hyperlink.
+
+As this might result in 'bloated' source containers
+(in fact a very minor concern, even with certain advantages),
+an additional, optional setup may be considered: see below.
 
 =head3 fixsrccnt, FixSrcCont.pm, FSCbrokerSuDo, FSCbrokerSsh
 
@@ -113,7 +119,7 @@ accordingly:
 
 =head2 VobPathConv.pm
 
-I<VobPathConv.pm> (and its pod file) does however not require any
+I<VobPathConv.pm> (and its pod file) does not require any
 configuration and may be used as such. I may even consider to extract
 it and publish it as a separate package in its own, albeit modest,
 right.
@@ -133,9 +139,12 @@ The lack of such an ability is considered a bug in ClearCase, and is the
 object of an RFE (currently rejected...). It defeats the use of locking in
 general.
 
-The installer must select the solution best adapted to her case,
+The installer must select the solution(s) best adapted to her case,
 possibly edit a few fields appropriate to her environment, and copy
-the suitable file by hand to the parl lib/site_perl directory.
+the suitable file by hand to the lib/site_perl directory.
+
+Users must pick up these configurations with environment variables,
+e.g. setting them in their C<~/.clearcase_profile.pl> file
 
 I<ForceLockSudo.pm> implements the simplest, safest and most efficient
 solution, from unix. As its alternatives, dealing with cases in which
