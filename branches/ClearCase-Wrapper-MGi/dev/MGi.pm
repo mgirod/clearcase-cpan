@@ -3766,6 +3766,7 @@ sub annotate {
     my @mver = grep{s%^\s+-> (\S+)$%$1%} $ct->lsvtree([qw(-s -merge)], $a)->qx;
     my %add;
     for my $v (@mver) { #versions merged to
+      next if $v =~ /CHECKEDOUT$/; #annotate works only on checked-in versions
       my $ev = "$a\@\@$v";
       my ($prd) = grep{s/^<- (.*)/$1/} $ct->des([qw(-s -ahl Merge)], $ev)->qx;
       my @new = grep{s%^>\s+(.*)$%$1%} $ct->diff(['-diff'], $prd, $ev)->qx;
@@ -3776,7 +3777,7 @@ sub annotate {
       my @prune = @out;
       @out = ();
       for (@prune) {
-	if (/^\S+\s+(\S+) \S+\s+D?\s+(.*)$/) {
+	if (/^\S+\s+(\S+) \S+\s+(?:D\s+)?(.*)$/) {
 	  push @out, $_ if !defined($add{$1}) or $add{$1}->{$2};
 	} else {
 	  push @out, $_;
@@ -3787,7 +3788,8 @@ sub annotate {
     }
     if ($opt{out} and $opt{out} eq '-') {
       if ($re) {
-	print for grep /$re/, @out;
+	my $pfl = $ENV{CCMGI_ANNL} || 49; # format length: 10 + 1 + 25 + 9 + 3
+	print for grep {substr($_, $pfl) =~ /$re/} @out;
       } else {
 	print for @out;
       }

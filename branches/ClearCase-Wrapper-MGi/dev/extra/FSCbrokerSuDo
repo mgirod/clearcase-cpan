@@ -17,18 +17,22 @@ for (@ARGV) {
   push @{$batch{$1}}, $2 if /^(\w+?):(.*)$/;
 }
 for my $owner (keys %batch) {
-  my @arg = @{$batch{$owner}};
-  my $su = Sudo->new({
-    sudo => '/usr/bin/sudo',
-    username => $owner,
-    program => $fsc,
-    program_args => join '@@', @arg, # split on whitespace...
-  });
-  my $res = $su->sudo_run();
-  if (!$res->{rc}) {
-    $rc = 1;
-    print STDERR $res->{stderr}, "\n";
+  my $arg = join '@@', @{$batch{$owner}}; # split on whitespace...
+  if ((getpwuid($<))[0] eq $owner) {
+    $rc = system($fsc, $arg);
+  } else {
+    my $su = Sudo->new({
+      sudo => '/usr/bin/sudo',
+      username => $owner,
+      program => $fsc,
+      program_args => $arg
+    });
+    my $res = $su->sudo_run();
+    if (!$res->{rc}) {
+      $rc = 1;
+      print STDERR $res->{stderr}, "\n";
+    }
+    print STDOUT $res->{stdout}, "\n";
   }
-  print STDOUT $res->{stdout}, "\n";
 }
 exit $rc;

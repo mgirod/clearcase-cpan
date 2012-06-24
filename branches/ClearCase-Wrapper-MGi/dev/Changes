@@ -217,7 +217,7 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- renamed FSCbroker to FSCbrokeSsh
 	- annotate: fixes, in conjunction with new options: -line and -grep
 
-1.00 Sun May 20 18:38:34 IST 2012
+1.00 Sun Jun 24 19:20:52 BST 2012
         - no major change anymore in sight: formal publication signal
         - rollout: typo in help string
 	- rollout: check lock of baseline, and lock it as configured
@@ -225,3 +225,5 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- _wrap: renamed to _Wrap, and made small functions non autoload
 	- mkview -equiv: accept times with dashes and dots instead of spaces
 	- added a synctree function
+	- annotate -grep: only the lines searched
+	- extra/FSCbrokerSuDo: skip sudo for the owner account
