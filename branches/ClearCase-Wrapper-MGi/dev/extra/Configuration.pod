@@ -33,7 +33,7 @@ conjunction with the I<BranchOff> mechanism
 =head2 BranchOff
 
 The I<BranchOff> mechanism is one of the two driving forces of this
-wrapper (the other one being I<incremental type families).
+wrapper (the other one being I<incremental type families>).
 
 The intention is to make it possible to always branch off,
 when checking out a version not already on a branch one created oneself;
@@ -278,6 +278,8 @@ Four variables to consider (see earlier for the two first):
   FSCBROKER
   CLEARCASE_TAB_SIZE: affects the annotate format (default: 2)
   CCMGI_ANNF: annotate format
+  CCMGI_ANNL: length of the prefix in the annotate format
+    (before the actual file contents)
 
 The default annotate format is:
 
@@ -286,3 +288,10 @@ The default annotate format is:
 This means: a short date, a 25 chars right aligned, possibly truncated
 field for the version specification, a 9 chars left aligned field for
 the author. The same format is used for elisions as for additions.
+
+Its corresponding prefix length is: 49 (10 for the date, 25 for the
+version, 9 for the id, 2 for space separators, and 3 for the deletion
+marker--including spaces).
+
+This prefix is used to compute the beginning of the text upon which to
+apply regexps in case of using the C<-grep> option of C<annotate>.
