@@ -1,7 +1,6 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Sudo;
 BEGIN {
   delete @ENV{qw(IFS CDPATH PATH ENV BASH_ENV)};
 }
@@ -10,6 +9,7 @@ BEGIN {
 # This is the version using sudo. There is an alternative version using ssh.
 
 my $fsc ='/usr/local/bin/fixsrccont';
+my $sudo = '/usr/bin/sudo';
 
 my $rc = 0;
 my %batch;
@@ -18,21 +18,7 @@ for (@ARGV) {
 }
 for my $owner (keys %batch) {
   my $arg = join '@@', @{$batch{$owner}}; # split on whitespace...
-  if ((getpwuid($<))[0] eq $owner) {
-    $rc = system($fsc, $arg);
-  } else {
-    my $su = Sudo->new({
-      sudo => '/usr/bin/sudo',
-      username => $owner,
-      program => $fsc,
-      program_args => $arg
-    });
-    my $res = $su->sudo_run();
-    if (!$res->{rc}) {
-      $rc = 1;
-      print STDERR $res->{stderr}, "\n";
-    }
-    print STDOUT $res->{stdout}, "\n";
-  }
+  $rc |= ((getpwuid($<))[0] eq $owner)? system($fsc, $arg)
+    : system($sudo, '-u', $owner, $fsc, $arg);
 }
 exit $rc;
