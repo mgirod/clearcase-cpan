@@ -229,3 +229,4 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- extra/FSCbrokerSuDo: skip sudo for the owner account
 	- support 'an' shortcut
 	- lock: minor fix--pass non lbtype args to cleartool unaltered
+	- unlock performs a cptype if needed
