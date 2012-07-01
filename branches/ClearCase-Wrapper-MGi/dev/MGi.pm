@@ -1926,30 +1926,33 @@ sub lock {
   $ct = ClearCase::Argv->new({autochomp=>1});
   my (@lbt, @oth, %vob);
   my $locvob = $ct->des(['-s'], 'vob:.')->stderr(0)->qx;
-  foreach my $t ($ct->des([qw(-fmt %Xn\n)], @args)->qx) {
-    if ($ct->des([qw(-fmt %m)], $t)->stderr(0)->qx eq 'label type') {
-      my ($t1, $v) = $t;
-      $v = $2 if $t =~ s/lbtype:(.*)@(.*)$/$1/;
-      $vob{$t} = $v;
-      push @lbt, $t;
-      my @et = grep s/^-> lbtype:(.*)@.*$/$1/,
-	$ct->des([qw(-s -ahl), $eqhl], $t1)->qx;
-      if (@et) {
-	my ($e, $p) = ($et[0], '');
-	$vob{$e} = $vob{$t};
-	push @lbt, $e;
-	my @pt = grep s/^-> lbtype:(.*)@.*$/$1/,
-	  $ct->des([qw(-s -ahl), $prhl], "lbtype:$e\@$v")->qx;
-	if (@pt) {
-	  $p = $pt[0];
-	  if (!$ct->lslock(['-s'], "lbtype:$p\@$v")->stderr(0)->qx) {
-	    push @lbt, $p;
-	    $vob{$p} = $v;
+  foreach (@args) {
+    if (/^lbtype:/) {
+      my $t = $ct->des([qw(-fmt %Xn\n)], $_)->qx;
+      if ($t and $ct->des([qw(-fmt %m)], $t)->stderr(0)->qx eq 'label type') {
+	my ($t1, $v) = $t;
+	$v = $2 if $t =~ s/lbtype:(.*)@(.*)$/$1/;
+	$vob{$t} = $v;
+	push @lbt, $t;
+	my @et = grep s/^-> lbtype:(.*)@.*$/$1/,
+	  $ct->des([qw(-s -ahl), $eqhl], $t1)->qx;
+	if (@et) {
+	  my ($e, $p) = ($et[0], '');
+	  $vob{$e} = $vob{$t};
+	  push @lbt, $e;
+	  my @pt = grep s/^-> lbtype:(.*)@.*$/$1/,
+	    $ct->des([qw(-s -ahl), $prhl], "lbtype:$e\@$v")->qx;
+	  if (@pt) {
+	    $p = $pt[0];
+	    if (!$ct->lslock(['-s'], "lbtype:$p\@$v")->stderr(0)->qx) {
+	      push @lbt, $p;
+	      $vob{$p} = $v;
+	    }
 	  }
 	}
       }
     } else {
-      push @oth, $t;
+      push @oth, $_;
     }
   }
   my $rc = @oth? $lock->args(@oth)->system : 0;
@@ -3693,6 +3696,7 @@ sub annotate {
   GetOptions(\%out, qw(line grep=s));
   GetOptions(\%ignore, qw(all rm));
   GetOptions(\%opt, qw(nco out=s));
+  $ARGV[0] = 'annotate'; #make 'ct an' work
   my $ann = ClearCase::Argv->new(@ARGV);
   $ann->parse(qw(short|long fmt=s rmfmt=s nheader ndata force));
   my $fout = ($opt{out} and $opt{out} ne '-')? $opt{out} : '';
