@@ -302,7 +302,7 @@ sub _Findnext {		# on input, the type exists
 sub _Findfreeinc {	   # on input, the values may or may not exist
   my ($nxt, %n) = shift;
   while (my ($k, $v) = each %{$nxt}) {
-    while ($ct->argv(qw(des -s), "lbtype:$v")->stderr(0)->qx) { #exists
+    while ($ct->des(['-s'], "lbtype:$v")->stderr(0)->qx) { #exists
       my @cand = sort _Compareincs _Findnext($v);
       $v = _Nextinc($cand[$#cand]);
     }
@@ -1523,7 +1523,7 @@ sub _GenMkTypeSub {
 		    die Msg('E', qq("$t" conflicts with an archived type))
 		      if grep m%/\Q$vob[0]\E$%, @{$g0};
 		  }
-		  $ct->argv('unlock', $t0)->system;
+		  _Wrap('unlock', $t0);
 		  my $lbt = "lbtype:$t";
 		  $ct->rename($t0, $lbt)->stderr(0)->system
 		    and die Msg('E', qq(Failed to restore "$t0" into "$t".));
@@ -1546,8 +1546,9 @@ sub _GenMkTypeSub {
 		  $glo{$t} = 1 if $g0 and !grep(/^-glo/, @opts);
 		  if (my ($p) = grep s/^-> (.*)$/$1/,
 		      $ct->des([qw(-s -ahl), $prhl], "lbtype:$t")->qx) {
-		    ($pair{$t}) = grep s/^-> lbtype:(.*)$/$1/,
+		    my ($e) = grep s/^-> lbtype:(.*)$/$1/,
 		      $ct->des([qw(-s -ahl), $eqhl], $p)->qx;
+		    $pair{$t} = $e || "${pfx}_1.00$sfx";
 		  } else {
 		    $pair{$t} = "${pfx}_1.00$sfx";
 		  }
@@ -1581,7 +1582,7 @@ sub _GenMkTypeSub {
 	      $ntype->system;
 	      my $inc = "$type:$pair{$t}";
 	      my $tt = $ct->des([qw(-fmt %Xn)], "$type:$t")->qx;
-	      $silent->argv('mkhlink', $eqhl, $tt, $inc)->system;
+	      $silent->mkhlink([$eqhl, $tt], $inc)->system;
 	      next if $type eq 'brtype';
 	      if ($glo{$t}) { # If restored type, otherwise handle all later
 		my @tvob = grep {s/^<- lbtype:.*?\@(.*)$/$1/}
@@ -1989,6 +1990,10 @@ There may be an issue if the two types are not owned by the same account.
 See the B<LOCK> documentation for overcoming it with a B<FORCELOCK>
 environment variable.
 
+There is also the case of global types: then one ensures that the
+family type is usable locally, by copying in the equivalent
+incremental type.
+
 =cut
 
 sub unlock {
@@ -1998,21 +2003,26 @@ sub unlock {
   $unlock->parse(qw(c|cfile=s cquery|cqeach nc version=s pname=s));
   my @args = $unlock->args;
   $ct = ClearCase::Argv->new({autochomp=>1});
-  my (@lbt, @oth, %vob);
+  my (@lbt, @oth, %vob, %eqt);
   my $locvob = $ct->des(['-s'], 'vob:.')->stderr(0)->qx;
-  foreach my $t ($ct->des([qw(-fmt %Xn\n)], @args)->qx) {
-    if ($ct->des([qw(-fmt %m)], $t)->stderr(0)->qx eq 'label type') {
-      my $t1 = $t;
-      $vob{$t} = $2 if $t =~ s/lbtype:(.*?)@(.*)$/$1/;
-      push @lbt, $t;
-      my @et = grep s/^-> lbtype:(.*)@.*$/$1/,
-	$ct->des([qw(-s -ahl), $eqhl], $t1)->qx;
-      if (@et) {
-	push @lbt, $et[0];
-	$vob{$et[0]} = $vob{$t};
+  foreach (@args) {
+    if (/^lbtype:/) {
+      my $t = $ct->des([qw(-fmt %Xn\n)], $_)->qx;
+      if ($ct->des([qw(-fmt %m)], $t)->stderr(0)->qx eq 'label type') {
+	my $t1 = $t;
+	$vob{$t} = $2 if $t =~ s/lbtype:(.*?)@(.*)$/$1/;
+	push @lbt, $t;
+	my @et = grep s/^-> lbtype:(.*)@.*$/$1/,
+	  $ct->des([qw(-s -ahl), $eqhl], $t1)->qx;
+	if (@et) {
+	  my $eq = $et[0];
+	  $eqt{$_} = $eq;
+	  push @lbt, $eq;
+	  $vob{$eq} = $vob{$t};
+	}
       }
     } else {
-      push @oth, $t;
+      push @oth, $_;
     }
   }
   my $rc = @oth? $unlock->args(@oth)->system : 0;
@@ -2041,6 +2051,15 @@ sub unlock {
       warn Msg('E', 'Object is not locked.');
       warn Msg('E', "Unable to unlock label type \"$lt\".");
       $rc = 1;
+    }
+  }
+  for (@args) {
+    my $eq = $eqt{$_};
+    my $lb = "lbtype:$eq";
+    if (!$ct->des(['-s'], $lb)->stderr(0)->qx) {
+      my $v = $vob{$eq};
+      my $ets = ($lb =~ /^([^@]*)/)[0] . "\@$v";
+      _Wrap('cptype', $ets, $lb);
     }
   }
   exit $rc;
