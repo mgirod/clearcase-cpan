@@ -40,7 +40,7 @@ sub add2fix {
     my $oidbr = $ct->des([qw(-fmt %On)], $br)->qx;
     my ($dir) = grep s/^source cont="(.*)"$/$1/, $ct->dump($v0)->qx;
     $dir = dirname($dir);
-    my $owner = $ct->des([qw(-fmt %[owner]p)], "vob:$ele")->qx;
+    my $owner = $ct->des([qw(-fmt %[owner]p)], "vob:$ele\@\@")->qx; # for -nda
     $owner =~ s%^.*/%%;
     push @{$tofix{$owner}}, join '@', $dir, $oid0, $oidbr, $oidpr;
   }
