@@ -2055,6 +2055,7 @@ sub unlock {
   }
   for (@args) {
     my $eq = $eqt{$_};
+    next unless $eq;
     my $lb = "lbtype:$eq";
     if (!$ct->des(['-s'], $lb)->stderr(0)->qx) {
       my $v = $vob{$eq};
