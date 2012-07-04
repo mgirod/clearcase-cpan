@@ -72,77 +72,80 @@ $Getopt::Long::ignorecase = 0;  # global override for dumb default
 ## placed in the standard package analogous to their pathname
 ## (e.g. ClearCase::Wrapper::Foo). Magic occurs here to get
 ## them into ClearCase::Wrapper where they belong.
+sub _FindAndLoadModules {
+    my ($dir, $subdir) = @_;
+    # Not sure how glob() sorts so force a standard order.
+    my @pms = sort glob("$dir/$subdir/*.pm");
+    for my $pm (@pms) {
+	$pm =~ s%^$dir/(.*)\.pm$%$1%;
+	(my $pkg = $pm) =~ s%[/\\]+%::%g;
+	eval "*${pkg}::exit = \$dieexit";
+	eval "*${pkg}::exec = \$dieexec";
+
+	# In this block we temporarily enter the overlay's package
+	# just in case the overlay module forgot its package stmt.
+	# We then require the overlay file and also, if it's
+	# an autoloaded module (which is recommended), we drag
+	# in the index file too. This is because we need to
+	# derive a list of all functions defined in the overlay
+	# in order to import them to our own namespace.
+	{
+	    eval qq(package $pkg); # default the pkg correctly
+	    no warnings qw(redefine);
+	    eval {
+		eval "require $pkg";
+		warn $@ if $@;
+	    };
+	    next if $@;
+	    my $ix = "auto/$pm/autosplit.ix";
+	    if (-e "$dir/$ix") {
+		eval { require $ix };
+		warn $@ if $@;
+	    }
+	}
+
+	# Now the overlay module is read in. We need to examine its
+	# newly-created symbol table, determine which functions
+	# it defined, and import them here. The same basic thing is
+	# done for the base package later.
+	no strict 'refs';
+	my %names = %{"${pkg}::"};
+	for (keys %names) {
+	    my $tglob = "${pkg}::$_";
+	    # Skip functions that can't be names of valid cleartool ops.
+	    next if m%^(?:_?[A-Z]|__)%;
+	    # Skip typeglobs that don't involve functions.
+	    my $coderef = \&{$tglob};
+	    ref $coderef or next;
+	    my $cv = B::svref_2object($coderef);
+	    $cv->isa('B::CV') or next;
+	    $cv->GV->isa('B::SPECIAL') and next;
+	    my $p = $cv->GV->STASH->NAME;
+	    next unless $p eq $pkg;
+
+	    # Take what survives the above tests and create a hash
+	    # mapping defined functions to the pkg that defines them.
+	    $ExtMap{$_} = $pkg;
+	    # We import the entire typeglob for 'foo' when we
+	    # find an extension func named foo(). This allows usage
+	    # msg extensions (in the form $foo) to come over too.
+	    eval qq(*$_ = *$tglob);
+	}
+
+	# The base module defines a few functions which the
+	# overlay's code might want to use. Make aliases
+	# for those in the overlay's symbol table.
+	for (@exports) {
+	    eval "*${pkg}::$_ = \\&$_";
+	}
+	eval "*${pkg}::prog = \\\$prog";
+
+	$Packages{$pkg} = $INC{"$pm.pm"};
+    }
+}
 for my $subdir (qw(ClearCase/Wrapper ClearCase/Wrapper/Site)) {
     for my $dir (@INC) {
-	$dir =~ s%\\%/%g if MSWIN;
-	# Not sure how glob() sorts so force a standard order.
-	my @pms = sort glob("$dir/$subdir/*.pm");
-	for my $pm (@pms) {
-	    $pm =~ s%^$dir/(.*)\.pm$%$1%;
-	    (my $pkg = $pm) =~ s%[/\\]+%::%g;
-	    eval "*${pkg}::exit = \$dieexit";
-	    eval "*${pkg}::exec = \$dieexec";
-
-	    # In this block we temporarily enter the overlay's package
-	    # just in case the overlay module forgot its package stmt.
-	    # We then require the overlay file and also, if it's
-	    # an autoloaded module (which is recommended), we drag
-	    # in the index file too. This is because we need to
-	    # derive a list of all functions defined in the overlay
-	    # in order to import them to our own namespace.
-	    {
-		eval qq(package $pkg); # default the pkg correctly
-		no warnings qw(redefine);
-		eval {
-		    eval "require $pkg";
-		    warn $@ if $@;
-		};
-		next if $@;
-		my $ix = "auto/$pm/autosplit.ix";
-		if (-e "$dir/$ix") {
-		    eval { require $ix };
-		    warn $@ if $@;
-		}
-	    }
-
-	    # Now the overlay module is read in. We need to examine its
-	    # newly-created symbol table, determine which functions
-	    # it defined, and import them here. The same basic thing is
-	    # done for the base package later.
-	    no strict 'refs';
-	    my %names = %{"${pkg}::"};
-	    for (keys %names) {
-		my $tglob = "${pkg}::$_";
-		# Skip functions that can't be names of valid cleartool ops.
-		next if m%^(?:_?[A-Z]|__)%;
-		# Skip typeglobs that don't involve functions.
-	        my $coderef = \&{$tglob};
-	        ref $coderef or next;
-	        my $cv = B::svref_2object($coderef);
-		$cv->isa('B::CV') or next;
-		$cv->GV->isa('B::SPECIAL') and next;
-		my $p = $cv->GV->STASH->NAME;
-		next unless $p eq $pkg;
-
-		# Take what survives the above tests and create a hash
-		# mapping defined functions to the pkg that defines them.
-		$ExtMap{$_} = $pkg;
-		# We import the entire typeglob for 'foo' when we
-		# find an extension func named foo(). This allows usage
-		# msg extensions (in the form $foo) to come over too.
-		eval qq(*$_ = *$tglob);
-	    }
-
-	    # The base module defines a few functions which the
-	    # overlay's code might want to use. Make aliases
-	    # for those in the overlay's symbol table.
-	    for (@exports) {
-		eval "*${pkg}::$_ = \\&$_";
-	    }
-	    eval "*${pkg}::prog = \\\$prog";
-
-	    $Packages{$pkg} = $INC{"$pm.pm"};
-	}
+	_FindAndLoadModules($dir, $subdir);
     }
 }
 
