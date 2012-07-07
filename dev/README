@@ -209,6 +209,8 @@ sub _Mysub
 sub MYSUB
   'CONST'  : So don't do this, instead do this -> use constant MYSUB => ...
 
+Note: these rules apply also to the names of global variables defined
+in the overlay modules. So, use initial uppercases...
 
 DEBUGGING
 --------
