@@ -111,15 +111,14 @@ sub _FindAndLoadModules {
 	no strict 'refs';
 	my %names = %{"${pkg}::"};
 	for (keys %names) {
+	    # Skip symbols that can't be names of valid cleartool ops.
+	    next if m%^(?:_?[A-Z]|__|[ab]$)%;
 	    my $tglob = "${pkg}::$_";
-	    # Skip functions that can't be names of valid cleartool ops.
-	    next if m%^(?:_?[A-Z]|__)%;
-	    # Skip typeglobs that don't involve functions.
 	    my $coderef = \&{$tglob};
-	    ref $coderef or next;
+	    next unless ref $coderef;
 	    my $cv = B::svref_2object($coderef);
-	    $cv->isa('B::CV') or next;
-	    $cv->GV->isa('B::SPECIAL') and next;
+	    next unless $cv->isa('B::CV');
+	    next if $cv->GV->isa('B::SPECIAL');
 	    my $p = $cv->GV->STASH->NAME;
 	    next unless $p eq $pkg;
 
@@ -274,13 +273,9 @@ if (-r "$ENV{HOME}/.clearcase_profile.pl" && ! -e "$libdir/NO_OVERRIDES") {
 for (keys %ClearCase::Wrapper::) {
     # Skip functions that can't be names of valid cleartool ops.
     next if m%^(?:_?[A-Z]|__)%;
-    # Skip typeglobs that don't involve functions. We can only
-    # do this test under >=5.6.0 since exists() on a coderef
-    # is a new feature. The eval is needed to avoid a compile-
-    # time error in <5.6.0.
-    if ($] >= 5.006) {
-	next unless eval "exists \&ClearCase::Wrapper::$_";
-    }
+    # Skip typeglobs that don't involve functions.
+    my $tglob = "ClearCase::Wrapper::$_";
+    next unless ref \&{$tglob};
     # Take what survives the above tests and create a hash
     # mapping defined functions to the pkg that defines them.
     $ExtMap{$_} ||= __PACKAGE__;
