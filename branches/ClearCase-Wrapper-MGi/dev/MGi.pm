@@ -722,33 +722,15 @@ sub _EqLbTypeList {
   my $top = shift;
   return unless $top;
   $top = "lbtype:$top" unless $top =~ /^lbtype:/;
-  my $CT = ClearCase::Argv->new({autochomp=>1});
-  my ($eq) = grep s/^-> (.*)$/$1/,
-    $CT->argv(qw(des -s -ahl), $EQHL, $top)->qx;
+  my $ct = ClearCase::Argv->new({autochomp=>1});
+  my ($eq) = grep s/^-> (.*)$/$1/, $ct->des([qw(-s -ahl), $EQHL], $top)->qx;
   $_ = $eq? $eq : $top;
   my @list;
   do {
     push @list, $1 if /^lbtype:(.*?)(@.*)?$/;
-    ($_) = grep s/^-> (.*)$/$1/,
-      $CT->argv(qw(des -s -ahl), $PRHL, $_)->qx;
+    ($_) = grep s/^-> (.*)$/$1/, $ct->des([qw(-s -ahl), $PRHL], $_)->qx;
   } while ($_);
   return @list;
-}
-sub _FltType {
-  use strict;
-  use warnings;
-  my $lbt = shift;
-  return unless $lbt;
-  $lbt = "lbtype:$lbt" unless $lbt =~ /^lbtype:/;
-  my $CT = ClearCase::Argv->new({autochomp=>1});
-  while (($_) = grep s/^<- (.*)$/$1/,
-	 $CT->argv(qw(des -s -ahl), $PRHL, $lbt)->qx) {
-    $lbt = $_;
-  }
-  my ($eq) = grep s/^<- (.*)$/$1/, $CT->argv(qw(des -s -ahl), $EQHL, $lbt)->qx;
-  return '' unless $eq;
-  $eq =~ s/^lbtype:(.*)\@.*$/$1/;
-  return $eq;
 }
 # Record the elements on the path to the argument, from 'mklabel -up'
 # Issues: symbolic links, esp. cross-vob, relative or absolute, view extended
@@ -2829,12 +2811,12 @@ sub setcs {
     if $opt{expand} && $opt{needed};
   my $tag = ViewTag(@ARGV) if grep /^(expand|sync|needed|clone)$/, keys %opt;
   if ($opt{expand}) {
-    my $CT = Argv->new([$^X, '-S', $0]);
+    my $ct = Argv->new([$^X, '-S', $0]);
     my $settmp = ".$::prog.setcs.$$";
     open(EXP, ">$settmp") || die Msg('E', "$settmp: $!");
-    print EXP $CT->opts(qw(catcs -expand -tag), $tag)->qx;
+    print EXP $ct->opts(qw(catcs -expand -tag), $tag)->qx;
     close(EXP);
-    $CT->opts('setcs', $settmp)->system;
+    $ct->opts('setcs', $settmp)->system;
     unlink $settmp;
     exit $?;
   } elsif ($opt{sync} || $opt{needed}) {
@@ -2855,12 +2837,12 @@ sub setcs {
       exit $needed;
     }
   } elsif ($opt{clone}) {
-    my $CT = ClearCase::Argv->new;
-    my $CTx = $CT->find_cleartool;
+    my $ct = ClearCase::Argv->new;
+    my $ctx = $ct->find_cleartool;
     my $cstmp = ".$ARGV[0].$$.cs.$tag";
     Argv->autofail(1);
-    Argv->new("$CTx catcs -tag $opt{clone} > $cstmp")->system;
-    $CT->setcs('-tag', $tag, $cstmp)->system;
+    Argv->new("$ctx catcs -tag $opt{clone} > $cstmp")->system;
+    $ct->setcs('-tag', $tag, $cstmp)->system;
     unlink($cstmp);
     exit 0;
   }
@@ -2895,11 +2877,11 @@ sub setcs {
   my $nr = $1 if $eqlst[0] =~ /^.*_(\d+\.\d+)$/;
   die Msg('E', qq($lbtype" is not the top of a label type family))
     unless $nr;
-  my $CT = ClearCase::Argv->new({autochomp=>1});
-  $tag = $CT->argv(qw(pwv -s))->qx unless $tag = $setcs->flag('tag');
+  my $ct = ClearCase::Argv->new({autochomp=>1});
+  $tag = $ct->pwv('-s')->qx unless $tag = $setcs->flag('tag');
   die Msg('E', 'Cannot get view info for current view: not a ClearCase object.')
     unless $tag;
-  my ($vws) = reverse split '\s+', $CT->argv('lsview', $tag)->qx;
+  my ($vws) = reverse split '\s+', $ct->lsview($tag)->qx;
   open $fh, '>', "$vws/$lbtype"
     or die Msg('E',
 	       qq(Failed to write config spec fragment "$vws/$lbtype": $!\n));
@@ -3500,8 +3482,6 @@ sub rollback {
   exit 0; #FIXME: return code
 }
 
-=back
-
 =item * ARCHIVE
 
 New command. Synonymous to alternatively mkbrtype or mklbtype -arc
@@ -3554,8 +3534,6 @@ sub archive {
   ClearCase::Wrapper->help();
   return 1;
 }
-
-=back
 
 =item * LSTYPE
 
@@ -3648,8 +3626,6 @@ sub lstype {
   $lst->pipe; # no fallback!
   exit 0;
 }
-
-=back
 
 =item * ANNOTATE
 
@@ -3831,8 +3807,6 @@ sub annotate {
   exit $rc;
 }
 
-=back
-
 =item * SYNCTREE
 
 This function offers an alternative interface, somewhat simplified,
@@ -3926,15 +3900,15 @@ sub synctree {
   $opt{sbase} =~ s%\\%/%g if MSWIN;
   ClearCase::Argv->quiet(1) if $opt{quiet};
   if ($opt{label}) {
-    my $CT = $sync->clone_ct({autofail=>0, stderr=>0});
-    my $dvob = $CT->desc(['-s'], "vob:$opt{dbase}")->qx;
+    my $ct = $sync->clone_ct({autofail=>0, stderr=>0});
+    my $dvob = $ct->des(['-s'], "vob:$opt{dbase}")->qx;
     my $lbtype = "lbtype:$opt{label}\@$dvob";
-    $sync->lblver($opt{label}) if $opt{vreuse} && $CT->desc(['-s'], $lbtype)->qx;
+    $sync->lblver($opt{label}) if $opt{vreuse} && $ct->des(['-s'], $lbtype)->qx;
     my ($inclb) = grep s/-> (lbtype:.*)$/$1/,
-      $CT->desc([qw(-s -ahl EqInc)], $lbtype)->qx;
+      $ct->des([qw(-s -ahl EqInc)], $lbtype)->qx;
     if ($inclb) {
       die "$prog: Error: incremental label types must be unlocked\n"
-	if $CT->lslock(['-s'], $lbtype, $inclb)->qx;
+	if $ct->lslock(['-s'], $lbtype, $inclb)->qx;
       $inclb =~ s/^lbtype:(.*)@.*$/$1/;
       $sync->inclb($inclb);
     }
