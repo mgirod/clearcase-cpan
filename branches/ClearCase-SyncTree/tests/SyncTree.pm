@@ -1233,7 +1233,7 @@ sub subtract {
     for my $d (sort {$b cmp $a} keys %dir) {
 	next if $keep{$d};
 	my ($k) = ($d =~ m%^\Q$dbase\E/(.*)$%);
-	if ($self->{ST_SRCMAP}->{$k}) {
+	if ($k and $self->{ST_SRCMAP}->{$k}) {
 	    delete $exnames->{$d};
 	    my $dad = $d;
 	    $keep{$dad}++ while $dad = dirname($dad) and $dad gt $dbase;
