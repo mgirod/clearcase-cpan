@@ -3927,7 +3927,20 @@ sub synctree {
   {
     my @src;
     if (@argv) {
-      die "List of arguments: not implemented yet";
+      my @abort;
+      for my $arg (@argv) {
+	if (-r $arg) {
+	  my $real = Cwd::realpath($arg);
+	  $real = $sync->normalize($real);
+	  if ($real =~ s/^\Q$opt{dbase}\E/$opt{sbase}/ and -r $real) {
+	    push @src, $real;
+	    next;
+	  }
+	}
+	push @abort, $arg;
+      }
+      die Msg('E', "argument" . (@abort > 1? 's' : '') . " not found:\n  "
+		. join("\n  ", @abort)) if @abort;
     } else {
       push @src, $opt{sbase};
     }
