@@ -1371,6 +1371,17 @@ sub _GenMkTypeSub {
 	    my $vobs = join ', ', grep s/^.*\@//, @new;
 	    die Msg('E', "No '$args[0]' in $vobs. Forgot an '-exc' option?");
 	  }
+	} else {
+	  my @mst = map{$CT->des([qw(-fmt %[master]p)], "lbtype:$_")->qx} @t;
+	  my @lrep = map{$CT->des([qw(-fmt %[replica_name]p)], "vob:$_")->qx}
+	    @vob;
+	  my @nlm; #non locally mastered types
+	  for (@mst) {
+	    my $lr = shift @lrep;
+	    push @nlm, shift(@t) unless /^\Q$lr\E\@/;
+	  }
+	  die Msg('E', "Cannot increment non locally mastered types: @nlm")
+	    if @nlm;
 	}
       }
       if (!$opt{family} and !$opt{config} and !$ntype->flag('global')) {
@@ -3889,13 +3900,13 @@ sub synctree {
     }
   }
   my $sync = ClearCase::SyncTree->new;
-  if (@argv == 1 and -d $argv[0]) {
+  if (@argv == 1 and (-d $argv[0] or ! -e $argv[0])) {
     $opt{dbase} = $sync->dstbase($argv[0]);
     @argv = ();
   } else {
     $opt{dbase} = $sync->dstbase(dirname($argv[0]));
   }
-  die Msg('E', "no such directory $opt{from}") unless -f $opt{from};
+  die Msg('E', "no such directory $opt{from}") unless -d $opt{from};
   $opt{sbase} = Cwd::realpath($opt{from});
   $opt{sbase} =~ s%\\%/%g if MSWIN;
   ClearCase::Argv->quiet(1) if $opt{quiet};
@@ -3945,6 +3956,16 @@ sub synctree {
   exit $rc unless $sync->get_addhash || $sync->get_modhash
 		                     || $sync->get_sublist || $sync->_lsco;
   $sync->err_handler(\$rc);
+  if ($ENV{FSCBROKER}) {
+    require ClearCase::FixSrcCont; #optional fix of source container
+    my $ct = $sync->clone_ct({autofail=>0});
+    for ($ct->lsco([qw(-cview -me -a -fmt), '%PVn %[hlink:Merge]p\n'],
+		   $opt{dbase})->qx) {
+      next unless m%^\S+/0 "Merge\@.*?" <- "(.*?)"%;
+      ClearCase::FixSrcCont::add2fix($1);
+    }
+    ClearCase::FixSrcCont::runfix();
+  }
   $sync->checkin;
   exit $rc;
 }
