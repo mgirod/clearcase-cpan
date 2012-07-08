@@ -217,16 +217,17 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- renamed FSCbroker to FSCbrokeSsh
 	- annotate: fixes, in conjunction with new options: -line and -grep
 
-1.00 Sun Jul  1 10:58:10 IST 2012
+1.00 Sun Jul  8 16:15:02 IST 2012
         - no major change anymore in sight: formal publication signal
         - rollout: typo in help string
 	- rollout: check lock of baseline, and lock it as configured
 	- rollback: fix to remote case on UNIX
 	- _wrap: renamed to _Wrap, and made small functions non autoload
 	- mkview -equiv: accept times with dashes and dots instead of spaces
-	- added a synctree function
+	- added a synctree function, optionally fixing text file containers
 	- annotate -grep: only the lines searched
 	- extra/FSCbrokerSuDo: skip sudo for the owner account
 	- support 'an' shortcut
 	- lock: minor fix--pass non lbtype args to cleartool unaltered
 	- unlock performs a cptype if needed
+	- mklbtype -inc: test locally mastered before creating new increment
