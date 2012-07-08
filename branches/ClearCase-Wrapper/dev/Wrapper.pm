@@ -289,6 +289,16 @@ sub Extension {
     return $ExtMap{$op};
 }
 
+# Returns the full name of a command, whether native or not; unchanged in error
+sub Canonic {
+    my $op = shift;
+    my $tglob = "$ExtMap{an}::$op";
+    my $coderef = \&{$tglob};
+    return $op unless ref $coderef;
+    my $cv = B::svref_2object($coderef);
+    return $cv->GV->NAME;
+}
+
 # Returns a boolean indicating whether the named cmd is native to
 # CC or not. Note: the first call to this func has a "cost" of one
 # "cleartool help" operation; subsequent calls are free.
@@ -324,6 +334,7 @@ sub Extension {
 # part of the module. It runs "cleartool man <cmd>" as requested,
 # followed by "perldoc ClearCase::Wrapper" iff <cmd> is extended below.
 sub man {
+    $_ = Canonic($_) for @ARGV[1..$#ARGV];
     my $page = (grep !/^-/, @ARGV)[1];
     return 0 unless $page;
     ClearCase::Argv->new(@ARGV)->system if Native($page);
@@ -951,11 +962,12 @@ sub edit {
 sub _helpmsg {
     my $FH = shift;
     my $rc = shift;
-    my @text = ClearCase::Argv->new(@_)->stderr(0)->qx;
     # Let cleartool handle any malformed requests.
     return 0 if @_ > 2;
+    my @text;
     if (@_ == 2) {
-	my $op = $_[1];
+	my $op = $_[1] = Canonic($_[1]);
+	@text = ClearCase::Argv->new(@_)->stderr(0)->qx;
 	if (Extension($op)) {
 	    chomp $text[-1] if @text;;
 	    if (my $msg = $$op) {
@@ -980,6 +992,8 @@ sub _helpmsg {
 	}
         print $FH @text;
 	exit $rc;
+    } else {
+	@text = ClearCase::Argv->new(@_)->stderr(0)->qx;
     }
     print $FH @text, "\n";
     my $bars = '='x70;
