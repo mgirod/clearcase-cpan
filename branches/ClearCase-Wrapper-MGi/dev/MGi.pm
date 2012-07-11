@@ -1373,8 +1373,9 @@ sub _GenMkTypeSub {
 	  }
 	} else {
 	  my @mst = map{$CT->des([qw(-fmt %[master]p)], "lbtype:$_")->qx} @t;
+	  #In case of global types, get the servers, then the vobs and replicas
 	  my @lrep = map{$CT->des([qw(-fmt %[replica_name]p)], "vob:$_")->qx}
-	    @vob;
+	    grep s/^.*?\@//, map{$CT->des([qw(-fmt %Xn)], "lbtype:$_")->qx} @t;
 	  my @nlm; #non locally mastered types
 	  for (@mst) {
 	    my $lr = shift @lrep;
@@ -1996,13 +1997,14 @@ sub unlock {
   $unlock->parse(qw(c|cfile=s cquery|cqeach nc version=s pname=s));
   my @args = $unlock->args;
   $CT = ClearCase::Argv->new({autochomp=>1});
-  my (@lbt, @oth, %vob, %eqt);
+  my (@lbt, @oth, %vob, %tvob, %eqt);
   my $locvob = $CT->des(['-s'], 'vob:.')->stderr(0)->qx;
   foreach (@args) {
     if (/^lbtype:/) {
       my $t = $CT->des([qw(-fmt %Xn\n)], $_)->qx;
       if ($CT->des([qw(-fmt %m)], $t)->stderr(0)->qx eq 'label type') {
 	my $t1 = $t;
+	$tvob{$_} = /lbtype:.*?(@.*)$/? $1 : '';
 	$vob{$t} = $2 if $t =~ s/lbtype:(.*?)@(.*)$/$1/;
 	push @lbt, $t;
 	my @et = grep s/^-> lbtype:(.*)@.*$/$1/,
@@ -2049,7 +2051,8 @@ sub unlock {
   for (@args) {
     my $eq = $eqt{$_};
     next unless $eq;
-    my $lb = "lbtype:$eq";
+    my $tv = $tvob{$_};
+    my $lb = "lbtype:$eq$tv"; #target vob
     if (!$CT->des(['-s'], $lb)->stderr(0)->qx) {
       my $v = $vob{$eq};
       my $ets = ($lb =~ /^([^@]*)/)[0] . "\@$v";
