@@ -27,17 +27,32 @@ passwordless (challenge -based) authentication.
 Its public keys should be added into each of the intended vob owner accounts'
 C<~/.ssh/authorized_keys> files.
 
-The script connects to a hardcoded host, where ssh is configured.
+The script connects to a host, where ssh is configured. If all hosts
+are so configured, one may obtain the local host name by invoking
+I<hostname>, instead of hardcoding one dedicated host.
+
+The host configuration may include adding the chosen account to the
+users.allow file.
+
+=head1 SUDO CONFIGURATION
+
+The I<user> account owning the script, installed suid-enabled, should
+be allowed in I</etc/sudoers> to run (cleartool) commands
+passwordlessly on behalf of all vob owner accounts. The following
+setting can serve as template:
+
+Runas_Alias VOBOWN = vobown1,vobown2
+%user ALL=(VOBOWN) NOPASSWD: ALL
 
 =head1 DETAILS
 
 The script sets its real uid to the value of its effective uid (owning the
 running process, and set via the suid bit).
 
-It then invokes C<ssh> on I<myhost.mydomain> (but using its host name instead 
-of C<0> or C<localhost>, in order to avoid recording different host keys 
-under the same name), with the account of the vob owner, obtained from
-ClearCase.
+It then invokes, either (1) C<ssh> on I<myhost.mydomain> (but using
+its host name instead of C<0> or C<localhost>, in order to avoid
+recording different host keys under the same name), or (20 sudo, with
+the account of the vob owner, obtained from ClearCase.
 
 Unlock events are logged, with the id and name of the real user, to a
 dedicated log file under the crontab account home.
