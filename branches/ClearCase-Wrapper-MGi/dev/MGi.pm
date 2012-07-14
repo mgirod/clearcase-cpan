@@ -197,58 +197,53 @@ sub _Parsevtree {
     push @{ $gen{$_}{parents} }, $v0;
     push @{ $gen{$v0}{children} }, $_;
   }
-  return %gen;
+  return \%gen;
+}
+sub _Parents {
+  my ($ver, $ele) = @_;
+  # v0 is $ele@@/main/0, whatever the actual name of 'main' for $ele
+  # Only mention v0 as last recourse, if there is nothing else
+  my $pred = $CT->des([qw(-fmt %En@@%PVn)], $ver)->qx;
+  return if $pred eq "$ele@@";	# Only v0 has no parent
+  my @ret = grep s/^<- .*?(@.*)/$ele$1/,
+    $CT->des([qw(-s -ahl Merge)], $ver)->qx;
+  $pred = $CT->des([qw(-fmt %En@@%PVn)], $pred)->qx
+    while $pred =~ m%\@[^@]*[/\\][^@]+[/\\][^@]+[/\\]0$%;
+  s%\\%/%g for grep $_, $pred, @ret; # Windows...
+  push @ret, $pred unless $pred =~ m%/0$% and @ret;
+  return @ret
+}
+sub _Offsprings {
+  my ($ele, $sel, $gen) = @_;
+  my @offsp = grep s/^-> .*?(@.*)/$ele$1/,
+    $CT->des([qw(-s -ahl Merge)], $sel)->qx;
+  my ($br, $nr) = ($sel =~ m%^(.*)/(\d+)$%); # $sel is normalized
+  if ($br and opendir BR, $br) {	     # Skip for CHECKEDOUT
+    my @f = grep !/^\.\.?/, readdir BR;
+    closedir BR;
+    my @n = sort grep { (/^\d+$/ and $_ > $nr) or $_ eq 'CHECKEDOUT' } @f;
+    push @offsp, join('/', $br, $n[0]) if @n;
+    my $sil = new ClearCase::Argv({autochomp=>1, stdout=>0, stderr=>0});
+    push @offsp, join('/', $br, $_, '0')
+      for grep { /^\D/ and !$sil->des(['-s'], "brtype:$_")->system } @f;
+    push @{ $gen->{$sel}{children} }, @offsp;
+  }
 }
 sub _DepthGen {
-  my ($ele, $dep, $sel, $verbose) = @_;
-  my %gen;
-  my $parents = sub {
-    my $ver = shift;
-    # v0 is $ele@@/main/0, whatever the actual name of 'main' for $ele
-    # Only mention v0 as last recourse, if there is nothing else
-    my $pred = $CT->des([qw(-fmt %En@@%PVn)], $ver)->qx;
-    return if $pred eq "$ele@@"; # Only v0 has no parent
-    my @ret = grep s/^<- .*?(@.*)/$ele$1/,
-      $CT->des([qw(-s -ahl Merge)], $ver)->qx;
-    $pred = $CT->des([qw(-fmt %En@@%PVn)], $pred)->qx
-      while $pred =~ m%\@[^@]*[/\\][^@]+[/\\][^@]+[/\\]0$%;
-    s%\\%/%g for grep $_, $pred, @ret; # Windows...
-    push @ret, $pred unless $pred =~ m%/0$% and @ret;
-    return @ret
-  };
-  if ($verbose) {
-    my @offsp = grep s/^-> .*?(@.*)/$ele$1/,
-      $CT->des([qw(-s -ahl Merge)], $sel)->qx;
-    my ($br, $nr) = ($sel =~ m%^(.*)/(\d+)$%); # $sel is normalized
-    if ($br and opendir BR, $br) { # Skip for CHECKEDOUT
-      my @f = grep !/^\.\.?/, readdir BR;
-      closedir BR;
-      my @n = sort grep { (/^\d+$/ and $_ > $nr) or $_ eq 'CHECKEDOUT' } @f;
-      push @offsp, join('/', $br, $n[0]) if @n;
-      my $sil = new ClearCase::Argv({autochomp=>1, stdout=>0, stderr=>0});
-      push @offsp, join('/', $br, $_, '0')
-       	for grep { /^\D/ and !$sil->des(['-s'], "brtype:$_")->system } @f;
-      push @{ $gen{$sel}{children} }, @offsp;
-    }
-  }
-  if ($dep) {
-    my @set = ($sel);
-    do {
-      my @nxt;
-      for my $s (@set) {
-	next if defined $gen{$s}{parents};
-	my @p = $parents->($s);
-	@{ $gen{$s}{parents} } = @p;
-	$gen{$s}{labels} = $CT->des([qw(-fmt %l)], $s)->qx;
-	push @{ $gen{$_}{children} }, $s for @p;
-	push @nxt, @p;
-      }
-      @set = @nxt;
-    } while $dep--;
+  my ($ele, $dep, $sel, $verbose, $gen) = @_;
+  $gen = {} unless $gen;
+  _Offsprings($ele, $sel, $gen) if $verbose;
+  if ($dep--) {
+    return if defined $gen->{$sel}{parents};
+    my @p = _Parents($sel, $ele);
+    @{ $gen->{$sel}{parents} } = @p;
+    $gen->{$sel}{labels} = $CT->des([qw(-fmt %l)], $sel)->qx;
+    push @{ $gen->{$_}{children} }, $sel for @p;
+    _DepthGen($ele, $dep, $_, $verbose, $gen) for @p;
   } else {
-    $gen{$sel}{labels} = $CT->des([qw(-fmt %l)], $sel)->qx;
+    $gen->{$sel}{labels} = $CT->des([qw(-fmt %l)], $sel)->qx;
   }
-  return %gen;
+  return $gen;
 }
 sub _Ensuretypes {
   my @typ = ($EQHL, $PRHL); # Default value
@@ -898,12 +893,12 @@ sub lsgenealogy {
     $ver =~ s%\\%/%g;
     my $ele = $ver;
     $ele =~ s%^(.*?)\@.*%$1%; # normalize in case of vob root directory
-    my %gen = ($opt{all} and defined $opt{depth})?
+    my $gen = ($opt{all} and defined $opt{depth})?
       _DepthGen($ele, $opt{depth}, $ver, !$opt{short})
       : _Parsevtree($ele, $opt{obsolete}, $ver);
-    _Setdepths($ver, 0, \%gen);
+    _Setdepths($ver, 0, $gen);
     my %seen = ();
-    _Printparents($ver, \%gen, \%seen, \%opt, 0);
+    _Printparents($ver, $gen, \%seen, \%opt, 0);
   }
   exit 0;
 }
