@@ -154,31 +154,41 @@ environment variable
 
   FORCELOCK=ClearCase::ForceLockSudo
 
-This is so its use would not penalize functions which do not require locking.
-Two other versions are provided for now, one for unix, and one for Windows
-(and cygwin):
+This is so its use would not penalize functions which do not require
+locking.  Two other versions are provided for now, one for unix, and
+one for Windows (and cygwin):
 
   FORCELOCK=ClearCase::ForceLockUnix #Unix
   FORCELOCK=ClearCase::ForceLock     #Windows
 
-These can be used as examples or a templates. They require some customization.
-The two latter build upon I<locklbtype>, a standalone script, to be installed
-suid enabled, owned by an account, which is itself authorized in the ssh
-configurations of the respective vob owners of all vobs in the local region,
-to run locking commands. It acts as a switch, allowing to simplify the
-maintainance of the I<~/.ssh/authorized_keys> files.
+These can be used as examples or a templates. They require some
+customization.  The two latter build upon I<locklbtype>, a standalone
+script, to be installed suid enabled, owned by an account, which is
+itself authorized in the configurations of the respective vob owners
+of all vobs in the local region, to run locking commands. It acts as a
+switch, allowing to simplify the maintainance of the authorization
+setup.
 
-The customization it requires is mostly the name of the host running an sshd
-daemon which it will use. One needs to avoid using I<localhost> here, so that
-different host keys do not overwrite each other in the I<~/.ssh/known_hosts>
-files.
+Two variants are proposed: one using ssh, the other using sudo. Only
+the most suitable one needs to be installed, as I<locklbtype>.  The
+appropriate setup will have to be performed respectively in the vob
+owner accounts' I<~/.ssh/authorized_keys> files, or in the host based
+or system-wide I</etc/sudoers> file.
 
-One may also set the name of the log used to save the identity of the
-unlocking users (for lock events, this is saved in a comment of the locks).
-The paths to ssh and cleartool are likely to be satisfying.
+Both variants require a minimal customization.
 
-In order to use this script, you need to define a pair of functions, for
-locking and unlocking.
+For ssh, one needs to set the name of the host running an sshd daemon
+Note that one needs to avoid using I<localhost> here, so that
+different host keys do not overwrite each other in the
+I<~/.ssh/known_hosts> files.
+
+For both, one may also set the name of the log used to save the
+identity of the unlocking users (for lock events, this is saved in a
+comment of the locks).  The paths to ssh or sudo, cleartool and perl
+are likely to be satisfying.
+
+In order to use this script, we needed to define a pair of functions,
+for locking and unlocking.
 
 The unix version of the I<ClearCase::ForceLock> module, is meant to
 invoke locklbtype via a system call, therefore using the suid bit

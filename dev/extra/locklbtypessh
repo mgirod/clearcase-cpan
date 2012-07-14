@@ -7,15 +7,13 @@ use strict;
 use Sys::Hostname;
 use Getopt::Long;
 use ClearCase::Argv;
-use IPC::System::Simple;
 use autodie qw(:system);
 use vars qw($help $unlock $vob $rep @op @nusers @lbtype);
 
 my $host = 'myhost.mydomain';
 my @ssh = qw(/usr/bin/ssh -q);
 my $binct = '/opt/rational/clearcase/bin/cleartool';
-ClearCase::Argv->ipc(1);
-my $ct = ClearCase::Argv->new({autochomp=>1});
+my $ct = ClearCase::Argv->new({ipc=>1, autochomp=>1});
 {
   my $bn = 'locklbtype'; #under suid, $0 is smthg like /dev/fd/4
   sub usage() {
@@ -61,7 +59,7 @@ map { $_ = untaint($_) } @lbtype;
 @nusers = split(/,/, join(',', @nusers));
 map { $_ = untaint($_) } @nusers;
 $vob = untaintpath($vob);
-$vob = $ct->argv(qw(des -s), "vob:$vob")->qx;
+$vob = $ct->des(['-s'], "vob:$vob")->qx;
 die "Couldn't find the vob $vob\n" unless $vob;
 $vob = untaintpath($vob);
 my $pwnam = (getpwuid($<))[6];
@@ -84,11 +82,11 @@ if ($unlock) {
   push @op, '-rep' if $rep;
 }
 my ($owner) = grep s%^.*/(.*)$%$1%,
-  $ct->argv(qw(des -fmt "%[owner]p"), "vob:$vob")->qx;
+  $ct->des([qw(-fmt %[owner]p)], "vob:$vob")->qx;
 $owner = untaint($owner);
 map { $_ = "lbtype:$_\@$vob" } @lbtype;
 foreach my $t (@lbtype) {
-  $ct->argv(qw(des -s), $t)->stdout(0)->system
+  $ct->des(['-s'], $t)->stdout(0)->system
     and die "Label type $t not found in $vob\n";
 }
 $< = $>;
