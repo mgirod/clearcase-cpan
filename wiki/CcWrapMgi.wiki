@@ -16,7 +16,6 @@ The code on this site is developed in a _dev_ branch.
   * I also acknowledge minor deficiencies in the support for the branch-no-merge strategy:
     * missing support for {{{des -fmt "%PVn"}}} and {{{%PSn}}}
     * missing support for graphical {{{lsgen}}} (based on Tk)
-    * missing support for {{{annotate}}} (based on pruning the -all output)
   * No major [http://code.google.com/p/clearcase-cpan/issues/list known bugs] now, but:
     * ipc is better supported in !ClearCase::Argv (it is even the *only* mode supported under cygwin). The mode is forced in many functions and {{{ctcmd}}} may still be preferred for some (which is wrong). It will always succeed on Windows, either on top of !ClearCase::!CtCmd if installed, or on top of CAL. I originally missed the existence of support in !ClearCase::Wrapper for flags such as {{{-/ipc=1}}}, and the possibility to set it in the {{{.clearcase_profile.pl}}} file.
     * [TypeMgr The source containers get bloated]
