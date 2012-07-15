@@ -55,19 +55,19 @@ sub _Sosbranch {		# same or sub- branch
 }
 sub _Printoffsprings {
   no warnings 'recursion';
-  my ($id, $gen, $seen, $opt, $ind, $out) = @_;
-  my $top = $out? 0 : ($out = [], 1);
+  my ($id, $gen, $opt, $ind, $seen, $out) = @_;
+  my $top = $out? 0 : ($out = [], $seen = {}, 1);
   if ($seen->{$id}++) {
-    push @{$out}, sprintf("%${ind}s\[alternative path: ${id}\]", '')
-      unless $opt->{short};
+    push @{$out}, sprintf("%${ind}s\[alternative: ${id}\]", '')
+      unless $opt->{short} or $opt->{fmt};
     return;
   }
-  my @p = defined($gen->{$id}{parents}) ? @{ $gen->{$id}{parents} } : ();
-  my @c = defined($gen->{$id}{children}) ? @{ $gen->{$id}{children} } : ();
-  my $l = defined($gen->{$id}{labels}) ? " $gen->{$id}{labels}" : '';
+  my @p = @{ $gen->{$id}{parents} || [] };
+  my @c = @{ $gen->{$id}{children} || [] };
+  my $l = $gen->{$id}{labels} || '';
   my ($s, $u) = ([], []);
   push @{$seen->{$_}? $s : $u}, $_ for @p;
-  if (@{$u} and !$opt->{short}) {
+  if (@{$u} and !($opt->{short} or $opt->{fmt})) {
     my $pprinted = 0;
     map{$pprinted++ if $gen->{$_}{printed}} @{$s};
     push @{$out}, ' 'x($ind-1) . '[contributor' . (@{$u}>1? 's' : '') . ': '
@@ -84,24 +84,28 @@ sub _Printoffsprings {
 	$ind++; # increase only if printed
       }
     } else {
-      push @{$out}, sprintf("%${ind}s${id}${l}", '') if $ind;
+      if ($ind) {
+	my $data = $opt->{fmt}? $l : "$id$l";
+	push @{$out}, sprintf("%${ind}s$data", '');
+      }
       $gen->{$id}{printed}++;
       $ind++;
     }
   }
-  _Printoffsprings($_, $gen, $seen, $opt, $ind, $out) for @c;
+  _Printoffsprings($_, $gen, $opt, $ind, $seen, $out) for @c;
   map{print "$_\n"} reverse @{$out} if $top; # only once
 }
 sub _Printparents {
   no warnings 'recursion';
   my ($id, $gen, $seen, $opt, $ind) = @_;
   if ($seen->{$id}++) {
-    printf("%${ind}s\[alternative path: ${id}\]\n", '') unless $opt->{short};
+    printf("%${ind}s\[alternative: ${id}\]\n", '')
+      unless $opt->{short} or $opt->{fmt};
     return;
   }
-  my @p = defined($gen->{$id}{parents}) ? @{ $gen->{$id}{parents} } : ();
-  my @c = defined($gen->{$id}{children}) ? @{ $gen->{$id}{children} } : ();
-  my $l = defined($gen->{$id}{labels}) ? " $gen->{$id}{labels}" : '';
+  my @p = @{ $gen->{$id}{parents} || [] };
+  my @c = @{ $gen->{$id}{children} || [] };
+  my $l = $gen->{$id}{labels} || '';
   my (@s, @u) = ();
   foreach my $c (@c) {
     if ($seen->{$c}) {
@@ -110,7 +114,7 @@ sub _Printparents {
       push @u, $c;
     }
   }
-  if (scalar(@u) and !$opt->{short}) {
+  if (scalar(@u) and !($opt->{short} or $opt->{fmt})) {
     my $cprinted = 0;
     for my $c (@s) {
       $cprinted++ if $gen->{$c}{printed};
@@ -136,7 +140,8 @@ sub _Printparents {
 	$ind++;
       }
     } else {
-      printf("%${ind}s${id}${l}\n", '');
+      my $data = $opt->{fmt}? $l : "$id$l";
+      printf "%${ind}s$data\n", '';
       $gen->{$id}{printed}++;
       $ind++;
     }
@@ -145,8 +150,8 @@ sub _Printparents {
   foreach my $p (@p) {
     if ($gen->{$id}{depth} < $gen->{$p}{depth}) {
       _Printparents($p, $gen, $seen, $opt, $ind);
-    } else {
-      printf("%${ind}s\[alternative path: ${p}\]\n", '') unless $opt->{short};
+    } elsif (!($opt->{short} or $opt->{fmt})) {
+      printf("%${ind}s\[alternative: ${p}\]\n", '');
     }
   }
 }
@@ -208,11 +213,11 @@ sub _Parsevtree {
   @vt = grep m%(^$sel|[\\/]([1-9]\d*|CHECKEDOUT))( .*)?$%, @vt;
   map { s%\\%/%g } @vt, $v0;
   my (%gen, @root);
-  $gen{$v0}{labels} = $1 if $v0 =~ s%/0 (\(.*)$%/0%;
+  $gen{$v0}{labels} = $1 if $v0 =~ s%/0( \(.*)$%/0%;
   my @stack = ();
   foreach my $g (@vt) {
     $g =~ s%^(.*/CHECKEDOUT) view ".*"(.*)$%$1$2%;
-    if ($g =~ m%^(.*) (\(.*\))$%) {
+    if ($g =~ m%^(.*)( \(.*\))$%) {
       $g = $1;
       $gen{$g}{labels} = $2;
     }
@@ -260,46 +265,50 @@ sub _Offsprings {
   if ($br and opendir BR, $br) {	     # Skip for CHECKEDOUT
     my @f = grep !/^\.\.?/, readdir BR;
     closedir BR;
-    my @n = sort grep { (/^\d+$/ and $_ > $nr) or $_ eq 'CHECKEDOUT' } @f;
+    my @n = sort {$a <=> $b} grep { /^\d+$/ and $_ > $nr } @f;
     push @offsp, join('/', $br, $n[0]) if @n;
-    my $sil = new ClearCase::Argv({autochomp=>1, stdout=>0, stderr=>0});
-    push @offsp, join('/', $br, $_, '0')
-      for grep { /^\D/ and !$sil->des(['-s'], "brtype:$_")->system } @f;
+    my $sil = new ClearCase::Argv({autochomp=>1, stderr=>0});
+    push @offsp, grep {$sil->des([qw(-fmt %Pn)], $_)->qx eq $sel}
+      join('/', $br, $_, '0')
+      for grep { /^\D/ and $sil->des(['-s'], "brtype:$_")->qx } @f;
+    push @offsp, join('/', $br, 'CHECKEDOUT')
+      if $sil->lsco([qw(-fmt %En@@%PVn)], $ele)->qx eq $sel;
     my %chld = map{$_ => 1} @{ $gen->{$sel}{children} }; # no duplicates
     push @{ $gen->{$sel}{children} }, grep{!$chld{$_}} @offsp;
   }
 }
 sub _DepthGen {
-  my ($ele, $dep, $sel, $verbose, $gen) = @_;
+  my ($ele, $dep, $sel, $verbose, $fmt, $gen) = @_;
   $gen = {} unless $gen;
   _Offsprings($ele, $sel, $gen) if $verbose;
   if ($dep--) {
     return if defined $gen->{$sel}{parents};
     my @p = _Parents($sel, $ele);
     @{ $gen->{$sel}{parents} } = @p;
-    $gen->{$sel}{labels} = $CT->des([qw(-fmt %l)], $sel)->qx;
+    $gen->{$sel}{labels} = $CT->des(['-fmt', $fmt], $sel)->qx if $fmt;
     push @{ $gen->{$_}{children} }, $sel for @p;
-    _DepthGen($ele, $dep, $_, $verbose, $gen) for @p;
-  } else {
-    $gen->{$sel}{labels} = $CT->des([qw(-fmt %l)], $sel)->qx;
+    _DepthGen($ele, $dep, $_, $verbose, $fmt, $gen) for @p;
+  } elsif ($fmt) {
+    $gen->{$sel}{labels} = $CT->des(['-fmt', $fmt], $sel)->qx;
   }
   return $gen;
 }
 sub _RecOff {
-  my ($ele, $sel, $gen, $seen) = @_;
+  my ($ele, $sel, $fmt, $gen, $seen) = @_;
   return if $seen->{$sel}++;
-  $gen->{$sel}{labels} = $CT->des([qw(-fmt %l)], $sel)->qx || undef;
+  ($gen->{$sel}{labels}) = grep /\S/, $CT->des(['-fmt', $fmt], $sel)->qx;
   my %par = map{$_ => 1} @{ $gen->{$sel}{parents} }; # no duplicates
   push @{ $gen->{$sel}{parents} }, grep{!$par{$_}} _Parents($sel, $ele);
   _Offsprings($ele, $sel, $gen);
-  _RecOff($ele, $_, $gen, $seen) for @{ $gen->{$sel}{children} };
+  _RecOff($ele, $_, $fmt, $gen, $seen) for @{ $gen->{$sel}{children} };
 }
 sub _RecGen {
   my ($ele, $sel, $opt) = @_;
-  my $gen = _DepthGen($ele, $opt->{depth}, $sel, !$opt->{short});
+  my $fmt = $opt->{fmt} || ' %l';
+  my $gen = _DepthGen($ele, $opt->{depth}, $sel, !$opt->{short}, $fmt);
   if ($opt->{offsprings}) {
     my $seen = {};
-    _RecOff($ele, $sel, $gen, $seen)
+    _RecOff($ele, $sel, $fmt, $gen, $seen)
   }
   return $gen;
 }
@@ -434,8 +443,8 @@ use AutoLoader 'AUTOLOAD';
 
   my $z = $ARGV[0] || '';
   $checkin = "\n* [-dir|-rec|-all|-avobs] [-ok] [-diff [diff-opts]] [-revert]";
-  $lsgenealogy =
-    "$z [-short] [-all] [-obsolete] [-depth d] [-offsprings ] pname ...";
+  $lsgenealogy = "$z [-short] [-all] [-fmt format] [-obsolete] [-depth d]"
+    . "\n[-offsprings] pname ...";
   $mkbrtype = "\n* [-archive]";
   $mklabel = "\n* [-up] [-force] [-over type [-all]]";
   $mklbtype = "\n* [-family] [-increment] [-archive] [-fullcopy type] \n"
@@ -919,6 +928,15 @@ Add obsoleted branches to the search.
 Skip displaying labels and 'labelled' versions and do not report
 alternative paths or siblings.
 
+=item B<-fmt>
+
+Substitute to the default representation of every version (optionally
+including labels), the output of C<des -fmt 'format' version>.
+
+The indentation is preserved, but all the verbose annotations
+(offsprings, siblings, alternatives) are stripped (as in B<short>
+mode).
+
 =item B<-depth>
 
 Specify a maximum depth at which to stop displaying the genealogy of
@@ -929,6 +947,8 @@ the element.
 Print the offsprings of the selected version (for every argument).
 Offsprings are not restricted by the I<depth> argument.
 
+This option is compatible with B<-fmt>.
+
 =back
 
 =cut
@@ -937,8 +957,10 @@ sub lsgenealogy {
   use warnings;
   use strict;
   my %opt;
-  GetOptions(\%opt, qw(short all obsolete depth=i offsprings));
+  GetOptions(\%opt, qw(short all fmt=s obsolete depth=i offsprings));
   Assert(@ARGV > 1);		# die with usage msg if untrue
+  die Msg('E', 'Incompatible flags: "short" and "fmt"')
+    if $opt{short} and $opt{fmt};
   shift @ARGV;
   my @argv = ();
   for (@ARGV) {
@@ -956,15 +978,12 @@ sub lsgenealogy {
     $ver =~ s%\\%/%g;
     my $ele = $ver;
     $ele =~ s%^(.*?)\@.*%$1%; # normalize in case of vob root directory
-    my $gen = ($opt{all} and defined $opt{depth})?
+    my $gen = (($opt{all} or $opt{fmt}) and defined $opt{depth})?
       _RecGen($ele, $ver, \%opt)
       : _Parsevtree($ele, $opt{obsolete}, $ver);
-    my %seen = ();
-    if ($opt{offsprings}) {
-      _Printoffsprings($ver, $gen, \%seen, \%opt, 0);
-      %seen = ();
-    }
+    _Printoffsprings($ver, $gen, \%opt, 0) if $opt{offsprings};
     _Setdepths($ver, 0, $gen);
+    my %seen = ();
     _Printparents($ver, $gen, \%seen, \%opt, 0);
   }
   exit 0;
@@ -2868,7 +2887,7 @@ its return code whether a recompile is in order.
 Adds a B<-expand> flag, which "flattens out" the config spec by
 inlining the contents of any include files.
 
-Add support for a incremental label type families, via a
+Add support for incremental label type families, via an
 I<##:IncrementalLabels:> attribute in the config spec: generate a
 config spec fragment equivalent to the type specified, and include it.
 An optional clause of C<-nocheckout> will be propagated to the
