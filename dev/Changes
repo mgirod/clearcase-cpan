@@ -233,3 +233,4 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- mklbtype -inc: test locally mastered before creating new increment
 	- extra/locklbtypesudo, as well as renamed locklbtype to locklbtypessh
 	- lsgen: fix-- with the -a option, siblings were missed in the genealogy
+	- lsgen -offspring (new option)

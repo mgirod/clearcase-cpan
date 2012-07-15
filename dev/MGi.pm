@@ -43,20 +43,59 @@ sub _Compareincs {
 }
 sub _Samebranch {		# same branch
   my ($cur, $prd) = @_;
-  $cur =~ s:/[0-9]+$:/:; # Treat CHECKEDOUT as other branch
-  $prd =~ s:/[0-9]+$:/:;
-  return ($cur eq $prd);
+  $cur =~ s:/\d+$:/:; # Treat CHECKEDOUT as other branch
+  $prd =~ s:/\d+$:/:;
+  return $cur eq $prd;
 }
 sub _Sosbranch {		# same or sub- branch
   my ($cur, $prd) = @_;
-  $cur =~ s:/[0-9]+$:/:;
-  $prd =~ s:/[0-9]+$:/:;
-  return ($cur =~ qr(^$prd));
+  $cur =~ s:/\d+$:/:;
+  $prd =~ s:/\d+$:/:;
+  return $cur =~ /^\Q$prd\E/;
+}
+sub _Printoffsprings {
+  no warnings 'recursion';
+  my ($id, $gen, $seen, $opt, $ind, $out) = @_;
+  my $top = $out? 0 : ($out = [], 1);
+  if ($seen->{$id}++) {
+    push @{$out}, sprintf("%${ind}s\[alternative path: ${id}\]", '')
+      unless $opt->{short};
+    return;
+  }
+  my @p = defined($gen->{$id}{parents}) ? @{ $gen->{$id}{parents} } : ();
+  my @c = defined($gen->{$id}{children}) ? @{ $gen->{$id}{children} } : ();
+  my $l = defined($gen->{$id}{labels}) ? " $gen->{$id}{labels}" : '';
+  my ($s, $u) = ([], []);
+  push @{$seen->{$_}? $s : $u}, $_ for @p;
+  if (@{$u} and !$opt->{short}) {
+    my $pprinted = 0;
+    map{$pprinted++ if $gen->{$_}{printed}} @{$s};
+    push @{$out}, ' 'x($ind-1) . '[contributor' . (@{$u}>1? 's' : '') . ': '
+      . join(' ', @{$u}) . ']' if $pprinted and $ind;
+  }
+  my $yes = ($opt->{all} or (@c != 1) or (@{$s} != 1)
+	       or !_Samebranch($id, $s->[0]) or !_Sosbranch($c[0], $id));
+  if ($l or $yes) {
+    if ($opt->{short}) {
+      if ($yes) {
+	# the arg (0-indented) is being printed with its parents
+	push @{$out}, sprintf("%${ind}s${id}", '') if $ind;
+	$gen->{$id}{printed}++;
+	$ind++; # increase only if printed
+      }
+    } else {
+      push @{$out}, sprintf("%${ind}s${id}${l}", '') if $ind;
+      $gen->{$id}{printed}++;
+      $ind++;
+    }
+  }
+  _Printoffsprings($_, $gen, $seen, $opt, $ind, $out) for @c;
+  map{print "$_\n"} reverse @{$out} if $top; # only once
 }
 sub _Printparents {
   no warnings 'recursion';
   my ($id, $gen, $seen, $opt, $ind) = @_;
-  if ($$seen{$id}++) {
+  if ($seen->{$id}++) {
     printf("%${ind}s\[alternative path: ${id}\]\n", '') unless $opt->{short};
     return;
   }
@@ -76,7 +115,7 @@ sub _Printparents {
     for my $c (@s) {
       $cprinted++ if $gen->{$c}{printed};
     }
-    if ($cprinted or !$ind) {
+    if (($cprinted or !$ind) and !$opt->{offsprings}) {
       my $plural = @u>1? 's' : '';
       if ($ind == 0) {
 	print "\[offspring${plural}: ";
@@ -88,18 +127,18 @@ sub _Printparents {
     }
   }
   my $yes = ($opt->{all} or (scalar(@p) != 1) or (scalar(@s) != 1)
-	       or !_Samebranch($id, $s[0]) or !_Sosbranch($p[0], $id));
+	       or !_Samebranch($id, $s[0]) or !_Sosbranch($id, $p[0]));
   if ($l or $yes) {
     if ($opt->{short}) {
       if ($yes) {
 	printf("%${ind}s${id}\n", '');
 	$gen->{$id}{printed}++;
-	${ind}++;
+	$ind++;
       }
     } else {
       printf("%${ind}s${id}${l}\n", '');
       $gen->{$id}{printed}++;
-      ${ind}++;
+      $ind++;
     }
   }
   return if (defined($opt->{depth})) and ($opt->{depth} < $ind);
@@ -122,18 +161,18 @@ sub _Findpredinstack {
 sub _Setdepths {
   no warnings 'recursion';
   my ($id, $dep, $gen) = @_;
-  if (defined($$gen{$id}{depth})) {
-    if ($$gen{$id}{depth} > $dep) {
-      $$gen{$id}{depth} = $dep;
+  if (defined($gen->{$id}{depth})) {
+    if ($gen->{$id}{depth} > $dep) {
+      $gen->{$id}{depth} = $dep;
     } else {
       return;
     }
   } else {
-    $$gen{$id}{depth} = $dep;
+    $gen->{$id}{depth} = $dep;
   }
-  my @p = defined($$gen{$id}{parents}) ? @{ $$gen{$id}{parents} } : ();
+  my @p = defined($gen->{$id}{parents}) ? @{ $gen->{$id}{parents} } : ();
   foreach my $p (@p) {
-    _Setdepths($p, $$gen{$id}{depth} + 1, $gen);
+    _Setdepths($p, $gen->{$id}{depth} + 1, $gen);
   }
 }
 sub _Checkcs {
@@ -226,7 +265,8 @@ sub _Offsprings {
     my $sil = new ClearCase::Argv({autochomp=>1, stdout=>0, stderr=>0});
     push @offsp, join('/', $br, $_, '0')
       for grep { /^\D/ and !$sil->des(['-s'], "brtype:$_")->system } @f;
-    push @{ $gen->{$sel}{children} }, @offsp;
+    my %chld = map{$_ => 1} @{ $gen->{$sel}{children} }; # no duplicates
+    push @{ $gen->{$sel}{children} }, grep{!$chld{$_}} @offsp;
   }
 }
 sub _DepthGen {
@@ -242,6 +282,24 @@ sub _DepthGen {
     _DepthGen($ele, $dep, $_, $verbose, $gen) for @p;
   } else {
     $gen->{$sel}{labels} = $CT->des([qw(-fmt %l)], $sel)->qx;
+  }
+  return $gen;
+}
+sub _RecOff {
+  my ($ele, $sel, $gen, $seen) = @_;
+  return if $seen->{$sel}++;
+  $gen->{$sel}{labels} = $CT->des([qw(-fmt %l)], $sel)->qx || undef;
+  my %par = map{$_ => 1} @{ $gen->{$sel}{parents} }; # no duplicates
+  push @{ $gen->{$sel}{parents} }, grep{!$par{$_}} _Parents($sel, $ele);
+  _Offsprings($ele, $sel, $gen);
+  _RecOff($ele, $_, $gen, $seen) for @{ $gen->{$sel}{children} };
+}
+sub _RecGen {
+  my ($ele, $sel, $opt) = @_;
+  my $gen = _DepthGen($ele, $opt->{depth}, $sel, !$opt->{short});
+  if ($opt->{offsprings}) {
+    my $seen = {};
+    _RecOff($ele, $sel, $gen, $seen)
   }
   return $gen;
 }
@@ -377,7 +435,7 @@ use AutoLoader 'AUTOLOAD';
   my $z = $ARGV[0] || '';
   $checkin = "\n* [-dir|-rec|-all|-avobs] [-ok] [-diff [diff-opts]] [-revert]";
   $lsgenealogy =
-    "$z [-short] [-all] [-obsolete] [-depth gen-depth] pname ...";
+    "$z [-short] [-all] [-obsolete] [-depth d] [-offsprings ] pname ...";
   $mkbrtype = "\n* [-archive]";
   $mklabel = "\n* [-up] [-force] [-over type [-all]]";
   $mklbtype = "\n* [-family] [-increment] [-archive] [-fullcopy type] \n"
@@ -866,6 +924,11 @@ alternative paths or siblings.
 Specify a maximum depth at which to stop displaying the genealogy of
 the element.
 
+=item B<-offsprings>
+
+Print the offsprings of the selected version (for every argument).
+Offsprings are not restricted by the I<depth> argument.
+
 =back
 
 =cut
@@ -874,7 +937,7 @@ sub lsgenealogy {
   use warnings;
   use strict;
   my %opt;
-  GetOptions(\%opt, qw(short all obsolete depth=i));
+  GetOptions(\%opt, qw(short all obsolete depth=i offsprings));
   Assert(@ARGV > 1);		# die with usage msg if untrue
   shift @ARGV;
   my @argv = ();
@@ -894,10 +957,14 @@ sub lsgenealogy {
     my $ele = $ver;
     $ele =~ s%^(.*?)\@.*%$1%; # normalize in case of vob root directory
     my $gen = ($opt{all} and defined $opt{depth})?
-      _DepthGen($ele, $opt{depth}, $ver, !$opt{short})
+      _RecGen($ele, $ver, \%opt)
       : _Parsevtree($ele, $opt{obsolete}, $ver);
-    _Setdepths($ver, 0, $gen);
     my %seen = ();
+    if ($opt{offsprings}) {
+      _Printoffsprings($ver, $gen, \%seen, \%opt, 0);
+      %seen = ();
+    }
+    _Setdepths($ver, 0, $gen);
     _Printparents($ver, $gen, \%seen, \%opt, 0);
   }
   exit 0;
@@ -1071,9 +1138,9 @@ sub diff {
     $ele =~ s%\\%/%g;
     $ver =~ s%\\%/%g;
     my $bra = $1 if $ver =~ m%^(.*?)/(?:\d+|CHECKEDOUT)$%;
-    my %gen = _DepthGen($ele, $limit + 1, $ver);
-    my $p = $gen{$ver}{'parents'};
-    $p = $gen{$p->[0]}{'parents'} while $p and $limit--;
+    my $gen = _DepthGen($ele, $limit + 1, $ver);
+    my $p = $gen->{$ver}{'parents'};
+    $p = $gen->{$p->[0]}{'parents'} while $p and $limit--;
     if (!($p and @{$p})) {
       warn Msg('E', "No predecessor version to compare to: $e");
       $rc = 1;
@@ -2959,12 +3026,12 @@ sub describe {
       $ver =~ s%\\%/%g;
       my $ele = $ver;
       $ele =~ s%^(.*?)\@.*%$1%; # normalize in case of vob root directory
-      my %gen = _DepthGen($ele, $i, $ver);
-      my @p = @{$gen{$ver}{'parents'}};
+      my $gen = _DepthGen($ele, $i, $ver);
+      my @p = @{$gen->{$ver}{'parents'}};
       while (@p and --$i) {
 	my %q;
 	for (@p) {
-	  $q{$_}++ for @{$gen{$_}{'parents'}};
+	  $q{$_}++ for @{$gen->{$_}{'parents'}};
 	}
 	@p = keys %q;
       }
