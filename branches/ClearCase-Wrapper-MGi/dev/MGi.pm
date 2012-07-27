@@ -457,8 +457,8 @@ use AutoLoader 'AUTOLOAD';
   $rollback = "$z [-force] [-c comment] -to increment";
   $archive = "$z [-c comment|-nc] brtype|lbtype ...";
   $annotate = "\n* [-line|-grep regexp]";
-  $synctree = "$z -from sbase [-c comment] [-quiet] [-force] [-summary]"
-    . "\n[-label type] [pname ...]";
+  $synctree = "$z -from sbase [-c comment] [-quiet] [-force] [-rollback]"
+    . "\n[-summary] [-label type] [pname ...]";
 }
 
 #############################################################################
@@ -3928,7 +3928,10 @@ The supported flags are:
 
 =item B<-quiet>
 
-=item B<-force>
+=item B<-force>: mutually exclusive with B<rollback>
+
+=item B<-rollback>: this restores the default behaviour of the original
+I<synctree>. See below: B<stop>
 
 =back
 
@@ -3950,6 +3953,17 @@ The default options used are (with respect to the standalone script):
 
 =item cr: config records are respected -- using "checkin -from"
 
+=item stop: abort in case of error.
+
+Typically, you need to fix the cause of the problem, possibly checkin
+recursively with the -revert option, remove any remaining view private
+files, and restart to continue.
+
+The default is changed from the original I<synctree> because the
+I<reuse> option tends to bring in hidden directories which may have
+wrong protections. Such errors are thus not infrequent, and the
+cleanup makes them cumbersome to fix.
+
 =back
 
 =cut
@@ -3961,7 +3975,9 @@ sub synctree {
   use Benchmark;
   use Cwd;
   my %opt;
-  GetOptions(\%opt, qw(from=s summary label=s comment=s force));
+  GetOptions(\%opt, qw(from=s summary label=s comment=s force rollback));
+  die Msg("-force and -rollback are mutually exclusive")
+    if $opt{force} and $opt{rollback};
   Assert(@ARGV > 1);		# die with usage msg if untrue
   shift @ARGV;
   my @argv = ();
@@ -4037,6 +4053,7 @@ sub synctree {
   $sync->vreuse(1) if $opt{label};
   $sync->dstcheck;
   my $rc = 0;
+  $sync->err_handler(sub {exit 2}) unless $opt{cleanup} or $opt{force};
   $sync->err_handler(\$rc) if $opt{force};
   $opt{comment} = 'imported with "ct synctree"' unless $opt{comment};
   $sync->comment($opt{comment});
