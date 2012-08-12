@@ -53,7 +53,7 @@ sub _Sosbranch {		# same or sub- branch
   $prd =~ s:/\d+$:/:;
   return $cur =~ /^\Q$prd\E/;
 }
-sub _Printoffsprings {
+sub _Printoffspring {
   no warnings 'recursion';
   my ($id, $gen, $opt, $ind, $seen, $out) = @_;
   my $top = $out? 0 : ($out = [], $seen = {}, 1);
@@ -86,13 +86,14 @@ sub _Printoffsprings {
     } else {
       if ($ind) {
 	my $data = $opt->{fmt}? $l : "$id$l";
+	$data =~ s/\%/\%\%/g;	#Escape possible percent signs
 	push @{$out}, sprintf("%${ind}s$data", '');
       }
       $gen->{$id}{printed}++;
       $ind++;
     }
   }
-  _Printoffsprings($_, $gen, $opt, $ind, $seen, $out) for @c;
+  _Printoffspring($_, $gen, $opt, $ind, $seen, $out) for @c;
   map{print "$_\n"} reverse @{$out} if $top; # only once
 }
 sub _Printparents {
@@ -119,10 +120,10 @@ sub _Printparents {
     for my $c (@s) {
       $cprinted++ if $gen->{$c}{printed};
     }
-    if (($cprinted or !$ind) and !$opt->{offsprings}) {
+    if (($cprinted or !$ind) and !$opt->{offspring}) {
       my $plural = @u>1? 's' : '';
       if ($ind == 0) {
-	print "\[offspring${plural}: ";
+	print "\[offspring: ";
       } else {
 	my $pind = $ind - 1;
 	print ' 'x$pind, "\[sibling${plural}: ";
@@ -141,6 +142,7 @@ sub _Printparents {
       }
     } else {
       my $data = $opt->{fmt}? $l : "$id$l";
+      $data =~ s/\%/\%\%/g; #Escape possible percent signs
       printf "%${ind}s$data\n", '';
       $gen->{$id}{printed}++;
       $ind++;
@@ -257,7 +259,7 @@ sub _Parents {
   push @ret, $pred unless $pred =~ m%/0$% and @ret;
   return @ret
 }
-sub _Offsprings {
+sub _Offspring {
   my ($ele, $sel, $gen) = @_;
   my @offsp = grep s/^-> .*?(@.*)/$ele$1/,
     $CT->des([qw(-s -ahl Merge)], $sel)->qx;
@@ -277,36 +279,48 @@ sub _Offsprings {
     push @{ $gen->{$sel}{children} }, grep{!$chld{$_}} @offsp;
   }
 }
+sub _DesFmt {
+  my ($fmt, $arg) = @_;
+  my $ph = 'PlAcEhOlDeR';
+  if ($fmt =~ s/\%\[(.*?)\](N?)l/$ph/) {
+    my ($re, $ncom) = (qr($1), $2);
+    $CT = new ClearCase::Argv({autochomp=>1}) unless $CT;
+    my @lb = grep /$re/, split / /, $CT->des([qw(-fmt %Nl)], $arg)->qx;
+    my $lb = $ncom? join(' ', @lb) : @lb? '(' . join(', ', @lb) . ')' : '';
+    $fmt =~ s/$ph/$lb/;
+  }
+  return $CT->des(['-fmt', $fmt], $arg)->qx;
+}
 sub _DepthGen {
   my ($ele, $dep, $sel, $verbose, $fmt, $gen) = @_;
   $gen = {} unless $gen;
-  _Offsprings($ele, $sel, $gen) if $verbose;
+  _Offspring($ele, $sel, $gen) if $verbose;
   if ($dep--) {
     return if defined $gen->{$sel}{parents};
     my @p = _Parents($sel, $ele);
     @{ $gen->{$sel}{parents} } = @p;
-    $gen->{$sel}{labels} = $CT->des(['-fmt', $fmt], $sel)->qx if $fmt;
+    $gen->{$sel}{labels} = _DesFmt($fmt, $sel) if $fmt;
     push @{ $gen->{$_}{children} }, $sel for @p;
     _DepthGen($ele, $dep, $_, $verbose, $fmt, $gen) for @p;
   } elsif ($fmt) {
-    $gen->{$sel}{labels} = $CT->des(['-fmt', $fmt], $sel)->qx;
+    $gen->{$sel}{labels} = _DesFmt($fmt, $sel);
   }
   return $gen;
 }
 sub _RecOff {
   my ($ele, $sel, $fmt, $gen, $seen) = @_;
   return if $seen->{$sel}++;
-  ($gen->{$sel}{labels}) = grep /\S/, $CT->des(['-fmt', $fmt], $sel)->qx;
+  ($gen->{$sel}{labels}) = grep /\S/, _DesFmt($fmt, $sel);
   my %par = map{$_ => 1} @{ $gen->{$sel}{parents} }; # no duplicates
   push @{ $gen->{$sel}{parents} }, grep{!$par{$_}} _Parents($sel, $ele);
-  _Offsprings($ele, $sel, $gen);
+  _Offspring($ele, $sel, $gen);
   _RecOff($ele, $_, $fmt, $gen, $seen) for @{ $gen->{$sel}{children} };
 }
 sub _RecGen {
   my ($ele, $sel, $opt) = @_;
   my $fmt = $opt->{fmt} || ' %l';
   my $gen = _DepthGen($ele, $opt->{depth}, $sel, !$opt->{short}, $fmt);
-  if ($opt->{offsprings}) {
+  if ($opt->{offspring}) {
     my $seen = {};
     _RecOff($ele, $sel, $fmt, $gen, $seen)
   }
@@ -444,7 +458,7 @@ use AutoLoader 'AUTOLOAD';
   my $z = $ARGV[0] || '';
   $checkin = "\n* [-dir|-rec|-all|-avobs] [-ok] [-diff [diff-opts]] [-revert]";
   $lsgenealogy = "$z [-short] [-all] [-fmt format] [-obsolete] [-depth d]"
-    . "\n[-offsprings] pname ...";
+    . "\n[-offspring] pname ...";
   $mkbrtype = "\n* [-archive]";
   $mklabel = "\n* [-up] [-force] [-over type [-all]]";
   $mklbtype = "\n* [-family] [-increment] [-archive] [-fullcopy type] \n"
@@ -934,7 +948,7 @@ Substitute to the default representation of every version (optionally
 including labels), the output of C<des -fmt 'format' version>.
 
 The indentation is preserved, but all the verbose annotations
-(offsprings, siblings, alternatives) are stripped (as in B<short>
+(offspring, siblings, alternatives) are stripped (as in B<short>
 mode).
 
 =item B<-depth>
@@ -942,10 +956,10 @@ mode).
 Specify a maximum depth at which to stop displaying the genealogy of
 the element.
 
-=item B<-offsprings>
+=item B<-offspring>
 
-Print the offsprings of the selected version (for every argument).
-Offsprings are not restricted by the I<depth> argument.
+Print the offspring of the selected version (for every argument).
+Offspring are not restricted by the I<depth> argument.
 
 This option is compatible with B<-fmt>.
 
@@ -957,7 +971,7 @@ sub lsgenealogy {
   use warnings;
   use strict;
   my %opt;
-  GetOptions(\%opt, qw(short all fmt=s obsolete depth=i offsprings));
+  GetOptions(\%opt, qw(short all fmt=s obsolete depth=i offspring));
   Assert(@ARGV > 1);		# die with usage msg if untrue
   die Msg('E', 'Incompatible flags: "short" and "fmt"')
     if $opt{short} and $opt{fmt};
@@ -981,7 +995,7 @@ sub lsgenealogy {
     my $gen = (($opt{all} or $opt{fmt}) and defined $opt{depth})?
       _RecGen($ele, $ver, \%opt)
       : _Parsevtree($ele, $opt{obsolete}, $ver);
-    _Printoffsprings($ver, $gen, \%opt, 0) if $opt{offsprings};
+    _Printoffspring($ver, $gen, \%opt, 0) if $opt{offspring};
     _Setdepths($ver, 0, $gen);
     my %seen = ();
     _Printparents($ver, $gen, \%seen, \%opt, 0);
@@ -3010,6 +3024,16 @@ Every version may thus have several parents. In fact, at a given
 generation level, the same contributors might occur several times: the
 command will show them only once.
 
+Two enhancements to the formats supported by the C<-fmt> flag:
+
+=over 1
+
+=item - C<%PVn> and C<%PSn> take the genealogy into consideration
+
+=item - C<%[...]l> accepts a regexp to filter the labels to be displayed
+
+=back
+
 =cut
 
 sub describe {
@@ -3058,8 +3082,8 @@ sub describe {
     }
     scalar @nargs? $desc->args(@nargs) : exit 0; # avoid fallback!
   } else {
-    my $nr;
     if (defined($desc->flagWRAPPER('family')) or grep /^-fam/, @args) {
+      my $nr;
       if (grep /^-fam/, @args) {
 	@args = grep !/^-fam/, @args;
 	$nr = 0;
@@ -3079,6 +3103,58 @@ sub describe {
 	}
       }
       @nargs? $desc->args(@nargs) : exit $rc; # avoid fallback!
+    } elsif (my $fmt = $desc->flagCC('fmt')) {
+      if ($fmt =~ s/\%P([VS]n)/\%$1/) {
+	my $farg = 0;
+	for (@{$desc->{AV_OPTS}{CC}}) {
+	  if ($farg) {
+	    $_ = $fmt;
+	    last;
+	  } else {
+	    $farg = 1 if /^-fmt$/;
+	  }
+	}
+	$desc->{AV_LKG}{CC}{fmt} = $fmt; # for possible further processing
+	$CT = new ClearCase::Argv({autochomp=>1});
+	my @nargs;
+	for my $arg (@args) {
+	  my $i = $generations;
+	  my ($ver, $type) =
+	    $CT->des([qw(-fmt %En@@%Vn\n%m)], $arg)->qx;
+	  if (!defined($type) or ($type !~ /version$/)) {
+	    warn Msg('W', "Not a version: $arg");
+	    next;
+	  }
+	  $ver =~ s%\\%/%g;
+	  my $ele = $ver;
+	  $ele =~ s%^(.*?)\@.*%$1%; # normalize in case of vob root directory
+	  my $gen = _DepthGen($ele, 1, $ver);
+	  my @p = @{$gen->{$ver}{'parents'}};
+	  push(@nargs, @p) if @p;
+	}
+	scalar @nargs? $desc->args(@nargs) : exit 0; # avoid fallback!
+      }
+    }
+  }
+  if (my $fmt = $desc->flagCC('fmt')) { # Maybe already modified
+    my $ph = 'PlAcEhOlDeR';
+    if ($fmt =~ s/\%\[(.*?)\](N?)l/$ph/) {
+      my ($re, $ncom) = (qr($1), $2);
+      my @args = $desc->args;
+      my $fix = 0;
+      for (@{$desc->{AV_OPTS}{CC}}) {
+	$fix++;
+	last if /^-fmt$/;
+      }
+      $CT = new ClearCase::Argv({autochomp=>1}) unless $CT;
+      for (@args) {
+	my @lb = grep /$re/, split / /, $CT->des([qw(-fmt %Nl)], $_)->qx;
+	my $lb = $ncom? join(' ', @lb) : @lb? '(' . join(', ', @lb) . ')' : '';
+	(my $f = $fmt) =~ s/$ph/$lb/;
+	$desc->{AV_OPTS}{CC}->[$fix] = $f;
+	$rc |= $desc->args($_)->system('CC');
+      }
+      exit $rc;
     }
   }
   $rc |= $desc->system('CC');
