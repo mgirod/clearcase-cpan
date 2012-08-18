@@ -590,12 +590,18 @@ sub _Mkbco {
 	  }
 	}
       }
-    } else {
+    } else { # Ensure proper treatment of cascading branches
       my @args;
       push @args, @opts, @cmt;
-      push @args, $bt if $bt;
-      push @args, $e; # Ensure non empty array
-      $rc |= $bt? $CT->mkbranch(@args)->system : $CT->co(@args)->system;
+      my $fn = ($cmd->prog())[1]; # Skip 'cleartool'
+      if ($fn =~ /^mkb/ and $bt) { # May be abbreviated
+	push @args, $bt;
+	push @args, $e; # Ensure non empty array
+	$rc |= $CT->mkbranch(@args)->system;
+      } else {
+	push @args, $e;
+	$rc |= $CT->co(@args)->system;
+      }
     }
   }
   return $rc;
@@ -975,6 +981,7 @@ sub lsgenealogy {
   Assert(@ARGV > 1);		# die with usage msg if untrue
   die Msg('E', 'Incompatible flags: "short" and "fmt"')
     if $opt{short} and $opt{fmt};
+  $opt{depth} = 0 if $opt{offspring} and !defined $opt{depth};
   shift @ARGV;
   my @argv = ();
   for (@ARGV) {
@@ -1018,6 +1025,10 @@ This allows to avoid both merging back to /main or to a delivery
 branch, and cascading branches indefinitely.  The logical version tree
 is restituted by navigating the merge arrows, to find all the direct
 or indirect contributors.
+
+The creation of cascading branches is preserved if specified by the
+config spec, unless in a I<BranchOff> config spec, in which case it
+doesn't make sense.
 
 Flag:
 
