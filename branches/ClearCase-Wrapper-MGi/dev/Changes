@@ -237,3 +237,4 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- lsgen -fmt (new option)
 	- des -fmt %PVn: takes genealogy into account
 	- des -fmt %[<regexp>]l, including while used from lsgen
+	- co: cascading branches in the config spec is preserved unless under BranchOff
