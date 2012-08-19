@@ -16,7 +16,8 @@ extra/FSCbrokerSuDo
 extra/VobPathConv.pm
 extra/VobPathConv.pod
 extra/fixsrccnt
-extra/locklbtype
+extra/locklbtypessh
+extra/locklbtypesudo
 extra/locklbtype.pod
 extra/updtlink
 extra/updthltypes
