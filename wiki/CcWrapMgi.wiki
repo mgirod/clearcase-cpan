@@ -14,7 +14,6 @@ The code on this site is developed in a _dev_ branch.
   * I do not test _ctcmd_ on Unix anymore for the time being. I currently use mostly cygwin, and the port has delayed my main work.
   * My intention was to develop a regression testing suite, which I started to do on !ClearCase::!SyncTree. I withdraw from my preliminary implementation, meaning that I have nothing solid in either package, which obviously is weak. A proper regression testion suite would surely help me...
   * I also acknowledge minor deficiencies in the support for the branch-no-merge strategy:
-    * missing support for {{{des -fmt "%PVn"}}} and {{{%PSn}}}
     * missing support for graphical {{{lsgen}}} (based on Tk)
   * No major [http://code.google.com/p/clearcase-cpan/issues/list known bugs] now, but:
     * ipc is better supported in !ClearCase::Argv (it is even the *only* mode supported under cygwin). The mode is forced in many functions and {{{ctcmd}}} may still be preferred for some (which is wrong). It will always succeed on Windows, either on top of !ClearCase::!CtCmd if installed, or on top of CAL. I originally missed the existence of support in !ClearCase::Wrapper for flags such as {{{-/ipc=1}}}, and the possibility to set it in the {{{.clearcase_profile.pl}}} file.
