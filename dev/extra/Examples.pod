@@ -235,7 +235,7 @@ Note finally how our config spec preserved the continuity of the selection.
  $ ct co -nc a/foo
  Created branch "tt" from "a/foo" version "/main/0".
  Checked out "a/foo" from version "/main/tt/0".
- $ ct ci -nc -ide a/foo
+ $ ct ci -c 'after archiving' -ide a/foo
  Checked in "a/foo" version "/main/tt/1".
  $ ct lsgen a/foo
  a/foo@@/main/tt/1
@@ -386,24 +386,37 @@ type were added to the different versions of the tree:
  /main/tt-001
  /main/tt-001/1 TTT_1.00 RmTTT=1.02
  /main/tt-001/2 TTT_1.01 RmTTT=1.02
- /main/tt-001/3 TTT TTT_1.03
+ /main/tt-001/3 TTT_1.03
  /main/tt-002
  /main/tt-002/1 BL BL_2.13 TTT-001 TTT_1.04
 
 This command shows the versions, with the labels, and the attributes they bear.
-And of course (but not showing the attributes):
+Of course, one can also use I<lsgen> (not showing the attributes):
 
- $ ct lsgen foo
- foo@@/main/tt-002/1 (BL, BL_2.13, TTT-001, TTT_1.04)
-  foo@@/main/tt-001/3 (TTT_1.03)
-   foo@@/main/tt-001/2 (TTT_1.01)
-    foo@@/main/tt-001/1 (TTT_1.00)
+ $ ct lsgen a/foo
+ a/foo@@/main/tt-002/1 (BL, BL_2.13, TTT-001, TTT_1.04)
+  a/foo@@/main/tt-001/3 (TTT_1.03)
+   a/foo@@/main/tt-001/2 (TTT_1.01)
+    a/foo@@/main/tt-001/1 (TTT_1.00)
+
+Given the profusion of labels, the I<lsgen> command was made to support
+an enhanced version of the I<-fmt> option, allowing to filter label
+types with a Perl regexp.
+Note that this also allows e.g. to show attributes, to shorten the
+output to versions only (the element name being common), and to
+display comments:
+
+ $ ct lsgen -fmt '%Vn %[^TTT(_[\d.]+)?$]Nl %Na "%Nc"' a/foo
+ /main/tt-002/1 TTT_1.04  "after archiving"
+  /main/tt-001/3 TTT_1.03  ""
+   /main/tt-001/2 TTT_1.01 RmTTT=1.02 ""
+    /main/tt-001/1 TTT_1.00 RmTTT=1.02 ""
 
 =head3 Pick the right increment/date
 
 One needs a convenient way to figure what increment and what date
 correspond to which changes. Fortunately, the I<-family> extension of
-I<describe> allows you to apply the formats of your choice to each an
+I<describe> allows you to apply the formats of your choice to each and
 every element of the type family:
 
  $ ct des -fmt "%n %d %Nc\n" -fam lbtype:TTT-001
