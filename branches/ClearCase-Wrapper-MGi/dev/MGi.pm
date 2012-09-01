@@ -1,6 +1,6 @@
 package ClearCase::Wrapper::MGi;
 
-$VERSION = '1.00';
+$VERSION = '1.01';
 
 use warnings;
 use strict;
@@ -526,7 +526,7 @@ sub _Mkbco {
   }
   die Msg('E', 'Element pathname required.') unless $cmd->args;
   foreach my $e ($cmd->args) {
-    my $ver = $cmd->{ver};
+    my $ver = $cmd->{ver}; #Only if mkbranch
     my $typ = $CT->des([qw(-fmt %m)], $e)->qx;
     if ($typ !~ /(branch|version)$/) {
       warn Msg('W', "Not a vob object: $e");
@@ -596,10 +596,10 @@ sub _Mkbco {
       my $fn = ($cmd->prog())[1]; # Skip 'cleartool'
       if ($fn =~ /^mkb/ and $bt) { # May be abbreviated
 	push @args, $bt;
-	push @args, $e; # Ensure non empty array
+	push @args, $ver || $e; # Ensure non empty array
 	$rc |= $CT->mkbranch(@args)->system;
       } else {
-	push @args, $e;
+	push @args, $ver || $e; # Restore the original argument
 	$rc |= $CT->co(@args)->system;
       }
     }
@@ -759,9 +759,9 @@ sub _Unco {
   my ($unco, $rc) = (shift, 0);
   $CT = ClearCase::Argv->new({autochomp=>1});
   for my $arg ($unco->args) { # Already sorted if several
-    my $b0 = $CT->argv(qw(ls -s -d), $arg)->qx;
+    my $b0 = $CT->ls(['-d'], $arg)->qx; #Cannot use '-s': ClearCase bug!
     $rc |= $unco->args($arg)->system;
-    if ($b0 =~ s%^(.*)[\\/]CHECKEDOUT$%$1% and $b0 !~ m%@@/[^/]+$%) {
+    if ($b0 =~ s%^(.*?)[\\/]CHECKEDOUT from.*%$1% and $b0 !~ m%@@/[^/]+$%) {
       opendir BR, $b0 or next;
       my @f = grep !/^\.\.?$/, readdir BR;
       closedir BR;
