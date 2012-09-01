@@ -238,3 +238,7 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- des -fmt %PVn: takes genealogy into account
 	- des -fmt %[<regexp>]l, including while used from lsgen
 	- co: cascading branches in the config spec is preserved unless under BranchOff
+
+1.01 Sat Sep  1 14:16:41 IST 2012
+        - co and mkbranch: obey -ver options in non BranchOff mode
+	- unco: remove orphaned cascaded branch in non BranchOff mode (around CC bug)
