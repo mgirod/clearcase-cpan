@@ -308,6 +308,7 @@ sub _DepthGen {
   return $gen;
 }
 sub _RecOff {
+  no warnings 'recursion';
   my ($ele, $sel, $fmt, $gen, $seen) = @_;
   return if $seen->{$sel}++;
   ($gen->{$sel}{labels}) = grep /\S/, _DesFmt($fmt, $sel);
@@ -1473,9 +1474,12 @@ sub _GenMkTypeSub {
 	  } elsif (@new == @t) {
 	    die Msg('E', 'Use -fam to create the family types');
 	  } else {
-	    $args[0] =~ s/\@.*$//;
-	    my $vobs = join ', ', grep s/^.*\@//, @new;
-	    die Msg('E', "No '$args[0]' in $vobs. Forgot an '-exc' option?");
+	    my %seen;
+	    my @v = @new; #preserve @new as map would change it
+	    my $vobs = join ', ', grep{!$seen{$_}++}
+	      map{ s/^.*\@// ? $_ : $CT->des(['-s'], 'vob:.')->qx} @v;
+	    $new[0] =~ s/^(.*?)_0(\@.*)?$/$1/;
+	    die Msg('E', "No '$new[0]' in $vobs.");
 	  }
 	} else {
 	  my @mst = map{$CT->des([qw(-fmt %[master]p)], "lbtype:$_")->qx} @t;
