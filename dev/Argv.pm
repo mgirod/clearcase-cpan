@@ -341,7 +341,13 @@ sub pipe {
     if ($mode) {
 	my $otherSelf = $self->clone();
 	$self->warning("$mode usage incompatible with pipe - temporarily reverting to plain cleartool") if $self->dbglevel;
-	($mode eq 'CtCmd') ? $otherSelf->ctcmd(0) : $otherSelf->ipc(0);
+	if ($mode eq 'CtCmd') {
+	    $otherSelf->ctcmd(0);
+	    my @prg = $otherSelf->prog; #Depends on the exact invocation path
+	    $otherSelf->prog(@ct, @prg) unless $prg[0] =~ /cleartool/;
+	} else {
+	    $otherSelf->ipc(0);
+	}
 	return $otherSelf->SUPER::pipe(@_);
     } else {
 	return $self->SUPER::pipe(@_);
