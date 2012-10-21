@@ -1,13 +1,14 @@
 #!/usr/local/bin/perl -w
 
-# Works only on UNIX, because of unimplemented getpwuid in the Windows port
+# Works only on UNIX, because of its using setview, and accessorily getpwuid
+# both unimplemented on Windows
 
 use strict;
 use ClearCase::Argv;
 use File::Basename;
 use Getopt::Long;
 use Cwd;
-use vars qw($opt_help $vob $lrep %mrep %seen);
+use vars qw($opt_help $vob $lrep %mrep %seen %ctview);
 
 my $me = basename $0;
 my $ct = new ClearCase::Argv({autochomp=>1, ipc=>1});
@@ -45,9 +46,12 @@ sub onepass {
     }
   }
   for my $v (keys %co) {
-    my $ctx = $ct->cleartool_path;
-    my @o = map {$_ = "oid:$_\@$vob" }@{$co{$v}};
-    $sil->setview(['-exec', "$ctx unco -rm @o"], $v)->system;
+    if (!$ctview{$v}) {
+      $ctview{$v} = $sil->clone;
+      $ctview{$v}->setview($v)->system;
+    }
+    my $ctv = $ctview{$v};
+    $ctv->unco(['-rm'], map {$_ = "oid:$_\@$vob" } @{$co{$v}})->system;
   }
   my $rep;
   for ($cterr->rmelem(['-f'], grep {!$seen{$_}} @f)->qx) {
@@ -75,21 +79,13 @@ sub onepass {
   }
   return 0;
 }
-sub matchvobroot {
-  my ($dir, $vob) = @_;
-  my $d = dirname($dir);
-  return 1 if $d eq $vob;
-  return 0 unless $^O =~ /^MSWin/;
-  my $vt = basename($vob);
-  return $d =~ m%^\w:/\Q$vt\E%;
-}
 GetOptions('help') or usage;
 usage if $opt_help;
 my $dir = getcwd;
 $vob = $ct->des(['-s'], 'vob:.')->qx;
 usage("The current directory is not in a vob") unless $vob;
 usage("The current directory is not the vob lost+found")
-  unless basename($dir) eq 'lost+found' and matchvobroot($dir, $vob);
+  unless basename($dir) eq 'lost+found' and dirname($dir) eq $vob;
 (my $owner = $ct->des([qw(-fmt %[owner]p)], 'vob:.')->qx) =~ s%^.*[/\\]%%;
 usage("Not running as vob owner") unless $owner eq (getpwuid($<))[0];
 $lrep = $ct->des([qw(-fmt %[replica_name]p)], 'vob:.')->qx;
