@@ -8,7 +8,7 @@ use ClearCase::Argv;
 use File::Basename;
 use Getopt::Long;
 use Cwd;
-use vars qw($opt_help $vob $lrep %mrep %seen %ctview);
+use vars qw($opt_help $vob $lrep %mrep %seen %ctview %nrview);
 
 my $me = basename $0;
 my $ct = new ClearCase::Argv({autochomp=>1, ipc=>1});
@@ -28,6 +28,9 @@ Usage: $me [--help]
   It will then attempt to uncheckout and remove all elements in the directory,
   looping doing so until the directory contains only objects it cannot remove.
   It will report the reasons for these failures.
+  Note that the same element may be checked out in different replicas.
+  Note also that the script cannot always tell between local and remote views,
+  when the servers are not reachable.
   This script is suitable for being run under nohup, as it may take a significant
   time to complete.
 EOT
@@ -47,9 +50,21 @@ sub onepass {
   }
   for my $v (keys %co) {
     if (!$ctview{$v}) {
-      $ctview{$v} = $sil->clone;
-      $ctview{$v}->setview($v)->system;
+      if (my ($host) = $v =~ /^(.*?):/) {
+	if ($cterr->hostinfo($host)->system) {
+	  $nrview{nrh}{$v} = scalar @{$co{$v}};
+	} else {
+	  $nrview{loc}{$v} = scalar @{$co{$v}};
+	}
+      } else {
+	$ctview{$v} = $ct->clone({stdout=>0, stderr=>0});
+	if ($ctview{$v}->setview($v)->system) {
+	  $nrview{loc}{$v} = scalar @{$co{$v}};
+	  delete $ctview{$v};
+	}
+      }
     }
+    next unless $ctview{$v};
     my $ctv = $ctview{$v};
     $ctv->unco(['-rm'], map {$_ = "oid:$_\@$vob" } @{$co{$v}})->system;
   }
@@ -69,11 +84,14 @@ sub onepass {
 	$seen{$1}++;
 	next;
       } else {
-	warn qq(No replica mentioned: Unable to remove "$1"\n);
+	warn qq(Locally mastered, but unable to remove "$1"\n);
 	$seen{$1}++;
 	next;
       }
     }
+    # The second is a duplicate: don't increase the count
+    next if /^cleartool: Warning: (Moving .* lost\+found|Object.*no longer)/
+      or /^cleartool: Error: Can't delete element with checked out versions\./;
     $seen{$_}++;
     warn "$_\n";
   }
@@ -97,4 +115,15 @@ while (1) {
 if (%mrep) {
   print "Some objects mastered in remote replicas:\n";
   print " $_: ", scalar(@{$mrep{$_}}), "\n" for keys %mrep;
+}
+if (%nrview) {
+  print "Some objects could not be unchecked out:\n";
+  if ($nrview{loc}) {
+    print " view server reachable:\n";
+    print "  $_: $nrview{loc}{$_}\n" for keys %{$nrview{loc}};
+  }
+  if ($nrview{nrh}) {
+    print " view server non reachable:\n";
+    print "  $_: $nrview{nrh}{$_}\n" for keys %{$nrview{nrh}};
+  }
 }

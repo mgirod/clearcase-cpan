@@ -72,12 +72,41 @@ if (!MSWIN && ($< == 0 || $< != $>  || !grep{$_}@ENV{qw(PATH ATRIAHOME)})) {
 
 # Class method to get/set the location of 'cleartool'.
 sub cleartool_path {
-    shift;
-    @ct = @_ if @_;
-    return wantarray ? @ct : $ct[0];
+    my $self = shift;
+    if (ref $self and $self->{CT}) {
+	$self->ct(@_) if @_;
+	return @{$self->ct};
+    } else {
+	@ct = @_ if @_;
+	return wantarray ? @ct : $ct[0];
+    }
 }
-*find_cleartool = \&cleartool_path;  # backward compatibility 
+*find_cleartool = \&cleartool_path;  # backward compatibility
 
+sub ct {
+    my $self = shift;
+    if (ref $self) {
+	if (@_) {
+	    if (defined(wantarray)) {
+		if (ref $self->{CT}) {
+		    unshift(@{$self->{CT}}, shift);
+		} elsif ($self->{CT}) {
+		    $self->{CT} = [shift, $self->{CT}];
+		} else {
+		    $self->{CT} = [shift];
+		}
+		return $self
+	    } else {
+		$self->{CT} = shift;
+		return undef;
+	    }
+	} else {
+	    return $self->{CT}? $self->{CT} : @ct;
+	}
+    } else {
+	return cleartool_path;
+    }
+}
 # Override of base-class method to change a prog value of 'foo' into
 # qw(cleartool foo). If the value is already an array or array ref
 # leave it alone. Same thing if the 1st word contains /cleartool/
@@ -86,11 +115,12 @@ sub prog {
     my $self = shift;
     return $self->SUPER::prog unless @_;
     my $prg = shift;
-    if (@_ || ref($prg) || $prg =~ m%^/|^\S*cleartool% || $self->ctcmd) {
+    if (@_ || ref($prg) || $prg =~ m%^/|^\S*(?:clear|multi)tool%
+	                                                    || $self->ctcmd) {
 	return $self->SUPER::prog($prg, @_);
     } else {
 	require Text::ParseWords;
-	return $self->SUPER::prog([@ct,
+	return $self->SUPER::prog([$self->ct,
 	    Text::ParseWords::parse_line('\s+', 1, $prg)], @_);
     }
 }
@@ -132,7 +162,7 @@ sub system {
     my($ifd, $ofd, $efd) = ($self->stdin, $self->stdout, $self->stderr);
     $self->args($self->glob) if $self->autoglob;
     my @prog = @{$self->{AV_PROG}};
-    shift(@prog) if $prog[0] =~ m%cleartool%;
+    shift(@prog) if $prog[0] =~ m%(?:clear|multi)tool%;
     my @opts = $self->_sets2opts(@_);
     my @args = @{$self->{AV_ARGS}};
     my @cmd = (@prog, @opts, @args);
@@ -225,7 +255,7 @@ sub qx {
     my($ifd, $ofd, $efd) = ($self->stdin, $self->stdout, $self->stderr);
     $self->args($self->glob) if $self->autoglob;
     my @prog = @{$self->{AV_PROG}};
-    shift(@prog) if $prog[0] =~ m%cleartool%;
+    shift(@prog) if $prog[0] =~ m%(?:clear|multi)tool%;
     my @opts = $self->_sets2opts(@_);
     my @args = @{$self->{AV_ARGS}};
     my @cmd = (@prog, @opts, @args);
@@ -340,11 +370,13 @@ sub pipe {
     }
     if ($mode) {
 	my $otherSelf = $self->clone();
-	$self->warning("$mode usage incompatible with pipe - temporarily reverting to plain cleartool") if $self->dbglevel;
+	$self->warning("$mode usage incompatible with pipe - temporarily" .
+			 " reverting to plain cleartool") if $self->dbglevel;
 	if ($mode eq 'CtCmd') {
 	    $otherSelf->ctcmd(0);
 	    my @prg = $otherSelf->prog; #Depends on the exact invocation path
-	    $otherSelf->prog(@ct, @prg) unless $prg[0] =~ /cleartool/;
+	    $otherSelf->prog($self->ct, @prg)
+	                              unless $prg[0] =~ /(?:clear|multi)tool/;
 	} else {
 	    $otherSelf->ipc(0);
 	}
@@ -566,8 +598,8 @@ sub ipc {
     # Dies on failure.
     my($down, $back);
     my $view = ($level =~ /^\d+$/) ? '' : $level;
-    my @cmd = !$view ? (@ct, '-status')
-      : (@ct, qw(setview -exec), q(cleartool -status), $view);
+    my @cmd = !$view ? ($self->ct, '-status')
+      : ($self->ct, qw(setview -exec), qq($self->ct -status), $view);
     my $pid = IPC::Open3::open3($down, $back, undef, @cmd);
 
     # Set the "line discipline" to convert CRLF to \n.
@@ -686,7 +718,7 @@ sub _ipc_cmd {
     while($_ = <$back>) {
         my ($last, $next, $err);
 	my $out = *STDOUT;
-	if (!$manok && m%^cleartool: (Error|Warning):%) {
+	if (!$manok && m%^(?:clear|multi)tool: (Error|Warning):%) {
 	    if ($stderr) {
 	        $out = *STDERR;
 	        $err = 1;

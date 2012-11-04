@@ -15,6 +15,7 @@ examples/fix_eltype
 examples/envp
 examples/functional
 examples/mkattr
+examples/mtfunc
 examples/setview
 examples/simple
 examples/simplest
