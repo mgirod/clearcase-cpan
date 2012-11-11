@@ -6,8 +6,7 @@ use ClearCase::Argv;
 my $ct = new ClearCase::Argv({autochomp=>1, ipc=>1});
 # ClearCase::Argv->cleartool_path('/opt/rational/clearcase/bin/multitool');
 my $mtx = '/opt/rational/clearcase/bin/multitool';
-my $mt = new ClearCase::Argv({autochomp=>1, ct=>$mtx});
-$mt->ipc(1); #ct must be set priorily
+my $mt = new ClearCase::Argv({autochomp=>1, ct=>$mtx, ipc=>1});
 $mt->lsrep(['-s'])->system;
 $ct->lsview($ct->pwv(['-s'])->qx)->system;
 my $lrep = $ct->des([qw(-fmt %[replica_name]p)], 'vob:.')->qx;
