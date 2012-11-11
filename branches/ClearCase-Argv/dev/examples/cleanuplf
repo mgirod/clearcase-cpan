@@ -8,7 +8,7 @@ use ClearCase::Argv;
 use File::Basename;
 use Getopt::Long;
 use Cwd;
-use vars qw($opt_help $vob $lrep %mrep %seen %ctview %nrview);
+use vars qw($opt_help $vob $lrep %mrep @lmas %seen %ctview %nrview);
 
 my $me = basename $0;
 my $ct = new ClearCase::Argv({autochomp=>1, ipc=>1});
@@ -27,10 +27,14 @@ Usage: $me [--help]
   It checks these two conditions and exits unless satisfied.
   It will then attempt to uncheckout and remove all elements in the directory,
   looping doing so until the directory contains only objects it cannot remove.
-  It will report the reasons for these failures.
-  Note that the same element may be checked out in different replicas.
-  Note also that the script cannot always tell between local and remote views,
-  when the servers are not reachable.
+  It will report the reason for these failures:
+  - elements mastered locally but checked out remotely (in some version)
+  - elements mastered remotely (the mastering replicas are reported)
+  In addition, it reports the views holding checkouts.
+  Unfortunately, it cannot reliably tell apart local views from remote ones,
+  as the servers may not be reachable, and the storage are reported local to them.
+  Note that the same element may be checked out multiple times, even in different
+  replicas.
   This script is suitable for being run under nohup, as it may take a significant
   time to complete.
 EOT
@@ -84,7 +88,7 @@ sub onepass {
 	$seen{$1}++;
 	next;
       } else {
-	warn qq(Locally mastered, but unable to remove "$1"\n);
+	push @lmas, $1;
 	$seen{$1}++;
 	next;
       }
@@ -112,6 +116,8 @@ while (1) {
   last if onepass;
 }
 
+print "Some objects are mastered locally, but checked out remotely: ",
+  scalar @lmas, "\n" if @lmas;
 if (%mrep) {
   print "Some objects mastered in remote replicas:\n";
   print " $_: ", scalar(@{$mrep{$_}}), "\n" for keys %mrep;

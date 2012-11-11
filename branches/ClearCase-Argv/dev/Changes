@@ -356,11 +356,12 @@ Revision history for Perl extension ClearCase::Argv.
 	- defined(%hash) deprecated in Perl 5.12
 	- cygwin: use perlcygwin API to convert paths (e.g. /usr/lib is c:\cygwin\lib)
 
-1.52 Sat Nov  3 23:59:27 CET 2012
+1.52 Sun Nov 11 14:05:27 CET 2012
         - fix in unixpath under cygwin: was skipping '0's
 	- fix to pipe: conditionally prepend cleartool to command in ctcmd mode.
 	- new example: cleanuplf --cleanup lost+found
 	- support for using multitool, and mtfunc example
+	- fix: broken pipe after failed setview in ipc mode
 
 BACKWARD COMPATIBILITY NOTES:
 
