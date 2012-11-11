@@ -78,7 +78,7 @@ sub cleartool_path {
 	return @{$self->ct};
     } else {
 	@ct = @_ if @_;
-	return wantarray ? @ct : $ct[0];
+	return @ct;
     }
 }
 *find_cleartool = \&cleartool_path;  # backward compatibility
@@ -87,21 +87,16 @@ sub ct {
     my $self = shift;
     if (ref $self) {
 	if (@_) {
-	    if (defined(wantarray)) {
-		if (ref $self->{CT}) {
-		    unshift(@{$self->{CT}}, shift);
-		} elsif ($self->{CT}) {
-		    $self->{CT} = [shift, $self->{CT}];
-		} else {
-		    $self->{CT} = [shift];
-		}
-		return $self
+	    if ($self->ipc) {
+		$self->ipc(0);
+		$self->{CT} = ref($_[0])? $_[0] : [@_];
+		$self->ipc(1);
 	    } else {
-		$self->{CT} = shift;
-		return undef;
+		$self->{CT} = ref($_[0])? $_[0] : [@_];
 	    }
+	    return defined(wantarray)? $self : undef;
 	} else {
-	    return $self->{CT}? $self->{CT} : @ct;
+	    return $self->{CT}? @{$self->{CT}} : @ct;
 	}
     } else {
 	return cleartool_path;
@@ -162,7 +157,7 @@ sub system {
     my($ifd, $ofd, $efd) = ($self->stdin, $self->stdout, $self->stderr);
     $self->args($self->glob) if $self->autoglob;
     my @prog = @{$self->{AV_PROG}};
-    shift(@prog) if $prog[0] =~ m%(?:clear|multi)tool%;
+    shift(@prog) while @prog and grep m%(?:clear|multi)tool%, @prog;
     my @opts = $self->_sets2opts(@_);
     my @args = @{$self->{AV_ARGS}};
     my @cmd = (@prog, @opts, @args);
@@ -260,7 +255,7 @@ sub qx {
     my($ifd, $ofd, $efd) = ($self->stdin, $self->stdout, $self->stderr);
     $self->args($self->glob) if $self->autoglob;
     my @prog = @{$self->{AV_PROG}};
-    shift(@prog) if $prog[0] =~ m%(?:clear|multi)tool%;
+    shift(@prog) while @prog and grep m%(?:clear|multi)tool%, @prog;
     my @opts = $self->_sets2opts(@_);
     my @args = @{$self->{AV_ARGS}};
     my @cmd = (@prog, @opts, @args);
@@ -381,7 +376,7 @@ sub pipe {
 	    $otherSelf->ctcmd(0);
 	    my @prg = $otherSelf->prog; #Depends on the exact invocation path
 	    $otherSelf->prog($self->ct, @prg)
-	                              unless $prg[0] =~ /(?:clear|multi)tool/;
+	                             unless grep m%(?:clear|multi)tool%, @prg;
 	} else {
 	    $otherSelf->ipc(0);
 	}
@@ -723,7 +718,7 @@ sub _ipc_cmd {
     while($_ = <$back>) {
         my ($last, $next, $err);
 	my $out = *STDOUT;
-	if (!$manok && m%^(?:clear|multi)tool: (Error|Warning):%) {
+	if (!$manok && m%^(?:clear|multi)tool.*?: (Error|Warning):%) {
 	    if ($stderr) {
 	        $out = *STDERR;
 	        $err = 1;
@@ -1217,16 +1212,13 @@ Argv uses the first-found of three different modules for cloning, and
 Marc Girod suspects that only the first one (Clone, in recent versions)
 performs correctly with GLOB objects... work-around in place.
 
-The string 'cleartool' is hard-coded in many places, making it hard to
-implement additional support for multitool commands.
-
 The use of 'cleartool -status' was restored, because of the failure to
 handle interactive comments without it. The ClearCase bug, with setview
 exiting the interactive session to the shell (Found from 2002.05.00 to 7.0.1
 and resulting in a hang under the ipc mode) is worked around by starting a
 new coprocess in the new view.
 
-Cygwin preliminary support on Windows.
+Cygwin support on Windows.
 
 The 'exit' cleartool command is dangerous in ipc mode: it will stop the
 coprocess unconditionally, without Argv updating its ipc status, and the
