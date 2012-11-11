@@ -216,12 +216,17 @@ sub system {
 	    $self->ipc(0);
 	    my @data;
 	    $self->ipc($cmd[1], \@data);
-	    if ($efd == 2) {
-	        print STDERR @data;
-	    } elsif ($efd == 1) {
-		print STDOUT @data;
+	    if (@data) {
+		if ($efd == 2) {
+		    print STDERR @data;
+		} elsif ($efd == 1) {
+		    print STDOUT @data;
+		}
+		delete $self->{IPC}; #destructor would send 'exit' to defunct
+		return scalar @data;
+	    } else {
+	        return 0;
 	    }
-	    return scalar @data;
 	}
         $rc = $self->_ipc_cmd(undef, $ofd, $efd, @cmd);
     }
