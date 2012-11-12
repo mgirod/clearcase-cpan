@@ -157,7 +157,7 @@ sub system {
     my($ifd, $ofd, $efd) = ($self->stdin, $self->stdout, $self->stderr);
     $self->args($self->glob) if $self->autoglob;
     my @prog = @{$self->{AV_PROG}};
-    shift(@prog) while @prog and grep m%(?:clear|multi)tool%, @prog;
+    shift(@prog) while grep m%(?:clear|multi)tool%, @prog;
     my @opts = $self->_sets2opts(@_);
     my @args = @{$self->{AV_ARGS}};
     my @cmd = (@prog, @opts, @args);
@@ -255,7 +255,7 @@ sub qx {
     my($ifd, $ofd, $efd) = ($self->stdin, $self->stdout, $self->stderr);
     $self->args($self->glob) if $self->autoglob;
     my @prog = @{$self->{AV_PROG}};
-    shift(@prog) while @prog and grep m%(?:clear|multi)tool%, @prog;
+    shift(@prog) while grep m%(?:clear|multi)tool%, @prog;
     my @opts = $self->_sets2opts(@_);
     my @args = @{$self->{AV_ARGS}};
     my @cmd = (@prog, @opts, @args);
