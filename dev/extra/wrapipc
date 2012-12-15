@@ -1,0 +1,16 @@
+#!/usr/local/bin/perl -w
+
+use strict;
+use ClearCase::Argv;
+
+# my @ctx = (qw(/bin/bash -c /opt/rational/clearcase/bin/cleartool));
+# my @ctx = (qw(/usr/bin/sudo -u vobadm100 /opt/rational/clearcase/bin/cleartool));
+# my @ctx = ('/opt/rational/clearcase/bin/cleartool');
+# my @ctx = ($^X, '/home/emagiro/perl/bin/cleartool.plx');
+my @ctx = ('/home/emagiro/perl/bin/cleartool.plx');
+my $ct = new ClearCase::Argv({autochomp=>1, ct=>[@ctx], dbglevel=>1, ipc=>1});
+$ct->hostinfo('-l')->system;
+$ct->lsgen([qw(-d 2)], '.')->system;
+$ct->des([qw(-fmt %d\n%Vn\n)], '.')->system;
+$ct->des([q(-fmt), q(2nd %d\n%Vn\n)], '.')->system;
+$ct->des([q(-fmt), q(3rd %d\n%Vn\n)], '.')->system;
