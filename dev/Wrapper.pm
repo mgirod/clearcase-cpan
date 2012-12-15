@@ -1,6 +1,6 @@
 package ClearCase::Wrapper;
 
-$VERSION = '1.17';
+$VERSION = '1.18';
 
 require 5.006;
 

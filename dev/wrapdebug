@@ -141,6 +141,7 @@ my $status;
 if (scalar @ARGV == 1 && $ARGV[0] eq '-status') {
     $status = 1;
     @ARGV = ();
+    $| = 1; #autoflush STDOUT
 }
 if (@ARGV) {
     exit one_cmd;
