@@ -2254,7 +2254,8 @@ sub mklabel {
   $CT = ClearCase::Argv->new({autochomp=>1});
   my (%vb, @lt);
   for my $e (@elems?@elems:($opt{config} or '.')) {
-    my $v = $CT->argv(qw(des -s), "vob:$e")->stderr(0)->qx;
+    my $ee = -r $e? $e : "$e\@\@"; #case when $e was: 'co -nda $e'
+    my $v = $CT->des(['-s'], "vob:$ee")->stderr(0)->qx;
     $vb{$v}++ if $v;
   }
   if ($lbtype =~ /@/) {

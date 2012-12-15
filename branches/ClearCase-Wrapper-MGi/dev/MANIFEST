@@ -21,3 +21,4 @@ extra/locklbtypesudo
 extra/locklbtype.pod
 extra/updtlink
 extra/updthltypes
+extra/wrapipc
