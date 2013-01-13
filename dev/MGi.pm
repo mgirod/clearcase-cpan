@@ -1745,10 +1745,12 @@ sub _GenMkTypeSub {
 	      next INCT;
 	    }
 	    my $lbt = "lbtype:$t";
-	    if ($CT->lslock(['-s'], $lbt)->stderr(0)->qx) {
+	    my @lt = ($lbt);
+	    push @lt, "lbtype:$prev\@$vob" if $prev;
+	    if ($CT->lslock(['-s'], @lt)->stderr(0)->qx) {
 	      $lck = 1; #remember to lock the previous equivalent back
 	       #This should happen as vob owner, to retain the timestamp
-	      _Wrap('unlock', $lbt); # Will unlock both types
+	      _Wrap('unlock', $lbt); # Will ensure both types are unlocked
 	    }
 	    if ($opt{config} and @vob) {
 	      $silent->mklbtype([qw(-rep -glo)], $t)->system
@@ -2699,10 +2701,11 @@ later C<mklbtype -fam LBTYPE>.
 
 =back
 
-Note that removing directly an incremental fixed type is left
-unchanged for low level purposes, and thus may corrupt the whole
-hierarchy: you need to restore links and take care of possible
-I<RmLBTYPE> attributes.
+Note that removing directly an incremental fixed type will result in
+restoring a consistent chain. This involves unlocking and re-locking
+the linked type.
+Removing the last increment does *not* remove the family (nor the
+I<RmLBTYPE> attribute).
 
 =cut
 
@@ -2724,20 +2727,25 @@ sub rmtype {
       push @oth, $_;
     }
   }
-  if (!@lbt) {
-    warn Msg('W', '"-family" applies only to label types') if $opt{family};
-    warn Msg('W', '"-increment" applies only to label types')
-      if $opt{increment};
-    exit $rmtype->system;
+  my $rs = 0;
+  if (@oth) {
+    die Msg('E', '"-family" only applies to label types') if $opt{family};
+    die Msg('E', '"-increment" only applies to label types') if $opt{increment};
+    $rs = $rmtype->args(@oth)->system;
   }
-  my $rs;
-  $rs = $rmtype->args(@oth)->system if @oth;
+  exit $rs unless @lbt;
   $CT = ClearCase::Argv->new({autochomp=>1});
+  my $sil = ClearCase::Argv->new({autochomp=>1, stderr=>0});
+  if (%opt) {
+    my @eq = grep s/^-> (lbtype:.*)/$1/,
+      $sil->des([qw(-s -ahl), $EQHL], @lbt)->qx;
+    die Msg('E', '"-family" and "-increment" only apply to family types')
+      if @opt{qw(family increment)} and @eq != @lbt;
+  }
   if (!$rmtype->flag('rmall')) {
     my @glb;
     for (@lbt) {
-      push @glb, $_
-	if $CT->argv(qw(des -fmt %[type_scope]p), $_)->qx eq 'global';
+      push @glb, $_ if $CT->des([qw(-fmt %[type_scope]p)], $_)->qx eq 'global';
     }
     if (@glb) {
       warn Msg('E', "Global type: must specify removal of all instances.");
@@ -2747,57 +2755,38 @@ sub rmtype {
     }
   }
   my (@args, @eq, @lck) = @lbt;
-  my $lct = new ClearCase::Argv; #Not autochomp
-  my ($fl, $loaded) = $ENV{FORCELOCK};
+  my $nout = new ClearCase::Argv(autochomp=>1, stdout=>0);
  LBT:for my $t (@lbt) {
-    my ($eq) = grep s/^-> (lbtype:.*)/$1/,
-      $CT->des([qw(-s -ahl), $EQHL], $t)->stderr(0)->qx;
-    if ($eq) {
+    my $eq = $sil->des([qw(-s -ahl), $EQHL], $t)->qx;
+    if ($eq =~ s/^-> (lbtype:.*)/$1/) {
       my ($base, $vob) = ($1, $2?$2:'') if $t =~ /^lbtype:(.*?)(\@.*)?$/;
-      if ($opt{family} or $eq =~ /_1.00(\@.*)?$/) {
+      if ($opt{family} or $eq =~ /_1.00(?:\@.*)?$/) {
 	push @eq, grep(s/^(.*)/lbtype:${1}$vob/, _EqLbTypeList($t)),
 	  "attype:Rm${base}$vob";
       } else {
 	my ($prev) = grep s/^-> (lbtype:.*)/$1/,
-	  $CT->argv(qw(des -s -ahl), $PRHL, $eq)->qx;
-	if ($prev and $CT->argv(qw(lslock -s), $prev)->stderr(0)->qx) {
+	  $CT->des([qw(-s -ahl), $PRHL], $eq)->qx;
+	if ($prev and $sil->lslock(['-s'], $prev)->qx) {
+	  _Wrap('unlock', $prev) and next LBT;
 	  push @lck, $prev;
-	  my @out = $lct->argv('unlock', $prev)->stderr(1)->qx;
-	  if (grep /^cleartool: Error/, @out) {
-	    if ($fl and !$loaded) {
-	      my $fn = $fl; $fn =~ s%::%/%g; $fn .= '.pm';
-	      require $fn;
-	      $fl->import;
-	      $loaded = 1;
-	    }
-	    if (!$fl) {
-	      print @out;
-	      next LBT;
-	    } else {
-	      my ($p, $v) = ($1, $2) if $prev =~ /^lbtype:(.*)\@(.*)$/;
-	      next LBT if funlocklt($p, $v);
-	    }
-	  } else {
-	    print @out;
-	  }
 	}
 	if ($opt{increment}) {
 	  my ($hl) = grep s/^\s+(.*) -> $eq/$1/,
-	    $CT->argv(qw(des -l -ahl), $EQHL, $t)->qx;
+	    $CT->des([qw(-l -ahl), $EQHL], $t)->qx;
 	  if ($hl) {
-	    $rs |= $CT->argv('rmhlink', $hl)->stdout(0)->system;
-	    $rs |= $CT->argv('mkhlink', $EQHL, $t, $prev)->stdout(0)->system;
+	    $rs |= $nout->rmhlink($hl)->system;
+	    $rs |= $nout->mkhlink([$EQHL, $t], $prev)->system;
 	    for (@args) {
 	      $_ = $eq if $_ eq $t;
 	    }
 	    # rollback... for all vobs referenced with GlobalDefinition...
 	    my @vb = grep s/^\s+.*?\s+.*? -> .*?\@(.*)$/$1/,
-	      map{ $CT->argv('des', "hlink:$_")->qx } grep s/^\s+(.+?) <-.*/$1/,
-	      $CT->argv(qw(des -l -ahl GlobalDefinition), $eq)->qx;
+	      map{ $CT->des("hlink:$_")->qx } grep s/^\s+(.+?) <-.*/$1/,
+	      $CT->des([qw(-l -ahl GlobalDefinition)], $eq)->qx;
 	    my ($tn, $vb) = ($1, $2) if $eq =~ /^lbtype:(.*)\@(.*)/;
 	    push @vb, $vb;
-	    my @e = map{$CT->argv('find', $_, qw(-a -ele), "lbtype_sub($tn)",
-			      qw(-nxn -print))->qx} @vb;
+	    my @e = map{$CT->find($_, qw(-a -ele), "lbtype_sub($tn)",
+				  qw(-nxn -print))->qx} @vb;
 	    warn Msg('W', qq(Need to move "$base" back on @e.)) if @e;
 	  } else {
 	    warn Msg('E', qq(Failed to roll "$t" one step back.));
@@ -2806,26 +2795,52 @@ sub rmtype {
 	} else {
 	  if ($prev) {
 	    my $t0 = "lbtype:${base}_0$vob"; # store the last eq into hidden type
-	    $CT->argv(qw(mklbtype -nc), $t0)->stdout(0)->system;
-	    $CT->argv(qw(mkhlink), $EQHL, $t0, $prev)->stdout(0)->system;
-	    $CT->argv('lock', $t0)->stdout(0)->system;
+	    $nout->mklbtype(['-nc'], $t0)->system;
+	    $nout->mkhlink([$EQHL, $t0], $prev)->system;
+	    $nout->lock($t0)->system;
 	  }
 	  push @eq, $eq;
 	}
+      }
+    } else {
+      if ($eq =~ s/^<- (lbtype:.*)/$1/) {
+	(my $prv = $sil->des([qw(-s -ahl), $PRHL], $t)->qx) =~ s/^-> //;
+	if ($prv) {
+	  my @l = $CT->lslock(['-s'], $prv, $eq)->qx;
+	  (my $v = $prv) =~ s/^[^@]+//;
+	  push @lck, map { $_ = "lbtype:${_}$v" } @l;
+	  if (!_Wrap('unlock', @l)) {
+	    my @hlnk = grep s/^\s+(\Q$EQHL\E\S+).*$/$1/,
+	      $CT->des([qw(-l -ahl), $EQHL], $t)->qx;
+	    $nout->rmhlink(@hlnk)->system or
+	      $nout->mkhlink([$EQHL, $eq], $prv)->system;
+	  }
+	}
+      } elsif (my @chn = $sil->des([qw(-s -ahl), $PRHL], $t)->qx) {
+	my @nxt = grep s/^<- //, @chn;
+	if (!@nxt) {
+	  (my $t1 = $t) =~ s/^lbtype:(.*?)(?:\@.*)?$/$1/;
+	  warn Msg('E', qq("$t1": incorrectly linked));
+	  next LBT;
+	}
+	if ($CT->lslock(['-s'], @nxt)->qx) {
+	  _Wrap('unlock', @nxt) or push @lck, @nxt;
+	}
+	my @prv = grep s/^-> //, @chn;
+	next LBT unless @prv;
+	if ($CT->lslock(['-s'], @prv)->qx) {
+	  _Wrap('unlock', @prv) or push @lck, @prv;
+	}
+	my @hlnk = grep s/^\s+(\Q$PRHL\E\S+).*$/$1/,
+	  $CT->des([qw(-l -ahl), $PRHL], $nxt[0], $prv[0])->qx;
+	$nout->rmhlink(@hlnk)->system or
+	  $nout->mkhlink([$PRHL, $nxt[0]], $prv[0])->system;
       }
     }
   }
   push @args, @eq if @eq;
   $rs |= $rmtype->args(@args)->system;
-  for my $l (@lck) {
-    my @out = $lct->argv('lock', $l)->stderr(1)->qx;
-    if ($fl and grep /^cleartool: Error/, @out) {
-      my ($p, $v) = ($1, $2) if $l =~ /^lbtype:(.*)\@(.*)$/;
-      flocklt($p, $v); # loaded while unlocking
-    } else {
-      print @out;
-    }
-  }
+  _Wrap('lock', @lck) if @lck;
   exit $rs;
 }
 

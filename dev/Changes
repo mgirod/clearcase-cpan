@@ -239,8 +239,10 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- des -fmt %[<regexp>]l, including while used from lsgen
 	- co: cascading branches in the config spec is preserved unless under BranchOff
 
-1.01 Fri Oct 12 11:48:00 CEST 2012
+1.01 Sun Jan 13 20:33:29 CET 2013
         - co and mkbranch: obey -ver options in non BranchOff mode
 	- unco: remove orphaned cascaded branch in non BranchOff mode (around CC bug)
 	- mklbtype -inc: fixed error report for some missing types (but not all)
 	- mklabel with a family type on checkedout -nda (missing file)
+	- rmtype: support removing lbtype increment and preserving chaining
+	- extra/locklbtypesudo: removed spurious autodie(:system)
