@@ -1,6 +1,6 @@
 package ClearCase::Argv;
 
-$VERSION = '1.52';
+$VERSION = '1.53';
 
 use Argv 1.26;
 
@@ -929,6 +929,9 @@ ClearCase::Argv - ClearCase-specific subclass of Argv
     # Create label type XX iff it doesn't exist
     ClearCase::Argv->new(qw(mklbtype -nc XX))
 	    if ClearCase::Argv->new(qw(lstype lbtype:XX))->stderr(0)->qx;
+    # Create a multitool ipc session in autochomp mode
+    my $mtx = ['/opt/rational/clearcase/bin/multitool'];
+    my $mt = new ClearCase::Argv({ipc=>1, ct=>$mtx, autochomp=>1});
 
     # Functional interface
     use ClearCase::Argv qw(ctsystem ctexec ctqx ctpipe);
@@ -1232,9 +1235,8 @@ E.g. S<C<< $ct->des(['-fmt', "%[owner]p\n"], 'vob:.')->system >>>
 
 This example is easily rewritten to work in both modes as either:
 
-    S<C<< $ct->des(['-fmt', '%[owner]p\n'], 'vob:.')->system >>>
-
-    S<C<< $ct->des([qw(-fmt %[owner]p\n)], 'vob:.')->system >>>
+    $ct->des(['-fmt', '%[owner]p\n'], 'vob:.')->system
+    $ct->des([qw(-fmt %[owner]p\n)], 'vob:.')->system
 
 =head1 PORTABILITY
 
@@ -1243,10 +1245,11 @@ versions. It's currently maintained on Solaris 9 and Windows XP with CC
 7.0 using Perl5.8.x.  Viability on other platforms and/or earlier
 versions is untestable by me.
 
-Marc Girod's testing environment: Solaris 10 (sparc and i386), and
-Windows Vista, without IPC::ChildSafe, with Clone. Perl 5.8.8 and
-5.10.x. Tatyana Shpichko's testing environment: RedHat Linux 4, with
-and without CtCmd, and Windows XP without CtCmd.
+Marc Girod's testing environment: Solaris 10 (sparc and i386),
+GNU/Linux 2.6, and Windows Vista, without IPC::ChildSafe, with
+Clone. Perl 5.8.8, 5.10, 5.14, 5.16. Tatiana Shpichko's testing
+environment: RedHat Linux 4, with and without CtCmd, and Windows XP
+without CtCmd.
 
 =head1 FILES
 
