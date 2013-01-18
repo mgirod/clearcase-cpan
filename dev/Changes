@@ -366,6 +366,7 @@ Revision history for Perl extension ClearCase::Argv.
 1.53 Sun Jan 13 13:20:01 CET 2013
         - one more example: elthier (vob element type hierarchy)
 	- minor documentation fixes and additions
+	- fix to bug in relation to setview
 
 BACKWARD COMPATIBILITY NOTES:
 
