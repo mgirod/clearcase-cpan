@@ -266,7 +266,7 @@ Next possible setting:
   $ClearCase::Wrapper::MGi::lockbl = 1;
 
 If this is set, the baseline type is locked in the end of a rollout.
-Conversely, a next rollout is aborted if the baselin is found unlocked on
+Conversely, a next rollout is aborted if the baseline is found unlocked on
 entry, in order to prevent possible collisions of independent rollouts.
 This would be the default if locking/unlocking by group members was
 supported natively by ClearCase, instead of depending on user configuration.
