@@ -599,7 +599,7 @@ sub ipc {
     my($down, $back);
     my $view = ($level =~ /^\d+$/) ? '' : $level;
     my @cmd = !$view ? ($self->ct, '-status')
-      : ($self->ct, qw(setview -exec), qq($self->ct -status), $view);
+      : ($self->ct, qw(setview -exec), join(' ', $self->ct, '-status'), $view);
     my $pid = IPC::Open3::open3($down, $back, undef, @cmd);
 
     # Set the "line discipline" to convert CRLF to \n.
