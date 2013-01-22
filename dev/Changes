@@ -367,6 +367,7 @@ Revision history for Perl extension ClearCase::Argv.
         - one more example: elthier (vob element type hierarchy)
 	- minor documentation fixes and additions
 	- fix to bug in relation to setview
+	- parsing command given as strings with embedded quotes
 
 BACKWARD COMPATIBILITY NOTES:
 
