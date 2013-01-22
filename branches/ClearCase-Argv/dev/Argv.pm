@@ -115,8 +115,9 @@ sub prog {
 	return $self->SUPER::prog($prg, @_);
     } else {
 	require Text::ParseWords;
-	return $self->SUPER::prog([$self->ct,
-	    Text::ParseWords::parse_line('\s+', 1, $prg)], @_);
+	my @prg = map { s/^'(.*)'$/$1/ || s/^"(.*)"$/$1/; $_ }
+	                         Text::ParseWords::parse_line('\s+', 1, $prg);
+	return $self->SUPER::prog([$self->ct, @prg], @_);
     }
 }
 
