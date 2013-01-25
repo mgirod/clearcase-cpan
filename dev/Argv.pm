@@ -689,7 +689,7 @@ sub _ipc_cmd {
     _ipc_nl_in_cmt(\@cmd);
     # Send the command to cleartool.
     my $cmd = join(' ', map {
-        m%^$|\s|[\[\]*"'?]% ?
+        m%^$|\s|[\[\]\(\)*"'?]% ?
 	  (m%'% ?
 	     (m%"% ?
 		_qmeta($_) : qq("$_"))
