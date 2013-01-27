@@ -218,8 +218,9 @@ sub system {
 		} elsif ($efd == 1) {
 		    print STDOUT @data;
 		}
-		delete $self->{IPC}; #destructor would send 'exit' to defunct
-		return scalar @data;
+		my @err = grep !/^cleartool: Warning:/, @data;
+		delete $self->{IPC} if @err; #dtor would send 'exit' to defunct
+		return scalar @err;
 	    } else {
 	        return 0;
 	    }
