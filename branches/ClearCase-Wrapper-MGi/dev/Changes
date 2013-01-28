@@ -245,4 +245,5 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- mklbtype -inc: fixed error report for some missing types (but not all)
 	- mklabel with a family type on checkedout -nda (missing file)
 	- rmtype: support removing lbtype increment and preserving chaining
+	- rmtype -rmall: preempted interaction when there are labels
 	- extra/locklbtypesudo: removed spurious autodie(:system)
