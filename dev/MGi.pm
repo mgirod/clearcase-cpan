@@ -2742,7 +2742,41 @@ sub rmtype {
     die Msg('E', '"-family" and "-increment" only apply to family types')
       if @opt{qw(family increment)} and @eq != @lbt;
   }
-  if (!$rmtype->flag('rmall')) {
+  if ($rmtype->flag('rmall')) {
+    if (!$rmtype->flag('force')) {
+      my @flt;
+      for my $lt (@lbt) {
+	my $xlt = $CT->des([qw(-fmt %Xn)], $lt)->qx;
+	my ($n, $v) = $xlt =~ /^lbtype:(.*?)(?:\@(.*))$/;
+	my @ver = $CT->find($v, qw(-a -ele), "lbtype_sub($n)", '-print')->qx;
+	my @sv = grep s/^<- //,
+	  $CT->des([qw(-s -ahl GlobalDefinition)], $xlt)->qx;
+	push @ver, $CT->find($_, qw(-a -ele), "lbtype_sub($n)", '-print')->qx
+	  for @sv;
+	if (my $nr = @ver) {
+	  print qq(There are $nr labels of type "$n".\nRemove labels?  [no] );
+	  my $ans = <STDIN>; chomp $ans; $ans = lc($ans);
+	  $ans = 'no' unless $ans;
+	  while ($ans !~ /^(yes|no)$/i) {
+	    print "Please answer with one of the following: yes, no\n";
+	    $ans = <STDIN>; chomp $ans; $ans = lc($ans);
+	    $ans = 'no' unless $ans;
+	  }
+	  push @flt, $lt if $ans eq 'yes';
+	} else {
+	  push @flt, $lt;
+	}
+      }
+      if (@flt) {
+	@lbt = @flt;
+	my @o = $rmtype->opts;
+	push @o, '-force';
+	$rmtype->opts(@o);
+      } else {
+	exit 1;
+      }
+    }
+  } else {
     my @glb;
     for (@lbt) {
       push @glb, $_ if $CT->des([qw(-fmt %[type_scope]p)], $_)->qx eq 'global';
