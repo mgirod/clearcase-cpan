@@ -10,7 +10,7 @@ use Benchmark;
 #
 # This suite does not test the presence of triggers.
 
-use Test::More tests => 20;
+use Test::More tests => 40;
 select(STDERR); $| = 1; select(STDOUT); $| = 1;
 use ClearCase::Argv;
 use Argv 1.25;
@@ -18,43 +18,38 @@ use Argv 1.25;
 ClearCase::Argv->summary;      # start keeping stats
 ClearCase::Argv->ipc(1);
 my $ct = ClearCase::Argv->new({autochomp=>1});
-my $silent = $ct->clone({stdout=>0, stderr=>0});
-$silent->dbglevel(1) if @ARGV;
 die "This test needs to be run in a view, in a vob\n"
   unless $ct->ls([qw(-s -d)], '.')->stderr(0)->qx;
+my $silent = $ct->clone({stdout=>0, stderr=>0});
+$silent->dbglevel(1) if @ARGV;
+my $ctx = ['/vobs/cello/cade_struct/bin/cleartool.plx'];
+my $wrap = $silent->clone({ct=>$ctx});
 die "Failed to create temporary test lbtype, please rmtype if exists\n"
   if $silent->mklbtype(['-c', 'temporary type for test case'], 'CMTTC')->system;
 my $lbt = 'lbtype:CMTTC';
+
+sub one_block {
+  my ($value, $mode) = @_;
+  (my $vrep = $value) =~ s/\n/<newline>/g;
+  ok(!$silent->chevent([qw(-rep -c), $value], $lbt)->system,
+     qq(String comment: "$vrep" ($mode mode, array syntax)));
+  ok(!$silent->argv(qq(chevent -rep -c "$value" $lbt))->system,
+     qq(String comment: "$vrep" ($mode mode, string syntax)));
+  ok(!$wrap->chevent([qw(-rep -c), $value], $lbt)->system,
+     qq(Wrapper--String comment: "$vrep" ($mode mode, array syntax)));
+  ok(!$wrap->argv(qq(chevent -rep -c "$value" $lbt))->system,
+     qq(Wrapper--String comment: "$vrep" ($mode mode, string syntax)));
+}
 
 sub one_pass {
   my $ipc = shift;
   my $mode = $ipc? 'ipc' : 'fork';
   $silent->ipc($ipc);
-  my $value = q(foo);
-  ok(!$silent->chevent([qw(-rep -c), $value], $lbt)->system,
-     "String comment set to '$value' ($mode mode, array syntax)");
-  ok(!$silent->argv(qq(chevent -rep -c '$value' $lbt))->system,
-     "String comment set to '$value' ($mode mode, string syntax)");
-  $value = q(O'Toole);
-  ok(!$silent->chevent([qw(-rep -c), $value], $lbt)->system,
-     qq(String comment set to "$value" ($mode mode, array syntax)));
-  ok(!$silent->argv(qq(chevent -rep -c "$value" $lbt))->system,
-     qq(String comment set to \"$value\" ($mode mode, string syntax)));
-  $value = q(*test*);
-  ok(!$silent->chevent([qw(-rep -c), $value], $lbt)->system,
-     "String comment set to '$value' ($mode mode, array syntax)");
-  ok(!$silent->argv(qq(chevent -rep -c '$value' $lbt))->system,
-     "String comment set to '$value' ($mode mode, string syntax)");
-  $value = qq(Two lines: one,\ntwo);
-  ok(!$silent->chevent([qw(-rep -c), $value], $lbt)->system,
-     "String comment set to '$value' ($mode mode, array syntax)");
-  ok(!$silent->argv(qq(chevent -rep -c '$value' $lbt))->system,
-     "String comment set to '$value' ($mode mode, string syntax)");
-  $value = 'created_since(today)';
-  ok(!$silent->chevent([qw(-rep -c), $value], $lbt)->system,
-     "String comment set to '$value' ($mode mode, array syntax)");
-  ok(!$silent->argv(qq(chevent -rep -c '$value' $lbt))->system,
-     "String comment set to '$value' ($mode mode, string syntax)");
+  one_block(q(foo), $mode);
+  one_block(q(O'Toole), $mode);
+  one_block(q(*test*), $mode);
+  one_block(qq(Two lines: one,\ntwo), $mode);
+  one_block('created_since(today)', $mode);
 }
 one_pass(0);
 one_pass(1);

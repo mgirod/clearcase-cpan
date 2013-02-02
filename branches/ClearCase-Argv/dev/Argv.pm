@@ -584,7 +584,9 @@ sub ipc {
     if ($self->ctcmd) {
 	$self->ctcmd(0);	# shut down the CtCmd connection
     }
-    if (exists($class->{IPC}) && $level =~ m%^\d+$%) {
+    if (exists($class->{IPC}) && $level =~ m%^\d+$%
+	                                    && !$self->{CT} && !$class->{CT}
+            || ($self->{CT} && $class->{CT} && $self->{CT} eq $class->{CT})) {
         if (($self ne $class) && !$self->ipc) {
 	    ++$pidcount{$class->{IPC}->{PID}};
 	    $self->{IPC}->{PID}  = $class->{IPC}->{PID};
@@ -884,8 +886,9 @@ sub new {
     my $proto = shift;
     my $self = $proto->SUPER::new(@_);
     if ($self->ipc) {
-	++$pidcount{$self->{IPC}->{PID}};
-	if (ref($proto)) {
+        no strict 'refs'; # $proto may be a symbolic hash
+	if ($proto->ipc && $self->{IPC}->{PID} == $proto->{IPC}->{PID}) {
+	    ++$pidcount{$self->{IPC}->{PID}};
 	    # Correct the effect of the base cloning on globs
 	    $self->{IPC}->{DOWN} = $proto->{IPC}->{DOWN};
 	    $self->{IPC}->{BACK} = $proto->{IPC}->{BACK};

@@ -363,11 +363,13 @@ Revision history for Perl extension ClearCase::Argv.
 	- support for using multitool, and mtfunc example
 	- fix: broken pipe after failed setview in ipc mode
 
-1.53 Sun Jan 13 13:20:01 CET 2013
+1.53 Sat Feb  2 21:53:26 CET 2013
         - one more example: elthier (vob element type hierarchy)
 	- minor documentation fixes and additions
 	- fix to bug in relation to setview
 	- parsing command given as strings with embedded quotes
+	- reference count for different ipc processes
+	- test case updates for wrapper uses
 
 BACKWARD COMPATIBILITY NOTES:
 
