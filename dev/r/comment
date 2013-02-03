@@ -45,6 +45,7 @@ sub one_pass {
   my $ipc = shift;
   my $mode = $ipc? 'ipc' : 'fork';
   $silent->ipc($ipc);
+  $wrap->ipc($ipc);
   one_block(q(foo), $mode);
   one_block(q(O'Toole), $mode);
   one_block(q(*test*), $mode);
