@@ -1,0 +1,48 @@
+# -*- cperl -*-
+use strict;
+use Benchmark;
+
+# Similar to comment and mkattr
+# Comments are handled in a specific way, and string attributes must be
+# enclosed in double quotes.
+# This leaves some cases to test.
+
+use Test::More tests => 16;
+select(STDERR); $| = 1; select(STDOUT); $| = 1;
+use ClearCase::Argv;
+use Argv 1.25;
+
+ClearCase::Argv->summary;      # start keeping stats
+ClearCase::Argv->ipc(1);
+my $ct = ClearCase::Argv->new({autochomp=>1});
+die "This test needs to be run in a view, in a vob\n"
+  unless $ct->ls([qw(-s -d)], '.')->stderr(0)->qx;
+my $silent = $ct->clone({stdout=>0, stderr=>0});
+$silent->dbglevel(1) if @ARGV;
+my $ctx = ['/vobs/cello/cade_struct/bin/cleartool.plx'];
+my $wrap = $silent->clone({ct=>$ctx});
+
+sub one_block {
+  my ($value, $mode) = @_;
+  (my $vrep = $value) =~ s/\n/<newline>/g;
+  ok(!$silent->des(['-fmt', $value], '.')->system,
+     qq(cleartool: "$vrep" ($mode mode, array syntax)));
+  ok(!$silent->argv(qq(des -fmt "$value" .))->system,
+     qq(cleartool: "$vrep" ($mode mode, string syntax)));
+  ok(!$wrap->des(['-fmt', $value], '.')->system,
+     qq(wrapper: "$vrep" ($mode mode, array syntax)));
+  ok(!$wrap->argv(qq(des -fmt "$value" .))->system,
+     qq(wrapper: "$vrep" ($mode mode, string syntax)));
+}
+sub one_pass {
+  my $ipc = shift;
+  my $mode = $ipc? 'ipc' : 'fork';
+  $silent->ipc($ipc);
+  $wrap->ipc($ipc);
+  one_block(q(%d\n), $mode);
+  one_block(q('%Fu' %d\n), $mode);
+}
+one_pass(0);
+one_pass(1);
+
+print STDERR "\n", ClearCase::Argv->summary;   # print out the stats we kept

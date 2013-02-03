@@ -12,6 +12,7 @@ examples/cleanuplf
 examples/cscomp
 examples/ctsudo
 examples/fix_eltype
+examples/elthier
 examples/envp
 examples/functional
 examples/mkattr
@@ -33,6 +34,7 @@ examples/bench/README
 examples/bench/read-bm.pl
 examples/bench/write-bm.pl
 r/comment
+r/desfmt
 r/cygwin
 r/mkattr
 r/setview

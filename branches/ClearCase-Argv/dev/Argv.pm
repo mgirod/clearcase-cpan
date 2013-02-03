@@ -83,6 +83,16 @@ sub cleartool_path {
 }
 *find_cleartool = \&cleartool_path;  # backward compatibility
 
+sub perlscript {
+    my $self = shift;
+    for (@{$self->{CT}}) {
+	next unless open my $fd, q(<), $_;
+	my $line = <$fd>;
+	close $fd;
+	return 1 if $line =~ m%^(#!|\@rem ).*\bperl\b%i;
+    }
+    return 0;
+}
 sub ct {
     my $self = shift;
     if (ref $self) {
@@ -94,6 +104,7 @@ sub ct {
 	    } else {
 		$self->{CT} = ref($_[0])? $_[0] : [@_];
 	    }
+	    $self->{WRAPPER}++ if $self->perlscript;
 	    return defined(wantarray)? $self : undef;
 	} else {
 	    return $self->{CT}? @{$self->{CT}} : @ct;
@@ -146,7 +157,7 @@ sub system {
     if (!$self->ctcmd && !$self->ipc) {
         if (CYGWIN) {
 	    my @ret = $self->SUPER::qv(@rargs);
-	    $self->unixpath(@ret);
+	    $self->unixpath(@ret) unless $self->{WRAPPER};
 	    print join("", @ret) if @ret;
 	    return $?;
 	} else {
@@ -236,7 +247,7 @@ sub system {
 }
 
 # Overridden to allow for alternate execution modes.
-sub qx {
+sub qx { # } --for emacs CPerl mode, as 'qx' is a keyword
     return $class->new(@_)->qx if !ref($_[0]) || ref($_[0]) eq 'HASH';
     my $self = shift;
     my @rargs = @_;
@@ -244,7 +255,7 @@ sub qx {
 
     unless ($self->ctcmd || $self->ipc) {
         my @ret = $self->SUPER::qx(@rargs);
-        if (CYGWIN) {
+        if (CYGWIN and !$self->{WRAPPER}) {
 	    $self->unixpath(@ret);
         }
         return wantarray? @ret : join '', @ret;
@@ -699,6 +710,7 @@ sub _ipc_cmd {
 	       : qq('$_'))
 	    : $_
     } grep {defined} @cmd);
+    $cmd = quotemeta($cmd) if $self->{WRAPPER};
     # Handle verbosity.
     my $dbg = $self->dbglevel;
     $self->_dbg($dbg, '=>', \*STDERR, $cmd) if $dbg;
@@ -751,7 +763,7 @@ sub _ipc_cmd {
 	print '+ <=', $_ if $_ && $dbg >= 2;
 	$rc = 1 if $diff && !m%^Files are identical%;
 	next if $next;
-	$self->unixpath($_) if CYGWIN;
+	$self->unixpath($_) if CYGWIN and !$self->{WRAPPER};
 	if ($stdout || ($err && $stderr)) {
 	    if ($disposition && (($err && $stderr == 1) || (!$err && $stdout == 1))) {
 	        push(@$disposition, $_);
