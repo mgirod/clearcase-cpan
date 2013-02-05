@@ -1815,7 +1815,7 @@ sub _GenMkTypeSub {
       if ($rep) {
 	$ntype->opts(@cmt, '-replace', $ntype->opts);
 	map { $_ = "$type:$_" unless /^$type:/ } @args;
-	my @a = $CT->des([qw(-fmt %Xn)], @args)->stderr(0)->qx;
+	my @a = $CT->des([qw(-fmt %Xn\n)], @args)->stderr(0)->qx; # split on \n
 	if (@a) {
 	  my @link;
 	  if ($ntype->flag('global')) { # replace also the equivalent types
