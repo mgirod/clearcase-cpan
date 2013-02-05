@@ -247,3 +247,4 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- rmtype: support removing lbtype increment and preserving chaining
 	- rmtype -rmall: preempted interaction when there are labels
 	- extra/locklbtypesudo: removed spurious autodie(:system)
+	- mklbtype -rep with multiple arguments--would not split them right
