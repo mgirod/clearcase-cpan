@@ -3203,7 +3203,7 @@ sub describe {
   }
   if (my $fmt = $desc->flagCC('fmt')) { # Maybe already modified
     my $ph = 'PlAcEhOlDeR';
-    if ($fmt =~ s/\%\[(.*?)\](N?)l/$ph/) {
+    if ($fmt =~ s/\%\[([^\]]*?)\](N?)l/$ph/) {
       my ($re, $ncom) = (qr($1), $2);
       my @args = $desc->args;
       my $fix = 0;
