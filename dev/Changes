@@ -248,3 +248,4 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- rmtype -rmall: preempted interaction when there are labels
 	- extra/locklbtypesudo: removed spurious autodie(:system)
 	- mklbtype -rep with multiple arguments--would not split them right
+	- des -fmt '%[Foo]NSa %[^O]Nl\n' -- keep the two specs distinct
