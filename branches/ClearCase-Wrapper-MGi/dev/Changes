@@ -249,3 +249,4 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- extra/locklbtypesudo: removed spurious autodie(:system)
 	- mklbtype -rep with multiple arguments--would not split them right
 	- des -fmt '%[Foo]NSa %[^O]Nl\n' -- keep the two specs distinct
+	- mkview -clone: ensures the storage directory exists

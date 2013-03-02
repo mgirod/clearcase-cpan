@@ -282,7 +282,7 @@ sub _Offspring {
 sub _DesFmt {
   my ($fmt, $arg) = @_;
   my $ph = 'PlAcEhOlDeR';
-  if ($fmt =~ s/\%\[(.*?)\](N?)l/$ph/) {
+  if ($fmt =~ s{ %\[( (?: [^][]+ | \[ [\w-]+ \] )* )\](N?)l }{$ph}x) {
     my ($re, $ncom) = (qr($1), $2);
     $CT = new ClearCase::Argv({autochomp=>1}) unless $CT;
     my @lb = grep /$re/, split / /, $CT->des([qw(-fmt %Nl)], $arg)->qx;
@@ -473,7 +473,7 @@ use AutoLoader 'AUTOLOAD';
   $archive = "$z [-c comment|-nc] brtype|lbtype ...";
   $annotate = "\n* [-line|-grep regexp]";
   $synctree = "$z -from sbase [-c comment] [-quiet] [-force] [-rollback]"
-    . "\n[-summary] [-label type] [pname ...]";
+    . "\n[-summary] [-label type] pname ...";
 }
 
 #############################################################################
@@ -3203,7 +3203,7 @@ sub describe {
   }
   if (my $fmt = $desc->flagCC('fmt')) { # Maybe already modified
     my $ph = 'PlAcEhOlDeR';
-    if ($fmt =~ s/\%\[([^\]]*?)\](N?)l/$ph/) {
+    if ($fmt =~ s{ %\[( (?: [^][]+ | \[ [\w-]+ \] )* )\](N?)l }{$ph}x) {
       my ($re, $ncom) = (qr($1), $2);
       my @args = $desc->args;
       my $fix = 0;
@@ -3240,6 +3240,7 @@ sub mkview {
   use File::Basename;
   use File::Spec;
   use File::Temp qw(tempfile);
+  use File::Path qw(make_path);
   use Sys::Hostname;
   use Date::Format;
   use Date::Parse;
@@ -3289,7 +3290,9 @@ sub mkview {
     } else {
       my $pdir = dirname($hpa);
       if (basename($pdir) eq $own) {
-	$hpa = File::Spec->catdir(dirname($pdir), $pwnam, "$tag.vws");
+	my $hd = File::Spec->catdir(dirname($pdir), $pwnam);
+	make_path $hd unless -d $hd;
+	$hpa = File::Spec->catdir($hd, "$tag.vws");
       } else {
 	$hpa = File::Spec->catdir($pdir, "$tag.vws");
       }
