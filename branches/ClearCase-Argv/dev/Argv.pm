@@ -587,6 +587,7 @@ sub ipc {
 	print $down "exit\n";
 	my $rc = close($down);
 	waitpid($pid, 0);
+	delete $pidcount{$pid};
 	return $rc || $?;
     } elsif (!defined($level)) {
 	return exists($self->{IPC}) ? $self : 0;
