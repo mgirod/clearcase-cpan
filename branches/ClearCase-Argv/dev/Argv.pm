@@ -714,7 +714,6 @@ sub _ipc_cmd {
 	       : qq('$_'))
 	    : $_
     } grep {defined} @cmd);
-    $cmd = quotemeta($cmd) if $self->{WRAPPER};
     # Handle verbosity.
     my $dbg = $self->dbglevel;
     $self->_dbg($dbg, '=>', \*STDERR, $cmd) if $dbg;
