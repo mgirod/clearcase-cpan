@@ -655,6 +655,7 @@ sub _cw_map {
 
 sub _cvt_input_cw {
     my $self = shift;
+    return if $self->{WRAPPER};
     _cw_map @{$self->{AV_ARGS}};
     for my $o (values %{$self->{AV_OPTS}}) {
         _cw_map grep{$_}@{$o};
