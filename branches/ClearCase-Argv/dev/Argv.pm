@@ -98,7 +98,9 @@ sub ct {
     if (ref $self) {
 	if (@_) {
 	    if ($self->ipc) {
-		$self->ipc(0);
+	        # servicing attrs after raw copy: the pid count was not
+	        # incremented yet, so we cannot call ipc(0)
+		delete $self->{IPC};
 		$self->{CT} = ref($_[0])? $_[0] : [@_];
 		$self->ipc(1);
 	    } else {
