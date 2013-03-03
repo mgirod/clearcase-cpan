@@ -665,17 +665,6 @@ sub _cvt_input_cw {
     }
 }
 
-sub _qmeta {
-    my $arg = shift;
-    if (CYGWIN || MSWIN) {
-        $arg =~ s%\'%^'%g;
-        $arg = q(') . $arg . q(');
-    } else {
-      $arg = quotemeta($arg);
-    }
-    return $arg;
-}
-
 # commands sent to ipc must be single line ones
 sub _ipc_nl_in_cmt {
     my $r = shift;
@@ -710,7 +699,7 @@ sub _ipc_cmd {
         m%^$|\s|[\[\]\(\)*"'?]% ?
 	  (m%'% ?
 	     (m%"% ?
-		_qmeta($_) : qq("$_"))
+		quotemeta($_) : qq("$_"))
 	       : qq('$_'))
 	    : $_
     } grep {defined} @cmd);
