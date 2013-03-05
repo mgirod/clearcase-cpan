@@ -667,12 +667,8 @@ sub _cvt_input_cw {
 
 sub _qmeta {
     my $arg = shift;
-    if (MSWIN || (CYGWIN && !$self->{WRAPPER})) {
-        $arg =~ s%\'%^'%g;
-        $arg = q(') . $arg . q(');
-    } else {
-      $arg = quotemeta($arg);
-    }
+    $arg =~ s%\'%^'%g;
+    $arg = q(') . $arg . q(');
     return $arg;
 }
 
@@ -706,11 +702,12 @@ sub _ipc_cmd {
     local *_;
     _ipc_nl_in_cmt(\@cmd);
     # Send the command to cleartool.
+    my $qm = (MSWIN || (CYGWIN && !$self->{WRAPPER}))? \&_qmeta : \&quotemeta;
     my $cmd = join(' ', map {
         m%^$|\s|[\[\]\(\)*"'?]% ?
 	  (m%'% ?
 	     (m%"% ?
-		_qmeta($_) : qq("$_"))
+		$qm->($_) : qq("$_"))
 	       : qq('$_'))
 	    : $_
     } grep {defined} @cmd);
