@@ -702,7 +702,8 @@ sub _ipc_cmd {
     local *_;
     _ipc_nl_in_cmt(\@cmd);
     # Send the command to cleartool.
-    my $qm = (MSWIN || (CYGWIN && !$self->{WRAPPER}))? \&_qmeta : \&quotemeta;
+    my $qm = (MSWIN || (CYGWIN && !$self->{WRAPPER}))? \&_qmeta :
+                                                      sub { quotemeta shift };
     my $cmd = join(' ', map {
         m%^$|\s|[\[\]\(\)*"'?]% ?
 	  (m%'% ?
