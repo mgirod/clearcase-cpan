@@ -2,7 +2,7 @@ package ClearCase::Argv;
 
 $VERSION = '1.53';
 
-use Argv 1.26;
+use Argv 1.28;
 
 use constant MSWIN	=> $^O =~ /MSWin|Windows_NT/i ? 1 : 0;
 use constant CYGWIN	=> $^O =~ /cygwin/i ? 1 : 0;
@@ -958,6 +958,10 @@ I<There are more examples in the ./examples subdir> that comes with this
 module. Also, I<the test script is designed as a demo and benchmark> and
 is a good source for cut-and-paste code.
 
+The C<r> directory contains a few regression test cases, unfortunately
+not general enough to be run from C<make test>. The file C<test.cfg>
+allows to tailor some of them for one's environment.
+
 =head1 DESCRIPTION
 
 I<ClearCase::Argv> is a subclass of I<Argv> for use with ClearCase.  It
@@ -974,6 +978,13 @@ Similarly, C<ipc> will send commands to a cleartool co-process.  See
 the documentation of these modules for details on what they do, and see
 I<ALTERNATE EXECUTION INTERFACES> below for how to invoke them. Sample
 scripts are packaged with I<ClearCase::Argv> in ./examples.
+
+A new C<ct> optional attribute is introduced in the constructor
+invocation. It may be used to create I<ClearCase::Argv> objects using
+a tool alternative to the default plain I<cleartool>.
+This may be I<multitool>, or I<cleartool> under another account via
+I<sudo>, or even a I<ClearCase::Wrapper>. It is supported for the
+C<fork> and the C<ipc> modes.
 
 I<As ClearCase::Argv is in most other ways identical to its base
 class, see C<perldoc Argv> for substantial further documentation.>
@@ -1280,7 +1291,7 @@ David Boyce <dsbperl AT boyski.com>
 
 =head1 COPYRIGHT
 
-Copyright (c) 1999-2012 David Boyce. All rights reserved.  This Perl
+Copyright (c) 1999-2013 David Boyce. All rights reserved.  This Perl
 program is free software; you may redistribute it and/or modify it
 under the same terms as Perl itself.
 
