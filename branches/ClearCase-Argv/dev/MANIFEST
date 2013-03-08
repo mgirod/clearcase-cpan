@@ -39,4 +39,5 @@ r/cygwin
 r/mkattr
 r/setview
 r/stdouterr
+r/test.cfg
 test.pl

@@ -371,6 +371,7 @@ Revision history for Perl extension ClearCase::Argv.
 	- reference count for different ipc processes
 	- test case updates for wrapper uses
 	- skip cygwin conversions, if wrapper used as ipc process
+	- require Argv 1.28 for Summary
 
 BACKWARD COMPATIBILITY NOTES:
 
