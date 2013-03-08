@@ -245,7 +245,6 @@ sub summary {
     my $cls = shift;
     my($cmds, $operands);
     if (!defined wantarray) {
-	# This is a horrible hack ....
 	$Argv::Summary = {};
 	return;
     }
