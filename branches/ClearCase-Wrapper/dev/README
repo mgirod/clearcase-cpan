@@ -224,7 +224,7 @@ passing -/dbg=1 on the command line. See "perldoc ClearCase::Argv" and
 The use of AutoSplit/AutoLoad makes debugging under the Perl debugger
 (-d option) somewhat cumbersome, especially when developing other
 modules than ClearCase::Wrapper itself. An alternative driver,
-wrapdebug, is provided to allow to place breakpoints to arbitrary
+cleartool.dbg, is provided to allow to place breakpoints to arbitrary
 positions in the code without having to first navigate to the right
 function. This driver loads all .al files at startup. One must however
 use the 'f' function of the debugger to select the right file, before
@@ -245,14 +245,14 @@ Note however that one needs to avoid certain ambiguities, e.g.:
 
 ...to place breakpoints in non-autosplitted functions.
 
-Let's add that using wrapdebug will report errors and warnings (if
+Let's add that using cleartool.dbg will report errors and warnings (if
 used) on the whole module instead of only per autoloaded function.
 
 TESTED PLATFORMS
 ----------------
 
-This module is in daily use on nearly all ClearCase platforms.  I'd
-expect it to work without significant modification on any supported
+This module is in daily use on nearly all ClearCase platforms.  It
+should work without significant modification on any supported
 CC platform.
 
 Note that while the module itself works on Windows, the sample
