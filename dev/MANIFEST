@@ -4,7 +4,7 @@ Makefile.PL
 README
 Wrapper.pm
 cleartool.plx
-wrapdebug
+cleartool.dbg
 lib/ClearCase/Wrapper/clearcase_profile
 test.pl
 README.GUI
@@ -14,3 +14,4 @@ examples/CGC.tar.gz
 examples/MySite.tar.gz
 examples/README
 examples/ct.bat
+META.yml                                 Module meta-data (added by MakeMaker)

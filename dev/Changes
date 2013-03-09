@@ -177,3 +177,8 @@ Revision history for Perl extension ClearCase::Wrapper.
 	Several enhancements contributed by Stephen Rauch, together with the
 	original impulse to better support strict/warnings and debugging.
 	Thanks as well to Ben Morrow for assistance.
+
+1.18 Sat Mar  9 16:31:16 CET 2013
+        - cleartool.plx and wrapdebug: autoflush STDOUT for background use.
+	- renamed wrapdebug to cleartool.dbg, so that it can be used as ipc process
+	  in ClearCase::Argv
