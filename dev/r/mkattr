@@ -13,31 +13,23 @@ use Benchmark;
 use vars qw($ctx $tvob $tele);
 use constant MSWIN	=> $^O =~ /MSWin|Windows_NT/i ? 1 : 0;
 use constant CYGWIN	=> $^O =~ /cygwin/i ? 1 : 0;
-BEGIN {
-  if (open my $fd, '<', 'test.cfg') {
-    my @cfg = <$fd>;
-    close $fd;
-    my $acc = "";
-    for (@cfg) {
-      $acc .= $_;
-      if (/\;\s*$/) {
-        eval $acc;
-        $acc = "";
-      }
-    }
-  }
-}
-use Test::More tests => $ctx? 16 : 8;
+use Test::More tests => 16;
 select(STDERR); $| = 1; select(STDOUT); $| = 1;
 use ClearCase::Argv qw(chdir);
 use Argv 1.28; # for summary to work on perl 5.14+
 
+if (!defined do 'test.cfg') {
+  if ($@) {
+    die "$@\n";
+  }
+  warn "Failed to open 'test.cfg', using default values\n" if $!;
+}
 ClearCase::Argv->summary;      # start keeping stats
 ClearCase::Argv->ipc(1);
 my $ct = ClearCase::Argv->new({autochomp=>1});
 my $silent = $ct->clone({stdout=>0, stderr=>0});
 $silent->dbglevel(1) if @ARGV;
-$tvob = $silent->des(['-s'], 'vob:.')->qx unless $tvob;
+$tvob = $ct->des(['-s'], 'vob:.')->qx unless $tvob;
 $tele = '.' unless $tele;
 my $wrap = $silent->clone({ct=>$ctx}) if $ctx;
 die "This test needs to be run in a view, in a vob\n"
@@ -50,9 +42,11 @@ sub one_block {
   my ($value, $mode) = @_;
   ok(!$silent->mkattr(['-rep', $attype, $value], $tele)->system,
      qq(String attribute set to '$value' ($mode mode, array syntax)));
-  return unless $wrap;
-  ok(!$wrap->mkattr(['-rep', $attype, $value], $tele)->system,
-     qq(Wrapper: String attribute set to '$value' ($mode mode, array syntax)));
+ SKIP: {
+    skip "No wrapper no fun", 1 unless $wrap;
+    ok(!$wrap->mkattr(['-rep', $attype, $value], $tele)->system,
+      qq(Wrapper: String attribute set to '$value' ($mode mode, array syntax)));
+  }
 }
 sub one_pass {
   my $ipc = shift;
