@@ -251,3 +251,4 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- des -fmt '%[Foo]NSa %[^O]Nl\n' -- keep the two specs distinct
 	- mkview -clone: ensures the storage directory exists
 	- _Mkbco: removed a _Pbrtype check--couldn't find it justified
+	- refuse to archive already archived types

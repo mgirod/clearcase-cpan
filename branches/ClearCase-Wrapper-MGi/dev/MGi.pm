@@ -1328,6 +1328,8 @@ For label types, the newly created type is hidden away (with a suffix
 of I<_0>) and locked. It is being restored the next time C<mklbtype -fam>
 is given for the same name.
 
+The wrapper will refuse to archive archived types.
+
 =item B<-glo/bal>
 
 Support for global family types is preliminary.
@@ -1537,6 +1539,13 @@ sub _GenMkTypeSub {
 	  $ntype->opts('-nc', $ntype->opts);
 	  foreach my $t (@args) {
 	    my ($pfx, $vob) = $t =~ /^$type:(.*?)(@.*)$/;
+	    if ($pfx =~ /-\d+$/) {
+	      if (grep s/^-> $type:(.*?)@.*/$1/,
+		  $CT->des([qw(-s -ahl), $PRHL], $t)->stderr(0)->qx) {
+		warn Msg('E', "'$pfx' is already an archived type.");
+		next;
+	      }
+	    }
 	    my ($prev) = grep s/^-> $type:(.*?)@.*/$1/,
 	      $CT->des([qw(-s -ahl), $PRHL], $t)->stderr(0)->qx;
 	    my $arc;
@@ -1554,7 +1563,7 @@ sub _GenMkTypeSub {
 	      $arc = $pfx . $nr++;
 	    }
 	    if ($CT->lslock(['-s'], $t)->qx and $CT->unlock($t)->system) {
-	      warn Msg('E', "Cannot unlock: cannot rename!\n");
+	      warn Msg('E', "Cannot unlock: cannot rename!");
 	      $rc = 1;
 	      next;
 	    }
