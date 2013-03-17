@@ -239,7 +239,7 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- des -fmt %[<regexp>]l, including while used from lsgen
 	- co: cascading branches in the config spec is preserved unless under BranchOff
 
-1.01 Sun Jan 13 20:33:29 CET 2013
+1.01 Sun Mar 17 17:32:25 CET 2013
         - co and mkbranch: obey -ver options in non BranchOff mode
 	- unco: remove orphaned cascaded branch in non BranchOff mode (around CC bug)
 	- mklbtype -inc: fixed error report for some missing types (but not all)
@@ -250,3 +250,4 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- mklbtype -rep with multiple arguments--would not split them right
 	- des -fmt '%[Foo]NSa %[^O]Nl\n' -- keep the two specs distinct
 	- mkview -clone: ensures the storage directory exists
+	- _Mkbco: removed a _Pbrtype check--couldn't find it justified
