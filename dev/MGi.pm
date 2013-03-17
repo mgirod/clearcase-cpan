@@ -195,15 +195,6 @@ sub _Checkcs {
   $CT->cd($pwd)->system if $dest;
   return scalar @cs;
 }
-sub _Pbrtype {
-  my ($pbrt, $bt) = @_;
-  if (!defined($pbrt->{$bt})) {
-    my $tc = $CT->argv('des', qw(-fmt %[type_constraint]p),
-		       "brtype:$bt")->qx;
-    $pbrt->{$bt} = ($tc =~ /one version per branch/);
-  }
-  return $pbrt->{$bt};
-}
 sub _Parsevtree {
   my ($ele, $obs, $sel) = @_;
   $CT->lsvtree;
@@ -510,7 +501,6 @@ sub _Mkbco {
   use File::Copy;
   my ($cmd, @cmt) = @_;
   my $rc = 0;
-  my %pbrt = ();
   my $bt = $cmd->{bt};
   my @opts = $cmd->opts;
   if ($cmd->flag('nco')) { #mkbranch
@@ -560,8 +550,7 @@ sub _Mkbco {
 	$main =~ s%^[^@]*\@\@[\\/](.*)$%$1%;
       }
       my $vob = $CT->des(['-s'], "vob:$e")->qx;
-      my $re = _Pbrtype(\%pbrt, "$bt\@$vob") ?
-	qr([\\/]${main}[\\/]$bt[\\/]\d+$) : qr([\\/]$bt[\\/]\d+$);
+      my $re = qr([\\/]$bt[\\/]\d+$);
       if ($ver =~ m%$re%) {
 	push @opts, @cmt, $e;
 	$rc |= $CT->co(@opts)->system;
