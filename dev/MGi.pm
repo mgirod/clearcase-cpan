@@ -4050,15 +4050,17 @@ sub synctree {
     }
   }
   my $sync = ClearCase::SyncTree->new;
-  if (@argv == 1 and (-d $argv[0] or ! -e $argv[0])) {
-    $opt{dbase} = $sync->dstbase($argv[0]);
-    @argv = ();
-  } else {
-    $opt{dbase} = $sync->dstbase(dirname($argv[0]));
-  }
   die Msg('E', "no such directory $opt{from}") unless -d $opt{from};
   $opt{sbase} = Cwd::realpath($opt{from});
   $opt{sbase} =~ s%\\%/%g if MSWIN;
+  my $a0 = $argv[0]; # We already checked it is non empty
+  if (@argv == 1 and -d $a0 or
+	!( -e $a0 or -f File::Spec->catfile($opt{sbase}, basename $a0))) {
+    $opt{dbase} = $sync->dstbase($a0);
+    @argv = ();
+  } else {
+    $opt{dbase} = $sync->dstbase(dirname($a0));
+  }
   ClearCase::Argv->quiet(1) if $opt{quiet};
   if ($opt{label}) {
     my $ct = $sync->clone_ct({autofail=>0, stderr=>0});
