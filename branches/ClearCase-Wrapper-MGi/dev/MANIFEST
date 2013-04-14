@@ -19,6 +19,7 @@ extra/fixsrccnt
 extra/locklbtypessh
 extra/locklbtypesudo
 extra/locklbtype.pod
+extra/sudofix
 extra/updtlink
 extra/updthltypes
 extra/wrapipc

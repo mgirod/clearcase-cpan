@@ -96,15 +96,17 @@ The C<sudo> alternative is preferred on UNIX, but the C<ssh> one is
 needed from Windows or Cygwin (note: that the current implementation
 is restricted to UNIX vob servers!)
 
-Install in a path reachable from every client, and setuid to an
-account trusted by every vob server account in the appropriate way
+Install in a path reachable from every client.
+You may choose to setuid it to an account trusted by every vob server
+account
 (i.e. using C<sudo>, this may be restricted to using C<fixsrccnt> but
-in a passwordless way).
+in a passwordless way),
+or you may choose to use use C<sudo> for this as well.
 
 Adjust the paths to C<perl> and to C<fixsrccnt>.
 
-In addition, check the path to C<sudo> for C<FSCbrokerSuDo>,
-which uses the C<Sudo> CPAN package (which you have to install).
+In addition, check the path to C<sudo> for C<FSCbrokerSuDo>.
+See later for a note on using C<sudo>.
 
 For C<FSCbrokerSsh>, the C<$sshhost> must be set.
 The template also assumes an installation in a vob, hence uses a C<$view>.
@@ -176,6 +178,7 @@ owner accounts' I<~/.ssh/authorized_keys> files, or in the host based
 or system-wide I</etc/sudoers> file.
 
 Both variants require a minimal customization.
+See later for a note on using C<sudo>.
 
 For ssh, one needs to set the name of the host running an sshd daemon
 Note that one needs to avoid using I<localhost> here, so that
@@ -280,7 +283,7 @@ are granted write access e.g. to directory elements being created.
 
 The example provided also sets an environment variable (see below).
 
-=head2 environment variables
+=head2 Environment variables
 
 Four variables to consider (see earlier for the two first):
 
@@ -305,3 +308,49 @@ marker--including spaces).
 
 This prefix is used to compute the beginning of the text upon which to
 apply regexps in case of using the C<-grep> option of C<annotate>.
+
+=head2 Note on using sudo
+
+C<sudo> may be used to completely avoid needing to setuid tools,
+which is not supported for scripts on certain platforms.
+
+This may however require one more level of wrapping around C<FSCbroker>
+and C<locklbtype>, in order to avoid invoking C<sudo>
+with the priviledged account itself.
+
+There is a second quirk: C<sudo> will filter the C<LD_LIBRARY_PATH> away
+(for security reasons), and we may need it to reach shared libraries used
+by Perl itself (e.g. if stored in a vob).
+
+This too may require yet another wrapper, this time around C<sudo>.
+We provide an example of such a script as c<sudofix>.
+
+Here is an example of the C<FSCbroker> wrapper script mentioned here above,
+and using this C<sudofix> (note that a similar one would be needed for
+C<locklbtype>):
+
+ #!/bin/bash
+
+ BRK=/usr/local/bin/FSCbrokerSuDo
+ PRV=vobown
+ SUDO=/usr/local/bin/sudofix
+ if [ $(uname) == SunOS ]; then
+    ID=/usr/xpg4/bin/id
+ else
+    ID=/usr/bin/id
+ fi
+
+ if [ $($ID -nu) == $PRV ]; then
+    $BRK "$@"
+ else
+    $SUDO -u $PRV $BRK "$@"
+ fi
+
+The value of C<$BRK> is obviously the Perl script.
+
+The value of C<$PRV> is the privileged account,
+authorized to run commands on behalf of the various vob owners.
+
+Remember (if using this setup) to set this script
+as the value of the C<$sudo> variable in the Perl scripts
+(C<FSCbrokerSuDo> and C<locklbtypesudo>) as well.

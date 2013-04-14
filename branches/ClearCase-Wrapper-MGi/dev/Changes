@@ -239,7 +239,7 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- des -fmt %[<regexp>]l, including while used from lsgen
 	- co: cascading branches in the config spec is preserved unless under BranchOff
 
-1.01 Sun Mar 17 17:32:25 CET 2013
+1.01 Sun Apr 14 13:28:17 CEST 2013
         - co and mkbranch: obey -ver options in non BranchOff mode
 	- unco: remove orphaned cascaded branch in non BranchOff mode (around CC bug)
 	- mklbtype -inc: fixed error report for some missing types (but not all)
@@ -254,3 +254,5 @@ Revision history for Perl extension ClearCase::Wrapper::MGi.
 	- refuse to archive already archived types
 	- removed lstype, now obsolete after RFE 12252 was delivered
 	  (fix for 7.1.1.9, 7.1.2.6 and 8.0.0.2, 16 Feb 2012)
+	- synctree: refuse to create a file (do not create a directory instead!)
+	- extra/sudofix, and addition to Configuration.pod
