@@ -579,6 +579,7 @@ sub ipc {
     no strict 'refs';	# because $self may be a symbolic hash ref
     my $level = shift;
     my $output = shift;
+    local $\ = '';	   # no extra newlines e.g. under perl -le ...
     if (defined($level) && !$level) {
 	return 0 unless exists($self->{IPC});
 	my $down = $self->{IPC}->{DOWN};
@@ -693,6 +694,7 @@ sub _ipc_cmd {
     my $self = shift;
     my ($disposition, $stdout, $stderr, @cmd) = @_;
     local *_;
+    local $\ = '';	   # no extra newlines e.g. under perl -le ...
     _ipc_nl_in_cmt(\@cmd);
     # Send the command to cleartool.
     my $qm = ((MSWIN || CYGWIN) && !$self->{WRAPPER})?
